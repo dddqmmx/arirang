@@ -1,11 +1,10 @@
 package asia.nana7mi.arirang.ui
 
-import android.app.LocaleManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.LocaleList
-import androidx.activity.ComponentActivity
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.*
@@ -28,25 +27,26 @@ import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
-import asia.nana7mi.arirang.R // 确保引用你的R文件
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
-import java.util.Locale
+import asia.nana7mi.arirang.R
+import asia.nana7mi.arirang.data.datastore.AppPreferences
 
-// 数据模型：用于存储选项的显示名称和实际值
+// 数据模型：用于存储选项的显示名称 and 实际值
 data class OptionItem(val label: String, val value: String)
 
-class InitActivity : ComponentActivity() {
+class InitActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -74,7 +74,9 @@ fun getAppColorScheme(context: Context): ColorScheme {
 
 @Composable
 fun SetupFlow() {
-    var step by remember { mutableIntStateOf(1) }
+    var step by rememberSaveable { mutableIntStateOf(1) }
+    var selectedLanguageCode by rememberSaveable { mutableStateOf(getCurrentAppLanguageCode()) }
+    var selectedRegionCode by rememberSaveable { mutableStateOf("CN") }
 
     AnimatedContent(
         targetState = step,
@@ -90,8 +92,18 @@ fun SetupFlow() {
         label = "ScreenTransition"
     ) { targetStep ->
         when (targetStep) {
-            1 -> LanguageRegionScreen(onNext = { step = 2 })
-            2 -> WarningScreen(onBack = { step = 1 })
+            1 -> LanguageRegionScreen(
+                onNext = { lang, region ->
+                    selectedLanguageCode = lang
+                    selectedRegionCode = region
+                    step = 2
+                }
+            )
+            2 -> WarningScreen(
+                languageCode = selectedLanguageCode,
+                regionCode = selectedRegionCode,
+                onBack = { step = 1 }
+            )
         }
     }
 }
@@ -100,9 +112,8 @@ fun SetupFlow() {
 // 第一屏：语言与地区 (逻辑增强版)
 // =======================
 @Composable
-fun LanguageRegionScreen(onNext: () -> Unit) {
+fun LanguageRegionScreen(onNext: (String, String) -> Unit) {
     val context = LocalContext.current
-
     // --- 读取 XML 资源 ---
     val languageLabels = stringArrayResource(id = R.array.language_names)
     val languageCodes = stringArrayResource(id = R.array.language_codes)
@@ -118,9 +129,10 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
     }
 
     // --- 状态管理 ---
-    // 默认选中第一个或从配置读取(此处简化为默认值)
     var currentLanguage by remember { mutableStateOf(languages.find { it.value == getCurrentAppLanguageCode() } ?: languages.first()) }
-    var currentRegion by remember { mutableStateOf(regions.first()) }
+    var currentRegionCode by rememberSaveable { mutableStateOf(regions.first().value) }
+    val currentRegion = regions.find { it.value == currentRegionCode } ?: regions.first()
+    
     val isExtreme = currentRegion.value == "KP"
 
     var showLangDialog by remember { mutableStateOf(false) }
@@ -129,7 +141,7 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
     // --- 弹窗组件调用 ---
     if (showLangDialog) {
         CommonSelectionDialog(
-            title = "Select Language",
+            title = stringResource(id = R.string.init_select_language),
             options = languages,
             selectedOption = currentLanguage,
             onDismiss = { showLangDialog = false },
@@ -137,21 +149,20 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
                 currentLanguage = selected
                 showLangDialog = false
                 // 执行真正的语言切换
-                applyLanguage(selected.value)
+                applyLanguage( selected.value)
             }
         )
     }
 
     if (showRegionDialog) {
         CommonSelectionDialog(
-            title = "Select Region",
+            title = stringResource(id = R.string.init_select_region),
             options = regions,
             selectedOption = currentRegion,
             onDismiss = { showRegionDialog = false },
             onOptionSelected = { selected ->
-                currentRegion = selected
+                currentRegionCode = selected.value
                 showRegionDialog = false
-                // TODO: 这里可以将 selected.value 保存到 SharedPreferences
             }
         )
     }
@@ -203,7 +214,7 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "欢迎使用 / Welcome",
+                text = stringResource(id = R.string.init_welcome_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -212,7 +223,7 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "请完成初始化设置\nPlease setup your preference",
+                text = stringResource(id = R.string.init_welcome_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -225,13 +236,13 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
         ) {
             SelectionCard(
                 icon = Icons.Default.Public,
-                label = "Language / 语言",
+                label = stringResource(id = R.string.init_label_language),
                 value = currentLanguage.label, // 显示动态选中的值
                 onClick = { showLangDialog = true }
             )
             SelectionCard(
-                icon = Icons.Default.Public, // 这里可以换个图标，比如 Icons.Default.Place
-                label = "Region / 地区",
+                icon = Icons.Default.Public,
+                label = stringResource(id = R.string.init_label_region),
                 value = currentRegion.label, // 显示动态选中的值
                 onClick = { showRegionDialog = true }
             )
@@ -241,7 +252,7 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
                 exit = fadeOut()
             ) {
                 Text(
-                    text = "⚠ EXTREME SECURITY MODE ENABLED",
+                    text = stringResource(id = R.string.init_extreme_warning),
                     color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
@@ -251,13 +262,13 @@ fun LanguageRegionScreen(onNext: () -> Unit) {
         }
 
         Button(
-            onClick = onNext,
+            onClick = { onNext(currentLanguage.value, currentRegion.value) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             shape = RoundedCornerShape(28.dp)
         ) {
-            Text("继续 / Next", fontSize = 18.sp)
+            Text(stringResource(id = R.string.init_button_next), fontSize = 18.sp)
         }
     }
 }}
@@ -271,7 +282,7 @@ fun SelectionCard(icon: ImageVector, label: String, value: String, onClick: () -
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        onClick = onClick // 传递点击事件
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
@@ -323,9 +334,8 @@ fun CommonSelectionDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            // 使用 LazyColumn 处理长列表
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp) // 限制高度
+                modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)
             ) {
                 items(options) { item ->
                     Row(
@@ -350,7 +360,7 @@ fun CommonSelectionDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(id = R.string.btn_cancel))
             }
         }
     )
@@ -360,18 +370,15 @@ fun CommonSelectionDialog(
 // 工具函数：语言切换逻辑
 // =======================
 
-// 真正应用语言的方法
 fun applyLanguage(code: String) {
     val localeList = if (code == "system") {
-        LocaleListCompat.getEmptyLocaleList() // 跟随系统
+        LocaleListCompat.getEmptyLocaleList()
     } else {
         LocaleListCompat.forLanguageTags(code)
     }
-    // 这行代码会重启当前的 Activity 以应用新语言
     AppCompatDelegate.setApplicationLocales(localeList)
 }
 
-// 获取当前应用语言代码，用于回显 UI
 fun getCurrentAppLanguageCode(): String {
     val currentLocales = AppCompatDelegate.getApplicationLocales()
     if (currentLocales.isEmpty) return "system"
@@ -379,10 +386,11 @@ fun getCurrentAppLanguageCode(): String {
 }
 
 // =======================
-// 第二屏：保持原样 (稍微清理)
+// 第二屏
 // =======================
 @Composable
-fun WarningScreen(onBack: () -> Unit) {
+fun WarningScreen(languageCode: String, regionCode: String, onBack: () -> Unit) {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -390,12 +398,17 @@ fun WarningScreen(onBack: () -> Unit) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick = { /* TODO: 进入App */ },
+                    onClick = {
+                        AppPreferences.setSetupCompleted(context, true)
+                        AppPreferences.setRegion(context, regionCode)
+                        AppPreferences.setLanguage(context, languageCode)
+                        val intent = Intent(context, MainActivity::class.java)
+                        context.startActivity(intent)
+                    },
                     modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
-                    Text("进入软件", fontSize = 18.sp)
+                    Text(stringResource(id = R.string.init_button_enter), fontSize = 18.sp)
                 }
-                // 如果需要返回上一步，可以加个返回键
             }
         }
     ) { paddingValues ->
@@ -414,7 +427,7 @@ fun WarningScreen(onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "运行环境检查",
+                text = stringResource(id = R.string.init_security_check_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -440,13 +453,13 @@ fun WarningScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
-                            text = "核心依赖",
+                            text = stringResource(id = R.string.init_core_dependency_title),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "本软件依赖 Xposed / Zygisk 运行。\n若未在受支持环境下运行，任何功能都无法生效",
+                            text = stringResource(id = R.string.init_core_dependency_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -471,7 +484,7 @@ fun WarningScreen(onBack: () -> Unit) {
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "使用前提",
+                            text = stringResource(id = R.string.init_precondition_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.Bold
@@ -481,17 +494,17 @@ fun WarningScreen(onBack: () -> Unit) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f))
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "本软件不是万能的只能在“系统本身可信”的前提下提供隐私保护，而对本就不可信的系统无能为力",
+                        text = stringResource(id = R.string.init_precondition_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "如以下情况：", style = MaterialTheme.typography.labelLarge)
+                    Text(text = stringResource(id = R.string.init_risk_cases_title), style = MaterialTheme.typography.labelLarge)
                     Spacer(modifier = Modifier.height(4.dp))
-                    RiskItem("系统已被植入后门")
-                    RiskItem("ROM 来源不可信")
-                    RiskItem("基带或内核被篡改")
-                    RiskItem("Root 权限被恶意程序控制")
+                    RiskItem(stringResource(id = R.string.init_risk_item_backdoor))
+                    RiskItem(stringResource(id = R.string.init_risk_item_rom))
+                    RiskItem(stringResource(id = R.string.init_risk_item_kernel))
+                    RiskItem(stringResource(id = R.string.init_risk_item_root))
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

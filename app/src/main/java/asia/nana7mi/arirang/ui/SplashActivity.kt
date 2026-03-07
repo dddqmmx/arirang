@@ -14,7 +14,6 @@ class SplashActivity : ComponentActivity() {
         if (AppPreferences.isSetupCompleted(this)) {
             startActivity(Intent(this, MainActivity::class.java))
         } else {
-
             startActivity(Intent(this, InitActivity::class.java))
         }
         finish()

@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Arirang</string>
-    <string name="title_activity_clipboard_setting">ClipboardSettingActivity</string>
-    <string name="title_activity_language_settings">LanguageSettings</string>
+    <string name="title_activity_clipboard_setting">剪切板设置</string>
+    <string name="title_activity_language_settings">语言设置</string>
 
     <string name="nav_home">首页</string>
     <string name="nav_settings">设置</string>
@@ -44,19 +44,49 @@
 
     <string name="ui_settings_title">UI设置</string>
 
-    <string name="slot_title_text">%1$d. SIM插槽</string>"
+    <string name="slot_title_text">%1$d. SIM插槽</string>
 
+    <string name="title_activity_init">初始化</string>
 
-    <string-array name="languages">
-        <item>默认</item>
-        <item>简体中文</item>
-        <item>日语</item>
-    </string-array>
+    <!-- Newly extracted strings -->
+    <string name="refresh_all_data" translatable="false">刷新所有数据</string>
+    <string name="native_android_api" translatable="false">Native Android API</string>
+    <string name="native_cache_waiting" translatable="false">原生(缓存): 等待中...</string>
+    <string name="native_realtime_waiting" translatable="false">原生(实时): 等待中...</string>
+    <string name="google_fused_location_api" translatable="false">Google Fused Location API</string>
+    <string name="fused_cache_waiting" translatable="false">Fused(缓存): 等待中...</string>
+    <string name="fused_realtime_waiting" translatable="false">Fused(实时): 等待中...</string>
+    <string name="add_new_slot" translatable="false">添加新插槽</string>
+    <string name="set_scope" translatable="false">设置作用域</string>
+    <string name="test_clipboard_receiver" translatable="false">测试 ClipboardRequestReceiver</string>
 
-    <string-array name="settings_language_codes">
-        <item>null</item>
-        <item>zh</item>
-        <item>ja</item>
-    </string-array>
-    <string name="title_activity_init">InitActivity</string>
+    <!-- InitActivity Adaptation -->
+    <string name="init_select_language">选择语言</string>
+    <string name="init_select_region">选择地区</string>
+    <string name="init_welcome_title">欢迎使用</string>
+    <string name="init_welcome_subtitle">请完成初始化设置</string>
+    <string name="init_label_language">语言</string>
+    <string name="init_label_region">地区</string>
+    <string name="init_extreme_warning">⚠ 极致安全模式已启用</string>
+    <string name="init_button_next">继续</string>
+    <string name="btn_cancel">取消</string>
+    <string name="init_button_enter">进入软件</string>
+    <string name="init_security_check_title">运行环境检查</string>
+    <string name="init_core_dependency_title">核心依赖</string>
+    <string name="init_core_dependency_desc">本软件依赖 Xposed / Zygisk 运行\n若未在受支持环境下运行，任何功能都无法生效</string>
+    <string name="init_precondition_title">使用前提</string>
+    <string name="init_precondition_desc">本软件不是万能的，只能在“系统本身可信”的前提下提供隐私保护，而对本就不可信的系统无能为力</string>
+    <string name="init_risk_cases_title">如以下情况：</string>
+    <string name="init_risk_item_backdoor">系统已被植入后门</string>
+    <string name="init_risk_item_rom">ROM 来源不可信</string>
+    <string name="init_risk_item_kernel">基带或内核被篡改</string>
+    <string name="init_risk_item_root">Root 权限被恶意程序控制</string>
+
+    <!-- UserFragment -->
+    <string name="user_region_title">地区</string>
+    <string name="user_sponsor_title">赞助</string>
+    <string name="user_sponsor_desc">支持 Arirang 的开发</string>
+    <string name="user_sponsor_alipay">支付宝</string>
+    <string name="user_sponsor_wechat">微信支付</string>
+    <string name="user_sponsor_github">GitHub Sponsors</string>
 </resources>

@@ -94,7 +94,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="添加新插槽"
+                    android:text="@string/add_new_slot"
                     android:textSize="18sp" />
             </LinearLayout>
 
@@ -124,7 +124,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="设置作用域"
+                    android:text="@string/set_scope"
                     android:textSize="18sp" />
             </LinearLayout>
 

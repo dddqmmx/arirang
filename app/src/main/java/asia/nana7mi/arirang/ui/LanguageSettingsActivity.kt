@@ -6,9 +6,12 @@ import asia.nana7mi.arirang.ui.adapter.LanguageAdapter
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.core.content.edit
+import androidx.core.os.LocaleListCompat
+import asia.nana7mi.arirang.data.datastore.AppPreferences
 
 class LanguageSettingsActivity : BaseActivity() {
 
@@ -18,12 +21,11 @@ class LanguageSettingsActivity : BaseActivity() {
         setContentView(R.layout.activity_language_settings)
 
         // 加载语言显示名和对应的代码
-        val names = resources.getStringArray(R.array.languages)
-        val codes = resources.getStringArray(R.array.settings_language_codes)
+        val names = resources.getStringArray(R.array.language_names)
+        val codes = resources.getStringArray(R.array.language_codes)
 
         // 合并成 LanguageItem 列表
-        val savedLang = getSharedPreferences("settings", MODE_PRIVATE)
-            .getString("language", null)
+        val savedLang = AppPreferences.getLanguage(this)
 
         val currentLang = if (savedLang == null || savedLang == "null") null else savedLang
 
@@ -37,25 +39,19 @@ class LanguageSettingsActivity : BaseActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = LanguageAdapter(languageList) { selected ->
 
-            val currentLang = getSharedPreferences("settings", MODE_PRIVATE)
-                .getString("language", null)
+            val currentLang = AppPreferences.getLanguage(this)
             if (currentLang == selected.code) return@LanguageAdapter
 
-            // 保存语言设置
-            getSharedPreferences("settings", MODE_PRIVATE)
-                .edit { putString("language", selected.code).commit() }
-
-            val intent = applicationContext.packageManager
-                .getLaunchIntentForPackage(applicationContext.packageName)
-            intent?.addFlags(
-                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TASK
-            )
-            applicationContext.startActivity(intent)
-
-            // 杀掉旧进程，防止语言错乱
-            Runtime.getRuntime().exit(0)
+            AppPreferences.setLanguage(this, selected.code)
+            applyLanguage(selected.code)
         }
+    }
+    fun applyLanguage(code: String) {
+        val localeList = if (code == "system") {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(code)
+        }
+        AppCompatDelegate.setApplicationLocales(localeList)
     }
 }

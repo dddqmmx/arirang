@@ -1,24 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <array name="whitelist_blacklist_mode_options">
-        <item>ホワイトリスト</item>
-        <item>ブラックリスト</item>
+        <item>Whitelist</item>
+        <item>Blacklist</item>
     </array>
     <array name="visibility_list_options">
-        <item>表示</item>
-        <item>非表示</item>
+        <item>Visible</item>
+        <item>Invisible</item>
     </array>
-
-    <!-- 语言显示名称 -->
     <string-array name="language_names">
-        <item>システム</item>
-        <item>英語</item>
-        <item>中国語 (簡体字)</item>
-        <item>日本語</item>
-        <item>韓国語</item>
+        <item>System</item>
+        <item>English</item>
+        <item>Chinese (Simplified)</item>
+        <item>Japanese</item>
+        <item>Korean</item>
     </string-array>
-
-    <!-- 语言实际代码 (Locale Tags) -->
     <string-array name="language_codes">
         <item>system</item>
         <item>en</item>
@@ -26,16 +22,12 @@
         <item>ja</item>
         <item>ko</item>
     </string-array>
-
-    <!-- 地区显示名称 -->
     <string-array name="region_names">
-        <item>日本</item>
-        <item>韓国</item>
-        <item>アメリカ合衆国</item>
-        <item>北朝鮮</item>
+        <item>Japan</item>
+        <item>South Korea</item>
+        <item>USA</item>
+        <item>North Korea</item>
     </string-array>
-
-    <!-- 地区实际代码 -->
     <string-array name="region_codes">
         <item>JP</item>
         <item>KR</item>

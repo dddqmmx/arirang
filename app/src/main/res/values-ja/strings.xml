@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Arirang</string>
-    <string name="title_activity_clipboard_setting">ClipboardSettingActivity</string>
-    <string name="title_activity_language_settings">LanguageSettings</string>
+    <string name="title_activity_clipboard_setting">クリップボード設定</string>
+    <string name="title_activity_language_settings">言語設定</string>
 
     <string name="nav_home">ホーム</string>
     <string name="nav_settings">設定</string>
@@ -36,18 +36,36 @@
 
     <string name="clipboard_permission_title">クリップボード読み取り権限</string>
     <string name="package_list_config_title">アプリリスト読み取り権限</string>
+    <string name="sim_config_title">SIMデータ設定</string>
     <string name="sim_scope_title">SIM改ざんの影響範囲</string>
 
-    <string name="sim_config_title">SIMデータ設定</string>
     <string name="hint_package_or_app_name">アプリ名で検索</string>
 
     <string name="ui_settings_title">UI設定</string>
-    <string name="slot_title_text">%1$d. SIMストック</string>"
 
-    <string-array name="languages">
-        <item>デフォルト</item>
-        <item>簡体字中国語</item>
-        <item>日本語</item>
-    </string-array>
-    <string name="title_activity_init">InitActivity</string>
+    <string name="slot_title_text">%1$d. SIMストック</string>
+
+    <string name="title_activity_init">初期化</string>
+
+    <!-- InitActivity Adaptation -->
+    <string name="init_select_language">言語を選択</string>
+    <string name="init_select_region">地域を選択</string>
+    <string name="init_welcome_title">ようこそ</string>
+    <string name="init_welcome_subtitle">初期設定を完了してください</string>
+    <string name="init_label_language">言語</string>
+    <string name="init_label_region">地域</string>
+    <string name="init_extreme_warning">⚠ 極限セキュリティモードが有効です</string>
+    <string name="init_button_next">次へ</string>
+    <string name="btn_cancel">キャンセル</string>
+    <string name="init_button_enter">アプリに入る</string>
+    <string name="init_security_check_title">実行環境チェック</string>
+    <string name="init_core_dependency_title">コア依存関係</string>
+    <string name="init_core_dependency_desc">本ソフトウェアは Xposed / Zygisk に依存しています。サポートされている環境以外では機能しません。</string>
+    <string name="init_precondition_title">前提条件</string>
+    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保護を提供します。</string>
+    <string name="init_risk_cases_title">例えば：</string>
+    <string name="init_risk_item_backdoor">システムにバックドアがある</string>
+    <string name="init_risk_item_rom">信頼できないROMソース</string>
+    <string name="init_risk_item_kernel">ベースバンドまたはカーネルが改ざんされている</string>
+    <string name="init_risk_item_root">Root権限がマルウェアに制御されている</string>
 </resources>

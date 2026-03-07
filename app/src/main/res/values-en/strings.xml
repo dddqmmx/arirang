@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">Arirang</string>
+    <string name="title_activity_clipboard_setting">Clipboard Settings</string>
+    <string name="title_activity_language_settings">Language Settings</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_user">User</string>
+    <string name="title_language">Language</string>
+
+    <string name="status_title">Status</string>
+    <string name="status_activated">Module Activated</string>
+    <string name="status_deactivated">Module Deactivated</string>
+
+    <string name="category_permission">Permissions</string>
+    <string name="category_anonymization">Anonymization</string>
+    <string name="category_control">Control</string>
+    <string name="category_audit">Audit</string>
+
+    <string name="feature_clipboard">Clipboard Access</string>
+    <string name="feature_sensor">Sensors</string>
+
+    <string name="feature_device_info">Device Info</string>
+    <string name="feature_sim_info">SIM Info</string>
+    <string name="feature_location">Location</string>
+    <string name="feature_sensor_info">Sensor Info</string>
+    <string name="feature_contacts">Contacts</string>
+    <string name="feature_app_list">App List</string>
+    <string name="feature_wifi_list">Wi-Fi List</string>
+    <string name="feature_bluetooth_list">Bluetooth List</string>
+
+    <string name="feature_background_network">Background Network</string>
+    <string name="feature_force_proxy">Force Proxy</string>
+
+    <string name="feature_permission_stats">Permission Usage Statistics</string>
+
+    <string name="clipboard_permission_title">Clipboard Access Permission</string>
+    <string name="package_list_config_title">App List Access Permission</string>
+    <string name="sim_config_title">SIM Info Configuration</string>
+    <string name="sim_scope_title">SIM Modification Scope</string>
+
+    <string name="hint_package_or_app_name">Package or App Name</string>
+
+    <string name="ui_settings_title">UI Settings</string>
+
+    <string name="slot_title_text">%1$d. SIM Slot</string>
+
+    <string name="title_activity_init">Initialization</string>
+
+    <!-- Newly extracted strings -->
+    <string name="refresh_all_data">Refresh All Data</string>
+    <string name="native_android_api">Native Android API</string>
+    <string name="native_cache_waiting">Native (Cache): Waiting...</string>
+    <string name="native_realtime_waiting">Native (Real-time): Waiting...</string>
+    <string name="google_fused_location_api">Google Fused Location API</string>
+    <string name="fused_cache_waiting">Fused (Cache): Waiting...</string>
+    <string name="fused_realtime_waiting">Fused (Real-time): Waiting...</string>
+    <string name="add_new_slot">Add New Slot</string>
+    <string name="set_scope">Set Scope</string>
+    <string name="test_clipboard_receiver">Test ClipboardRequestReceiver</string>
+
+    <!-- InitActivity Adaptation -->
+    <string name="init_select_language">Select Language</string>
+    <string name="init_select_region">Select Region</string>
+    <string name="init_welcome_title">Welcome</string>
+    <string name="init_welcome_subtitle">Please complete initialization setup</string>
+    <string name="init_label_language">Language</string>
+    <string name="init_label_region">Region</string>
+    <string name="init_extreme_warning">⚠ EXTREME SECURITY MODE ENABLED</string>
+    <string name="init_button_next">Next</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="init_button_enter">Enter App</string>
+    <string name="init_security_check_title">Environment Check</string>
+    <string name="init_core_dependency_title">Core Dependency</string>
+    <string name="init_core_dependency_desc">This app relies on Xposed / Zygisk. Functions will not work if not running in a supported environment.</string>
+    <string name="init_precondition_title">Precondition</string>
+    <string name="init_precondition_desc">This app is not a panacea; it only provides privacy protection when the system itself is trusted.</string>
+    <string name="init_risk_cases_title">Such as:</string>
+    <string name="init_risk_item_backdoor">System has backdoors</string>
+    <string name="init_risk_item_rom">Untrusted ROM source</string>
+    <string name="init_risk_item_kernel">Baseband or kernel tampered</string>
+    <string name="init_risk_item_root">Root access controlled by malware</string>
+</resources>

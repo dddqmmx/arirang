@@ -5,4 +5,5 @@
     <color name="enabled_color">#3CBD52</color>
     <color name="disabled_color">#FF9E9E9E</color>
     <color name="gray">#373737</color>
+    <color name="outline_variant">#CAC4D0</color>
 </resources>

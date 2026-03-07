@@ -1,21 +1,20 @@
 package asia.nana7mi.arirang
 
-import asia.nana7mi.arirang.util.LocaleHelper
 import android.app.Application
-import android.content.Context
-import android.util.Log
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import asia.nana7mi.arirang.data.datastore.AppPreferences
 
 class ArirangApp : Application() {
 
-    override fun attachBaseContext(base: Context) {
-        val prefs = base.getSharedPreferences("settings", MODE_PRIVATE)
-        val lang = prefs.getString("language", null)
-        Log.v("language", lang.toString())
-        val context = if (lang.isNullOrEmpty() || lang == "null") {
-            base
-        } else {
-            LocaleHelper.setLocale(base, lang)
+    override fun onCreate() {
+        super.onCreate()
+
+        val savedLang = AppPreferences.getLanguage(this)
+
+        if (!savedLang.isNullOrEmpty() && savedLang != "system") {
+            val localeList = LocaleListCompat.forLanguageTags(savedLang)
+            AppCompatDelegate.setApplicationLocales(localeList)
         }
-        super.attachBaseContext(context)
     }
 }

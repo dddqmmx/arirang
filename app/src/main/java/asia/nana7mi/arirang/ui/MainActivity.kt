@@ -24,9 +24,6 @@ class MainActivity : BaseActivity() {
             startActivity(intent)
         }
 
-        val lang = Locale.getDefault().toString()
-        Log.d("LANG", "当前语言: $lang")
-
         setContentView(R.layout.main)
 
         val bottomNavigationView: BottomNavigationView = findViewById(R.id.bottom_navigation)
