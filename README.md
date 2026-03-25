@@ -8,14 +8,14 @@ This software is currently in an early development stage. It may cause system in
 
 ## 🚀 Features
 
-- **SIM Mocking: Customize or hide SIM card details (IMSI, operator info, etc.) from apps. (Not yet available)
-- **Location Spoofing: Provide mock GPS coordinates to specific applications. (Not yet available)
-- **Clipboard Protection: Monitor and intercept clipboard access requests with real-time confirmation dialogs. (Currently available)
-- **Package List Management: Hide specific installed applications from being detected by other apps (Invisible/Whitelist modes). (Not yet available)
-- **Device Info Masking: Modify hardware identifiers and system properties. (Not yet available)
-- **Real-time Notifications: Get notified or prompted when apps attempt to access sensitive data via the HookNotifyService. (Clipboard only)
-- **Modern UI: Built with Material Design 3 and Dynamic Colors support.
-- **Multi-language Support: Easily switch between supported languages.
+- **SIM Mocking**: Customize or hide SIM card details (IMSI, operator info, etc.) from apps. (Not yet available)
+- **Location** Spoofing: Provide mock GPS coordinates to specific applications. (Not yet available)
+- **Clipboard Protection**: Monitor and intercept clipboard access requests with real-time confirmation dialogs. (Currently available)
+- **Package List Management**: Hide specific installed applications from being detected by other apps (Invisible/Whitelist modes). (Not yet available)
+- **Device Info Masking**: Modify hardware identifiers and system properties. (Not yet available)
+- **Real-time Notifications**: Get notified or prompted when apps attempt to access sensitive data via the HookNotifyService. (Clipboard only)
+- **Modern UI**: Built with Material Design 3 and Dynamic Colors support.
+- **Multi-language Support**: Easily switch between supported languages.
 
 ## 🛠 Requirements
 
