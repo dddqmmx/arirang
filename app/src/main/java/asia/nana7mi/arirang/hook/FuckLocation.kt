@@ -11,11 +11,8 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
-class FuckLocation : IXposedHookLoadPackage {
-    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        // 定位服务核心逻辑全部在 system_server 进程中
-        if (lpparam.packageName != "android") return
-
+class FuckLocation : BaseHookModule(matchSystem = true) {
+    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         val classLoader = lpparam.classLoader
 
         try {
@@ -31,9 +28,6 @@ class FuckLocation : IXposedHookLoadPackage {
 
             // 3. 劫持 Provider 汇报逻辑 (核心：处理流式定位更新)
             hookProviderManager(classLoader)
-
-//            // 4. 劫持底层 GNSS 数据
-//            hookGnssLocation(classLoader)
 
         } catch (t: Throwable) {
             XposedBridge.log("FuckLocation: Hook 过程出错 - ${t.message}")

@@ -5,7 +5,11 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class HookManager : IXposedHookLoadPackage {
     private val modules = listOf(
+        SystemServerHook(),
         FuckClipboard(),
+//        FuckLocation(),
+//        FuckPackageList(),
+//        FuckSIM(),
         XposedActivation()
     )
 

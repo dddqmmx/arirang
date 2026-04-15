@@ -1,0 +1,126 @@
+<resources>
+    <string name="app_name">Arirang</string>
+    <string name="title_activity_clipboard_setting">剪切板设置</string>
+    <string name="title_activity_language_settings">语言设置</string>
+
+    <string name="nav_home">首页</string>
+    <string name="nav_settings">设置</string>
+    <string name="nav_user">用户</string>
+    <string name="title_language">语言</string>
+
+    <string name="status_title">运行状态</string>
+    <string name="status_activated">模块已激活</string>
+    <string name="status_deactivated">模块未激活</string>
+
+    <string name="category_permission">权限</string>
+    <string name="category_anonymization">匿名化</string>
+    <string name="category_control">控制</string>
+    <string name="category_audit">审计</string>
+
+    <string name="feature_clipboard">剪切板读取</string>
+    <string name="feature_sensor">传感器</string>
+
+    <string name="feature_device_info">设备信息</string>
+    <string name="feature_sim_info">SIM 信息</string>
+    <string name="feature_location">定位</string>
+    <string name="feature_sensor_info">传感器信息</string>
+    <string name="feature_contacts">联系人</string>
+    <string name="feature_app_list">应用列表</string>
+    <string name="feature_wifi_list">Wi-Fi列表</string>
+    <string name="feature_bluetooth_list">蓝牙列表</string>
+
+    <string name="feature_background_network">后台联网</string>
+    <string name="feature_force_proxy">强制代理</string>
+
+    <string name="feature_permission_stats">软件权限调取次数统计</string>
+
+
+    <string name="clipboard_permission_title">剪切板读取权限</string>
+    <string name="package_list_config_title">应用列表读取权限</string>
+    <string name="sim_config_title">SIM信息配置</string>
+    <string name="sim_scope_title">SIM修改作用域</string>
+
+    <string name="hint_package_or_app_name">包名或应用名</string>
+
+    <string name="ui_settings_title">UI设置</string>
+
+    <string name="slot_title_text">%1$d. SIM插槽</string>
+
+    <string name="title_activity_init">初始化</string>
+
+    <!-- Newly extracted strings -->
+    <string name="refresh_all_data">刷新所有数据</string>
+    <string name="native_android_api">Native Android API</string>
+    <string name="native_cache_waiting">原生(缓存): 等待中...</string>
+    <string name="native_realtime_waiting">原生(实时): 等待中...</string>
+    <string name="google_fused_location_api">Google Fused Location API</string>
+    <string name="fused_cache_waiting">Fused(缓存): 等待中...</string>
+    <string name="fused_realtime_waiting">Fused(实时): 等待中...</string>
+    <string name="add_new_slot">添加新插槽</string>
+    <string name="set_scope">设置作用域</string>
+    <string name="test_clipboard_receiver">测试 ClipboardRequestReceiver</string>
+
+    <!-- InitActivity Adaptation -->
+    <string name="init_select_language">选择语言</string>
+    <string name="init_select_region">选择地区</string>
+    <string name="init_welcome_title">欢迎使用</string>
+    <string name="init_welcome_subtitle">请完成初始化设置</string>
+    <string name="init_label_language">语言</string>
+    <string name="init_label_region">地区</string>
+    <string name="init_extreme_warning">⚠ 极致安全模式已启用</string>
+    <string name="init_button_next">继续</string>
+    <string name="btn_cancel">取消</string>
+    <string name="init_button_enter">进入软件</string>
+    <string name="init_security_check_title">运行环境检查</string>
+    <string name="init_core_dependency_title">核心依赖</string>
+    <string name="init_core_dependency_desc">本软件依赖 Xposed / Zygisk 运行\n若未在受支持环境下运行，任何功能都无法生效</string>
+    <string name="init_precondition_title">使用前提</string>
+    <string name="init_precondition_desc">本软件不是万能的，只能在“系统本身可信”的前提下提供隐私保护，而对本就不可信的系统无能为力</string>
+    <string name="init_risk_cases_title">如以下情况：</string>
+    <string name="init_risk_item_backdoor">系统已被植入后门</string>
+    <string name="init_risk_item_rom">ROM 来源不可信</string>
+    <string name="init_risk_item_kernel">基带或内核被篡改</string>
+    <string name="init_risk_item_root">Root 权限被恶意程序控制</string>
+
+    <!-- UserFragment -->
+    <string name="user_region_title">地区</string>
+    <string name="user_sponsor_title">赞助</string>
+    <string name="user_sponsor_desc">支持 Arirang 的开发</string>
+    <string name="user_sponsor_alipay">支付宝</string>
+    <string name="user_sponsor_wechat">微信支付</string>
+    <string name="user_sponsor_github">GitHub Sponsors</string>
+
+    <string name="permission_allow">允许</string>
+    <string name="permission_deny">拒绝</string>
+    <string name="permission_ask">询问</string>
+    <string name="filter_all_apps">全部应用</string>
+    <string name="filter_user_apps">用户应用</string>
+    <string name="filter_system_apps">系统应用</string>
+    <string name="label_filter">筛选: </string>
+    <string name="label_mode">模式: </string>
+
+    <!-- Confirm Dialog -->
+    <string name="clipboard_access_warning">剪贴板访问警告</string>
+    <string name="clipboard_access_desc">应用 [Unknown] 正在尝试读取剪切板。\n请选择策略：</string>
+    <string name="allow_once">允许一次</string>
+    <string name="always_allow">始终允许</string>
+    <string name="always_deny">始终拒绝</string>
+    <string name="this_deny_close">本次拒绝</string>
+
+    <!-- Test Activity -->
+    <string name="test_dialog_title">测试弹窗功能</string>
+    <string name="test_dialog_desc">点击下方按钮可以在前台或者延时在后台弹出交互弹窗进行测试。</string>
+    <string name="test_dialog_foreground">前台测试弹窗</string>
+    <string name="test_dialog_background">后台测试弹窗 (延时3秒)</string>
+    <string name="test_dialog_result">交互结果将显示在这里</string>
+
+    <string name="service_connected">服务已连接</string>
+    <string name="requesting_foreground">正在请求 (前台)...</string>
+    <string name="requesting_background_hint">3秒后将在后台发起请求，请退到桌面...</string>
+    <string name="result_allow">结果：允许 (ALLOW)</string>
+    <string name="result_deny">结果：拒绝 (DENY)</string>
+    <string name="exception">异常: </string>
+    <string name="service_not_connected">服务未连接，请重试</string>
+
+    <string name="sponsor_thanks">感谢通过 %1$s 提供支持！</string>
+</resources>

@@ -101,6 +101,17 @@ object HookNotifyClient {
     private val handler = Handler(Looper.getMainLooper())
 
     /**
+     * 重连延迟任务
+     */
+    private val reconnectRunnable = Runnable {
+        val ctx = getSystemContext()
+        if (ctx != null && sService == null) {
+            XposedBridge.log("$TAG Triggering auto-reconnect...")
+            ensureBound(ctx)
+        }
+    }
+
+    /**
      * ⚠ 注意：
      * 在 system_server 中必须为成员变量
      * 不能使用匿名临时对象，否则可能被 GC 回收导致连接丢失
@@ -115,6 +126,8 @@ object HookNotifyClient {
             try {
                 // 将 IBinder 转换为 AIDL 接口
                 sService = IHookNotify.Stub.asInterface(service)
+                // 连接成功，移除潜在的重连任务
+                handler.removeCallbacks(reconnectRunnable)
             } catch (t: Throwable) {
                 XposedBridge.log("$TAG asInterface failed: ${t.stackTraceToString()}")
                 sService = null
@@ -131,9 +144,36 @@ object HookNotifyClient {
          */
         override fun onServiceDisconnected(name: ComponentName) {
             XposedBridge.log("$TAG onServiceDisconnected $name")
+            handleDisconnect()
+        }
+
+        override fun onBindingDied(name: ComponentName) {
+            XposedBridge.log("$TAG onBindingDied $name, connection is permanently dead for system auto-restart")
+            handleDisconnect()
+        }
+
+        override fun onNullBinding(name: ComponentName) {
+            XposedBridge.log("$TAG onNullBinding $name")
+            handleDisconnect()
+        }
+
+        private fun handleDisconnect() {
             sService = null
             sBinding = false
             sConnectLatch?.countDown()
+            
+            // 延迟重连（防止因 App 持续崩溃导致 system_server 死循环 bind 消耗过多 CPU）
+            handler.removeCallbacks(reconnectRunnable)
+            handler.postDelayed(reconnectRunnable, 5000L) // 5秒后尝试重连
+        }
+    }
+
+    /**
+     * 自动绑定服务（如果尚未绑定）
+     */
+    fun autoBind(ctx: Context) {
+        if (sService == null && !sBinding) {
+            ensureBound(ctx)
         }
     }
 
@@ -298,7 +338,7 @@ object HookNotifyClient {
      * @return system Context 或 null
      */
     @SuppressLint("PrivateApi")
-    private fun getSystemContext(): Context? {
+    fun getSystemContext(): Context? {
         return try {
             val atClass = Class.forName("android.app.ActivityThread")
             val at = XposedHelpers.callStaticMethod(
