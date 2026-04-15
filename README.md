@@ -48,7 +48,9 @@ Use at your own risk.
 1. Install the latest `Arirang` APK  
 2. Open your Xposed Manager (e.g., LSPosed)  
 3. Enable the **Arirang** module  
-4. Select target applications to hook  
+4. Select scope:
+   - System (required)
+   - Phone (optional, for SIM simulation)
 5. Reboot your device or restart target apps  
 
 ## ⚙️ Configuration
@@ -57,6 +59,8 @@ Open Arirang from your launcher:
 
 - **Clipboard Protection**  
   Configure interception and confirmation behavior
+
+After reboot, open Arirang to verify the module is active.
 
 ## 🛡 Disclaimer
 
