@@ -20,13 +20,13 @@ Use at your own risk.
 - **Real-time Permission Prompt (Available)**  
   Intercept clipboard access attempts and explicitly allow or deny each request.
 
-- **SIM Mocking (Planned)**  
+- **SIM Mocking (In Development)**  
   Customize or hide SIM card details (IMSI, operator info, etc.).
 
-- **Location Spoofing (Planned)**  
+- **Location Spoofing (In Development)**  
   Provide mock GPS coordinates to selected applications.
 
-- **Package List Management (Planned)**  
+- **Package List Management (In Development)**  
   Hide installed applications (Invisible / Whitelist modes).
 
 - **Device Info Masking (Planned)**  
