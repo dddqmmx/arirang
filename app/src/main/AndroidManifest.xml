@@ -62,7 +62,7 @@
             android:launchMode="singleInstance"
             android:showForAllUsers="true"
             android:taskAffinity=""
-            android:theme="@style/Theme.AppCompat.Dialog.Alert" />
+            android:theme="@style/Theme.Arirang.Transparent" />
         <activity
             android:name=".ui.SimScopeActivity"
             android:exported="false" />

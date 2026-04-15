@@ -15,7 +15,7 @@
     <string name="category_permission">権限</string>
     <string name="category_anonymization">匿名化</string>
     <string name="category_control">制御</string>
-    <string name="category_audit">監査</string>
+    <string name="category_audit">审计</string>
 
     <string name="feature_clipboard">クリップボード</string>
     <string name="feature_sensor">センサー</string>
@@ -47,6 +47,18 @@
 
     <string name="title_activity_init">初期化</string>
 
+    <!-- Newly extracted strings -->
+    <string name="refresh_all_data">すべてのデータを更新</string>
+    <string name="native_android_api">Native Android API</string>
+    <string name="native_cache_waiting">ネイティブ(キャッシュ): 待機中...</string>
+    <string name="native_realtime_waiting">ネイティブ(リアルタイム): 待機中...</string>
+    <string name="google_fused_location_api">Google Fused Location API</string>
+    <string name="fused_cache_waiting">Fused(キャッシュ): 待機中...</string>
+    <string name="fused_realtime_waiting">Fused(リアルタイム): 待機中...</string>
+    <string name="add_new_slot">新しいスロットを追加</string>
+    <string name="set_scope">スコープを設定</string>
+    <string name="test_clipboard_receiver">ClipboardRequestReceiver をテスト</string>
+
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">言語を選択</string>
     <string name="init_select_region">地域を選択</string>
@@ -68,4 +80,45 @@
     <string name="init_risk_item_rom">信頼できないROMソース</string>
     <string name="init_risk_item_kernel">ベースバンドまたはカーネルが改ざんされている</string>
     <string name="init_risk_item_root">Root権限がマルウェアに制御されている</string>
-</resources>
+
+    <string name="user_region_title">地域</string>
+    <string name="user_sponsor_title">スポンサー</string>
+    <string name="user_sponsor_desc">Arirang の開発を支援する</string>
+    <string name="user_sponsor_alipay">Alipay</string>
+    <string name="user_sponsor_wechat">WeChat Pay</string>
+    <string name="user_sponsor_github">GitHub Sponsors</string>
+
+    <string name="permission_allow">許可</string>
+    <string name="permission_deny">拒否</string>
+    <string name="permission_ask">尋ねる</string>
+    <string name="filter_all_apps">すべてのアプリ</string>
+    <string name="filter_user_apps">ユーザーアプリ</string>
+    <string name="filter_system_apps">システムアプリ</string>
+    <string name="label_filter">フィルター: </string>
+    <string name="label_mode">モード: </string>
+
+    <!-- Confirm Dialog -->
+    <string name="clipboard_access_warning">クリップボードアクセスの警告</string>
+    <string name="clipboard_access_desc">アプリ [Unknown] がクリップボードを読み取ろうとしています。\nポリシーを選択してください：</string>
+    <string name="allow_once">1回許可</string>
+    <string name="always_allow">常に許可</string>
+    <string name="always_deny">常に拒否</string>
+    <string name="this_deny_close">今回は拒否 (ポップアップを閉じる)</string>
+
+    <!-- Test Activity -->
+    <string name="test_dialog_title">ダイアログ機能のテスト</string>
+    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対話ポップアップをテストします。</string>
+    <string name="test_dialog_foreground">フォアグラウンドテストダイアログ</string>
+    <string name="test_dialog_background">バックグラウンドテストダイアログ (3秒遅延)</string>
+    <string name="test_dialog_result">対話結果がここに表示されます</string>
+
+    <string name="service_connected">サービスが接続されました</string>
+    <string name="requesting_foreground">リクエスト中 (フォアグラウンド)...</string>
+    <string name="requesting_background_hint">3秒後にバックグラウンドでリクエストが開始されます。ホーム画面に戻ってください...</string>
+    <string name="result_allow">結果: 許可 (ALLOW)</string>
+    <string name="result_deny">結果: 拒否 (DENY)</string>
+    <string name="exception">例外: </string>
+    <string name="service_not_connected">サービスが接続されていません。再試行してください</string>
+
+    <string name="sponsor_thanks">%1$s を通じたご支援ありがとうございます！</string>
+    </resources>

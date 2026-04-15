@@ -47,6 +47,6 @@ class UserFragment : Fragment() {
     }
 
     private fun showSponsorToast(method: String) {
-        Toast.makeText(requireContext(), "Thank you for supporting via $method!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(requireContext(), getString(R.string.sponsor_thanks, method), Toast.LENGTH_SHORT).show()
     }
 }

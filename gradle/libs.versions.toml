@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.0"
+agp = "9.1.1"
 api = "82"
 appcompatVersion = "1.6.1"
 coreSplashscreen = "1.2.0"
