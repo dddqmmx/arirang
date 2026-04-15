@@ -103,7 +103,7 @@
     <string name="allow_once">1回許可</string>
     <string name="always_allow">常に許可</string>
     <string name="always_deny">常に拒否</string>
-    <string name="this_deny_close">今回は拒否 (ポップアップを閉じる)</string>
+    <string name="this_deny_close">今回は拒否</string>
 
     <!-- Test Activity -->
     <string name="test_dialog_title">ダイアログ機能のテスト</string>
