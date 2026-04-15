@@ -123,4 +123,5 @@
     <string name="service_not_connected">服务未连接，请重试</string>
 
     <string name="sponsor_thanks">感谢通过 %1$s 提供支持！</string>
+    <string name="feature_not_available">暂未开放</string>
 </resources>

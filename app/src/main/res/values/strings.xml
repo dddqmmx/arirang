@@ -120,4 +120,5 @@
     <string name="service_not_connected">Service not connected, please retry</string>
 
     <string name="sponsor_thanks">Thank you for supporting via %1$s!</string>
+    <string name="feature_not_available">Coming Soon</string>
 </resources>
