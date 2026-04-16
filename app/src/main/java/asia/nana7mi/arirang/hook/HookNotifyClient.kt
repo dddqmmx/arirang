@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.service.HookNotifyService
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import java.util.concurrent.CountDownLatch
@@ -248,10 +249,6 @@ object HookNotifyClient {
 
     /**
      * 确保已发起 bind 操作
-     *
-     * 线程安全：
-     * - 只允许一个线程触发 bind
-     * - 其他线程复用同一个 CountDownLatch
      */
     private fun ensureBound(ctx: Context) {
 
@@ -266,33 +263,46 @@ object HookNotifyClient {
             sConnectLatch = connectLatch
         }
 
+        // 在 system_server 中强制将包设置为“已启动”状态
+        // 这样可以绕过系统对未启动 App 的 Intent 过滤
+        unstopPackage()
+
         val intent = Intent(ACTION_BIND).apply {
-            setPackage(TARGET_PKG)
+            component = ComponentName(TARGET_PKG, HookNotifyService::class.java.name)
+            // 🟢 核心修复：包含处于停止状态的包
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            // 增加前台优先级，确保快速启动
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
         }
 
         try {
-            // 获取 SYSTEM UserHandle
+            // 获取 SYSTEM UserHandle (通常为 User 0)
             val systemUser = XposedHelpers.getStaticObjectField(
                 UserHandle::class.java,
                 "SYSTEM"
             ) as UserHandle
 
+            XposedBridge.log("$TAG Binding to service $TARGET_PKG as user $systemUser")
+
             // 以 SYSTEM 用户身份绑定服务
-            ctx.bindServiceAsUser(
+            val success = ctx.bindServiceAsUser(
                 intent,
                 connection,
-                Context.BIND_AUTO_CREATE,
+                Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT or Context.BIND_ABOVE_CLIENT,
                 systemUser
             )
 
+            if (!success) {
+                XposedBridge.log("$TAG bindServiceAsUser returned false")
+                sBinding = false
+                connectLatch?.countDown()
+            }
+
             /**
              * 🔴 兜底超时机制
-             *
-             * 如果系统未触发回调（极端异常）
-             * 必须主动释放 latch，否则 await 将永久阻塞
              */
             handler.postDelayed({
-                if (sService == null) {
+                if (sService == null && sBinding) {
                     XposedBridge.log("$TAG bind timeout, reset binding")
                     sBinding = false
                     connectLatch?.countDown()
@@ -303,6 +313,32 @@ object HookNotifyClient {
             XposedBridge.log("$TAG bind exception: ${t.stackTraceToString()}")
             sBinding = false
             connectLatch?.countDown()
+        }
+    }
+
+    /**
+     * 强制取消包的“停止状态”
+     * 运行环境：system_server
+     */
+    @SuppressLint("PrivateApi")
+    private fun unstopPackage() {
+        try {
+            val b = XposedHelpers.callStaticMethod(
+                Class.forName("android.os.ServiceManager"),
+                "getService",
+                "package"
+            ) as IBinder
+            val ipm = XposedHelpers.callStaticMethod(
+                Class.forName("android.content.pm.IPackageManager\$Stub"),
+                "asInterface",
+                b
+            )
+            // setPackageStoppedState(packageName, stopped, userId)
+            // UserId 0 是主用户
+            XposedHelpers.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
+            XposedBridge.log("$TAG Success to unstop package $TARGET_PKG")
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG Failed to unstop package: ${t.message}")
         }
     }
 

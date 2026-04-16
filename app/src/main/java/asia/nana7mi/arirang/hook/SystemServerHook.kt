@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import asia.nana7mi.arirang.BuildConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -35,13 +36,15 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                             val filter = IntentFilter().apply {
                                 addAction(Intent.ACTION_PACKAGE_REPLACED)
                                 addAction(Intent.ACTION_PACKAGE_RESTARTED)
+                                addAction(Intent.ACTION_PACKAGE_ADDED)
+                                addAction(Intent.ACTION_PACKAGE_CHANGED)
                                 addDataScheme("package")
                             }
 
                             ctx.registerReceiver(object : BroadcastReceiver() {
                                 override fun onReceive(context: Context, intent: Intent) {
                                     val pkgName = intent.data?.schemeSpecificPart
-                                    if (pkgName == asia.nana7mi.arirang.BuildConfig.APPLICATION_ID) {
+                                    if (pkgName == BuildConfig.APPLICATION_ID) {
                                         XposedBridge.log("Arirang: Package $pkgName updated/restarted, trying to bind service...")
                                         HookNotifyClient.autoBind(context)
                                     }
