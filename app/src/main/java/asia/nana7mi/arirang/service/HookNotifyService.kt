@@ -1,6 +1,8 @@
 package asia.nana7mi.arirang.service
 
+import android.app.KeyguardManager
 import android.app.Service
+import android.content.Context
 import android.content.SharedPreferences
 import android.content.Intent
 import android.os.Bundle
@@ -60,12 +62,19 @@ class HookNotifyService : Service() {
     // 存放待处理请求的 map
     private val pendingRequests = ConcurrentHashMap<Long, PendingRequest>()
 
-    // 策略锁，用于同步 alwaysAllowPackages 和 alwaysDenyPackages
+    // 锁屏管理器
+    private val keyguardManager by lazy { getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager }
+
+    // 策略锁，用于同步
     private val policyLock = Any()
 
-    // 永久允许和永久拒绝的应用包名集合
-    private var alwaysAllowPackages = mutableSetOf<String>()
-    private var alwaysDenyPackages = mutableSetOf<String>()
+    @Volatile
+    private var isFeatureEnabled = true
+
+    @Volatile
+    private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
+
+    private var appPolicies = mapOf<String, ClipboardPromptPrefs.Policy>()
 
     /**
      * 内部类表示一个待处理请求
@@ -94,10 +103,17 @@ class HookNotifyService : Service() {
          * @return DECISION_ALLOW 或 DECISION_DENY
          */
         override fun requestClipboardRead(pkgName: String, uid: Int, userId: Int, timeoutMs: Long): Int {
-            // 永久允许的应用直接返回允许
-            if (isAlwaysAllowed(pkgName)) return DECISION_ALLOW
-            // 永久拒绝的应用直接返回拒绝
-            if (isAlwaysDenied(pkgName)) return DECISION_DENY
+            if (!isFeatureEnabled) return DECISION_ALLOW
+
+            val policy = synchronized(policyLock) { appPolicies[pkgName] } ?: defaultPolicy
+
+            if (policy == ClipboardPromptPrefs.Policy.ALLOW) return DECISION_ALLOW
+            if (policy == ClipboardPromptPrefs.Policy.DENY) return DECISION_DENY
+
+            // 如果处于锁屏状态，直接拒绝
+            if (keyguardManager?.isKeyguardLocked == true) {
+                return DECISION_DENY
+            }
 
             // 超过最大待处理请求数则直接拒绝
             if (pendingRequests.size >= MAX_PENDING_REQUESTS) return DECISION_DENY
@@ -243,9 +259,21 @@ class HookNotifyService : Service() {
      */
     private fun loadPolicy() {
         serviceScope.launch {
-            val appPolicies = ClipboardPromptPrefs.getAppPolicies(this@HookNotifyService)
-            alwaysAllowPackages = appPolicies.filter { appPolicies.equals(ClipboardPromptPrefs.Policy.ALLOW) }.keys.toMutableSet()
-            alwaysDenyPackages = appPolicies.filter { appPolicies.equals(ClipboardPromptPrefs.Policy.ALLOW) }.keys.toMutableSet()
+            ClipboardPromptPrefs.getAppPoliciesFlow(this@HookNotifyService).collect { policies ->
+                synchronized(policyLock) {
+                    appPolicies = policies
+                }
+            }
+        }
+        serviceScope.launch {
+            ClipboardPromptPrefs.isFeatureEnabledFlow(this@HookNotifyService).collect { enabled ->
+                isFeatureEnabled = enabled
+            }
+        }
+        serviceScope.launch {
+            ClipboardPromptPrefs.getDefaultPolicyFlow(this@HookNotifyService).collect { policy ->
+                defaultPolicy = policy
+            }
         }
     }
 
@@ -254,8 +282,9 @@ class HookNotifyService : Service() {
      */
     private fun setAlwaysAllowed(pkgName: String) {
         synchronized(policyLock) {
-            alwaysAllowPackages.add(pkgName)
-            alwaysDenyPackages.remove(pkgName)
+            val newMap = appPolicies.toMutableMap()
+            newMap[pkgName] = ClipboardPromptPrefs.Policy.ALLOW
+            appPolicies = newMap
             persistPolicyLocked(pkgName, ClipboardPromptPrefs.Policy.ALLOW)
         }
     }
@@ -265,21 +294,10 @@ class HookNotifyService : Service() {
      */
     private fun setAlwaysDenied(pkgName: String) {
         synchronized(policyLock) {
-            alwaysDenyPackages.add(pkgName)
-            alwaysAllowPackages.remove(pkgName)
+            val newMap = appPolicies.toMutableMap()
+            newMap[pkgName] = ClipboardPromptPrefs.Policy.DENY
+            appPolicies = newMap
             persistPolicyLocked(pkgName, ClipboardPromptPrefs.Policy.DENY)
-        }
-    }
-
-    private fun isAlwaysAllowed(pkgName: String): Boolean {
-        synchronized(policyLock) {
-            return alwaysAllowPackages.contains(pkgName)
-        }
-    }
-
-    private fun isAlwaysDenied(pkgName: String): Boolean {
-        synchronized(policyLock) {
-            return alwaysDenyPackages.contains(pkgName)
         }
     }
 

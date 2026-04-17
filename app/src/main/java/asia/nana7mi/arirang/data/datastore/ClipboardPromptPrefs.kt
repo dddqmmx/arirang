@@ -42,6 +42,19 @@ object ClipboardPromptPrefs {
         }.toMap()
     }
 
+    fun getAppPoliciesFlow(context: Context): kotlinx.coroutines.flow.Flow<Map<String, Policy>> {
+        return context.dataStore.data.map { prefs ->
+            prefs.asMap().mapNotNull { (key, value) ->
+                val name = key.name
+                if (name.startsWith("app_policy_")) {
+                    val pkg = name.removePrefix("app_policy_")
+                    val policy = (value as? String)?.let { Policy.valueOf(it) } ?: Policy.ASK
+                    pkg to policy
+                } else null
+            }.toMap()
+        }
+    }
+
     private val DEFAULT_POLICY = stringPreferencesKey("default_policy")
 
     suspend fun getDefaultPolicy(context: Context): Policy {
@@ -49,8 +62,27 @@ object ClipboardPromptPrefs {
         return value?.let { Policy.valueOf(it) } ?: Policy.ASK
     }
 
+    fun getDefaultPolicyFlow(context: Context): kotlinx.coroutines.flow.Flow<Policy> {
+        return context.dataStore.data.map { preferences ->
+            preferences[DEFAULT_POLICY]?.let { Policy.valueOf(it) } ?: Policy.ASK
+        }
+    }
+
     suspend fun setDefaultPolicy(context: Context, policy: Policy){
         context.dataStore.edit { preferences -> preferences[DEFAULT_POLICY] = policy.name }
+    }
 
+    private val IS_FEATURE_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("is_feature_enabled")
+
+    suspend fun isFeatureEnabled(context: Context): Boolean {
+        return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: true }.first()
+    }
+
+    fun isFeatureEnabledFlow(context: Context): kotlinx.coroutines.flow.Flow<Boolean> {
+        return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: true }
+    }
+
+    suspend fun setFeatureEnabled(context: Context, enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[IS_FEATURE_ENABLED] = enabled }
     }
 }

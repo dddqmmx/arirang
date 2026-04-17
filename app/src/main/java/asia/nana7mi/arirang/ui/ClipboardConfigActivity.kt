@@ -101,6 +101,9 @@ class ClipboardConfigActivity : BaseActivity() {
         featureStatusIcon.setOnClickListener {
             isFeatureEnabled = !isFeatureEnabled
             updateFeatureStatusUI()
+            lifecycleScope.launch(Dispatchers.IO) {
+                ClipboardPromptPrefs.setFeatureEnabled(this@ClipboardConfigActivity, isFeatureEnabled)
+            }
         }
     }
 
@@ -161,14 +164,17 @@ class ClipboardConfigActivity : BaseActivity() {
         val context = this
         lifecycleScope.launch {
             defaultPolicy = ClipboardPromptPrefs.getDefaultPolicy(context)
+            isFeatureEnabled = ClipboardPromptPrefs.isFeatureEnabled(context)
+            withContext(Dispatchers.Main) {
+                val spinnerPos = when(defaultPolicy) {
+                    ClipboardPromptPrefs.Policy.ALLOW -> 0
+                    ClipboardPromptPrefs.Policy.DENY -> 1
+                    ClipboardPromptPrefs.Policy.ASK -> 2
+                }
+                filterSpinner.setSelection(spinnerPos)
+                updateFeatureStatusUI()
+            }
         }
-        val spinnerPos = when(defaultPolicy) {
-            ClipboardPromptPrefs.Policy.ALLOW -> 0
-            ClipboardPromptPrefs.Policy.DENY -> 1
-            ClipboardPromptPrefs.Policy.ASK -> 2
-        }
-        filterSpinner.setSelection(spinnerPos)
-        updateFeatureStatusUI()
     }
 
     private fun updateAppPermission(packageName: String, newState: ClipboardPromptPrefs.Policy) {

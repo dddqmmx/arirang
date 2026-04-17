@@ -42,22 +42,10 @@ class ConfirmDialogActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 唤醒屏幕逻辑
         window.addFlags(
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
-        }
 
         val pkgName = intent.getStringExtra("pkg_name") ?: "Unknown"
         val receiver = getResultReceiver()
