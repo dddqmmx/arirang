@@ -121,4 +121,6 @@
 
     <string name="sponsor_thanks">Thank you for supporting via %1$s!</string>
     <string name="feature_not_available">Coming Soon</string>
+    <string name="reset_all">Reset All Settings</string>
+    <string name="reset_all_confirm">Are you sure you want to reset all clipboard settings? This will clear all app-specific policies and restore the default behavior.</string>
 </resources>

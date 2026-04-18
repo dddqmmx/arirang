@@ -19,6 +19,12 @@ object ClipboardPromptPrefs {
         ASK
     }
 
+    enum class AppFilter{
+        ALL,
+        USER,
+        SYSTEM
+    }
+
     private fun appPolicyKey(pkg: String) = stringPreferencesKey("app_policy_$pkg")
 
     suspend fun getAppPolicy(context: Context, pkg: String): Policy {
@@ -28,6 +34,17 @@ object ClipboardPromptPrefs {
 
     suspend fun setAppPolicy(context: Context, pkg: String, policy: Policy){
         context.dataStore.edit { preferences -> preferences[appPolicyKey(pkg)] = policy.name }
+    }
+
+    private val APP_FILTER = stringPreferencesKey("app_app_filter")
+
+    suspend fun getAppFilter(context: Context): AppFilter {
+        val value = context.dataStore.data.map { preferences -> preferences[APP_FILTER] }.first()
+        return value?.let { AppFilter.valueOf(it) } ?: AppFilter.ALL
+    }
+
+    suspend fun setAppFilter(context: Context, appFilter: AppFilter){
+        context.dataStore.edit { preferences -> preferences[APP_FILTER] = appFilter.name }
     }
 
     suspend fun getAppPolicies(context: Context): Map<String, Policy> {
@@ -84,5 +101,11 @@ object ClipboardPromptPrefs {
 
     suspend fun setFeatureEnabled(context: Context, enabled: Boolean) {
         context.dataStore.edit { preferences -> preferences[IS_FEATURE_ENABLED] = enabled }
+    }
+
+    suspend fun resetAll(context: Context) {
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+        }
     }
 }

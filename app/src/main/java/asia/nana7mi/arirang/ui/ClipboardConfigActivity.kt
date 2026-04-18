@@ -16,6 +16,10 @@ import android.widget.AdapterView
 import android.widget.EditText
 import android.widget.ImageView
 import androidx.appcompat.widget.AppCompatSpinner
+import android.view.Menu
+import android.view.MenuItem
+import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -38,15 +42,51 @@ class ClipboardConfigActivity : BaseActivity() {
     private var isFeatureEnabled = true 
     private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
 
+    private var appFilter = ClipboardPromptPrefs.AppFilter.ALL
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_clipboard_setting)
 
+        setSupportActionBar(findViewById(R.id.toolbar))
+
         initViews()
-        loadConfig()
         setupListeners()
-        loadInstalledApps()
+        lifecycleScope.launch {
+            loadConfig()
+            loadInstalledApps()
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_clipboard_config, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.action_reset) {
+            showResetConfirmDialog()
+            return true
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun showResetConfirmDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.reset_all)
+            .setMessage(R.string.reset_all_confirm)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        ClipboardPromptPrefs.resetAll(this@ClipboardConfigActivity)
+                    }
+                    loadConfig()
+                    loadInstalledApps()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun initViews() {
@@ -86,7 +126,9 @@ class ClipboardConfigActivity : BaseActivity() {
                         lifecycleScope.launch(Dispatchers.IO) {
                             ClipboardPromptPrefs.setDefaultPolicy(this@ClipboardConfigActivity, defaultPolicy)
                         }
-                        loadInstalledApps() 
+                        lifecycleScope.launch {
+                            loadInstalledApps()
+                        }
                     }
                 } else {
                     applyFilters()
@@ -113,15 +155,14 @@ class ClipboardConfigActivity : BaseActivity() {
         )
     }
 
-    private fun loadInstalledApps() {
+    private suspend fun loadInstalledApps() {
         val pm = packageManager
         val context = this
-        lifecycleScope.launch(Dispatchers.IO) {
+        val items = withContext(Dispatchers.IO) {
             val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            
             val appPolicies = ClipboardPromptPrefs.getAppPolicies(context)
 
-            val items = packages.map { pkg ->
+            packages.map { pkg ->
                 val isSystem = (pkg.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 val appPolicy = appPolicies[pkg.packageName]
                 val state = appPolicy ?: defaultPolicy
@@ -134,18 +175,28 @@ class ClipboardConfigActivity : BaseActivity() {
                     isSystemApp = isSystem
                 )
             }.sortedBy { it.appName.lowercase() }
+        }
 
-            withContext(Dispatchers.Main) {
-                allApps.clear()
-                allApps.addAll(items)
-                applyFilters()
-            }
+        withContext(Dispatchers.Main) {
+            allApps.clear()
+            allApps.addAll(items)
+            applyFilters()
         }
     }
 
     private fun applyFilters() {
         val query = searchEditText.text.toString().lowercase()
-        val appTypeFilter = filterAppTypeSpinner.selectedItemPosition 
+        val appTypeFilter = filterAppTypeSpinner.selectedItemPosition
+
+        val newAppFilter = when (appTypeFilter) {
+            0 -> ClipboardPromptPrefs.AppFilter.ALL
+            1 -> ClipboardPromptPrefs.AppFilter.USER
+            else -> ClipboardPromptPrefs.AppFilter.SYSTEM
+        }
+        if (newAppFilter != this.appFilter){
+            this.appFilter = newAppFilter
+            updateAppFilter(newAppFilter)
+        }
 
         val filtered = allApps.filter { app ->
             val matchesQuery = app.appName.lowercase().contains(query) || 
@@ -157,23 +208,44 @@ class ClipboardConfigActivity : BaseActivity() {
             }
             matchesQuery && matchesType
         }
+
         adapter.setList(filtered)
     }
 
-    private fun loadConfig() {
+    private fun updateAppFilter(newAppFilter: ClipboardPromptPrefs.AppFilter) {
         val context = this
-        lifecycleScope.launch {
-            defaultPolicy = ClipboardPromptPrefs.getDefaultPolicy(context)
-            isFeatureEnabled = ClipboardPromptPrefs.isFeatureEnabled(context)
-            withContext(Dispatchers.Main) {
-                val spinnerPos = when(defaultPolicy) {
-                    ClipboardPromptPrefs.Policy.ALLOW -> 0
-                    ClipboardPromptPrefs.Policy.DENY -> 1
-                    ClipboardPromptPrefs.Policy.ASK -> 2
-                }
-                filterSpinner.setSelection(spinnerPos)
-                updateFeatureStatusUI()
+        lifecycleScope.launch(Dispatchers.IO) {
+            ClipboardPromptPrefs.setAppFilter(context, newAppFilter)
+        }
+    }
+
+    private suspend fun loadConfig() {
+        val context = this
+        val config = withContext(Dispatchers.IO) {
+            val dp = ClipboardPromptPrefs.getDefaultPolicy(context)
+            val af = ClipboardPromptPrefs.getAppFilter(context)
+            val fe = ClipboardPromptPrefs.isFeatureEnabled(context)
+            Triple(dp, af, fe)
+        }
+        
+        defaultPolicy = config.first
+        appFilter = config.second
+        isFeatureEnabled = config.third
+
+        withContext(Dispatchers.Main) {
+            val spinnerPos = when(defaultPolicy) {
+                ClipboardPromptPrefs.Policy.ALLOW -> 0
+                ClipboardPromptPrefs.Policy.DENY -> 1
+                ClipboardPromptPrefs.Policy.ASK -> 2
             }
+            filterSpinner.setSelection(spinnerPos)
+            val appTypeSpinnerPos = when(appFilter) {
+                ClipboardPromptPrefs.AppFilter.ALL -> 0
+                ClipboardPromptPrefs.AppFilter.USER -> 1
+                ClipboardPromptPrefs.AppFilter.SYSTEM -> 2
+            }
+            filterAppTypeSpinner.setSelection(appTypeSpinnerPos)
+            updateFeatureStatusUI()
         }
     }
 

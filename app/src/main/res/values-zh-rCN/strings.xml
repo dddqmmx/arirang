@@ -124,4 +124,6 @@
 
     <string name="sponsor_thanks">感谢通过 %1$s 提供支持！</string>
     <string name="feature_not_available">暂未开放</string>
+    <string name="reset_all">重置所有设定</string>
+    <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为。</string>
 </resources>
