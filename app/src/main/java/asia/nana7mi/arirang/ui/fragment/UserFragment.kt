@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import android.widget.Toast
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.AppPreferences
@@ -23,7 +22,6 @@ class UserFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupRegionDisplay(view)
-        setupSponsorButtons(view)
     }
 
     private fun setupRegionDisplay(view: View) {
@@ -37,16 +35,5 @@ class UserFragment : Fragment() {
         val displayName = if (index != -1) regionNames[index] else regionCode
         
         tvCurrentRegion.text = displayName
-    }
-
-    private fun setupSponsorButtons(view: View) {
-
-        view.findViewById<View>(R.id.btn_sponsor_github).setOnClickListener {
-            showSponsorToast(getString(R.string.user_sponsor_github))
-        }
-    }
-
-    private fun showSponsorToast(method: String) {
-        Toast.makeText(requireContext(), getString(R.string.sponsor_thanks, method), Toast.LENGTH_SHORT).show()
     }
 }

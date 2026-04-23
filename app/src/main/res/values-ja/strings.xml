@@ -70,11 +70,11 @@
     <string name="init_button_next">次へ</string>
     <string name="btn_cancel">キャンセル</string>
     <string name="init_button_enter">アプリに入る</string>
-    <string name="init_security_check_title">実行環境チェック</string>
+    <string name="init_security_check_title">実行环境チェック</string>
     <string name="init_core_dependency_title">コア依存関係</string>
     <string name="init_core_dependency_desc">本ソフトウェアは Xposed / Zygisk に依存しています。サポートされている環境以外では機能しません。</string>
     <string name="init_precondition_title">前提条件</string>
-    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保護を提供します。</string>
+    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保护を提供します。</string>
     <string name="init_risk_cases_title">例えば：</string>
     <string name="init_risk_item_backdoor">システムにバックドアがある</string>
     <string name="init_risk_item_rom">信頼できないROMソース</string>
@@ -82,11 +82,6 @@
     <string name="init_risk_item_root">Root権限がマルウェアに制御されている</string>
 
     <string name="user_region_title">地域</string>
-    <string name="user_sponsor_title">スポンサー</string>
-    <string name="user_sponsor_desc">Arirang の開発を支援する</string>
-    <string name="user_sponsor_alipay">Alipay</string>
-    <string name="user_sponsor_wechat">WeChat Pay</string>
-    <string name="user_sponsor_github">GitHub Sponsors</string>
 
     <string name="permission_allow">許可</string>
     <string name="permission_deny">拒否</string>
@@ -107,10 +102,10 @@
 
     <!-- Test Activity -->
     <string name="test_dialog_title">ダイアログ機能のテスト</string>
-    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対話ポップアップをテストします。</string>
+    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対话ポップアップをテストします。</string>
     <string name="test_dialog_foreground">フォアグラウンドテストダイアログ</string>
     <string name="test_dialog_background">バックグラウンドテストダイアログ (3秒遅延)</string>
-    <string name="test_dialog_result">対話結果がここに表示されます</string>
+    <string name="test_dialog_result">対话结果がここに表示されます</string>
 
     <string name="service_connected">サービスが接続されました</string>
     <string name="requesting_foreground">リクエスト中 (フォアグラウンド)...</string>
@@ -120,6 +115,5 @@
     <string name="exception">例外: </string>
     <string name="service_not_connected">サービスが接続されていません。再試行してください</string>
 
-    <string name="sponsor_thanks">%1$s を通じたご支援ありがとうございます！</string>
     <string name="feature_not_available">未開放</string>
-    </resources>
+</resources>

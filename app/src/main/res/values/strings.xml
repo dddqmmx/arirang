@@ -81,11 +81,6 @@
     <string name="init_risk_item_kernel">Baseband or kernel tampered</string>
     <string name="init_risk_item_root">Root access controlled by malware</string>
     <string name="user_region_title">Region</string>
-    <string name="user_sponsor_title">Sponsor</string>
-    <string name="user_sponsor_desc">Support the development of Arirang.</string>
-    <string name="user_sponsor_alipay">Alipay</string>
-    <string name="user_sponsor_wechat">WeChat</string>
-    <string name="user_sponsor_github">GitHub Sponsors</string>
 
     <string name="permission_allow">Allow</string>
     <string name="permission_deny">Deny</string>
@@ -119,7 +114,6 @@
     <string name="exception">Exception: </string>
     <string name="service_not_connected">Service not connected, please retry</string>
 
-    <string name="sponsor_thanks">Thank you for supporting via %1$s!</string>
     <string name="feature_not_available">Coming Soon</string>
     <string name="reset_all">Reset All Settings</string>
     <string name="reset_all_confirm">Are you sure you want to reset all clipboard settings? This will clear all app-specific policies and restore the default behavior.</string>

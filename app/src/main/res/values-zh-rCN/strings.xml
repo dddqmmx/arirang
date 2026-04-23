@@ -84,11 +84,6 @@
 
     <!-- UserFragment -->
     <string name="user_region_title">地区</string>
-    <string name="user_sponsor_title">赞助</string>
-    <string name="user_sponsor_desc">支持 Arirang 的开发</string>
-    <string name="user_sponsor_alipay">支付宝</string>
-    <string name="user_sponsor_wechat">微信支付</string>
-    <string name="user_sponsor_github">GitHub Sponsors</string>
 
     <string name="permission_allow">允许</string>
     <string name="permission_deny">拒绝</string>
@@ -122,7 +117,6 @@
     <string name="exception">异常: </string>
     <string name="service_not_connected">服务未连接，请重试</string>
 
-    <string name="sponsor_thanks">感谢通过 %1$s 提供支持！</string>
     <string name="feature_not_available">暂未开放</string>
     <string name="reset_all">重置所有设定</string>
     <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为。</string>
