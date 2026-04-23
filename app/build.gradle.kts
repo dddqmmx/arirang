@@ -17,6 +17,7 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled = false
+        resConfigs("en", "zh-rCN", "ja")
     }
 
     buildFeatures {
@@ -27,7 +28,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -42,6 +44,14 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE*"
+            excludes += "META-INF/NOTICE*"
+            excludes += "META-INF/maven/**"
+            excludes += "**/dump_syms/**"
+        }
     }
     kotlin {
         compilerOptions {
@@ -52,7 +62,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.appcompat.v161)
+    implementation(libs.androidx.appcompat)
     implementation(libs.google.gson)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -62,19 +72,14 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.firebase.crashlytics.buildtools)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.play.services.location)
-    implementation(libs.androidx.gridlayout)
     compileOnly(libs.api)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    implementation(libs.androidx.compose.material3) // 或更新版本
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.material.icons.extended) // 用于更多图标
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)

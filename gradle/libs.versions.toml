@@ -1,11 +1,9 @@
 [versions]
-agp = "9.1.1"
+agp = "9.2.0"
 api = "82"
-appcompatVersion = "1.7.1"
 coreSplashscreen = "1.2.0"
 datastorePreferences = "1.2.1"
 googleGson = "2.13.2"
-gridlayout = "1.1.0"
 kotlin = "2.3.20"
 coreKtx = "1.18.0"
 junit = "4.13.2"
@@ -21,18 +19,14 @@ composeBom = "2026.03.01"
 material3 = "1.4.0"
 materialIconsExtended = "1.7.8"
 playServicesLocation = "21.3.0"
-firebaseCrashlyticsBuildtools = "3.0.7"
 ui = "1.10.6"
 
 [libraries]
-androidx-appcompat-v161 = { module = "androidx.appcompat:appcompat", version.ref = "appcompatVersion" }
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
-androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
-androidx-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "ui" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
-androidx-gridlayout = { module = "androidx.gridlayout:gridlayout", version.ref = "gridlayout" }
 api = { module = "de.robv.android.xposed:api", version.ref = "api" }
 google-gson = { module = "com.google.code.gson:gson", version.ref = "googleGson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -53,10 +47,8 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
-firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-

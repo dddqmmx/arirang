@@ -10,7 +10,6 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.google.firebase.crashlytics.buildtools.reloc.com.google.common.util.concurrent.ServiceManager
 import java.util.Locale
 
 class MainActivity : BaseActivity() {
