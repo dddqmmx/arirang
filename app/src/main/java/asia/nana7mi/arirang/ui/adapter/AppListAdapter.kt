@@ -22,6 +22,8 @@ class AppListAdapter(
     private val onPermissionChange: (AppInfo, ClipboardPromptPrefs.Policy) -> Unit
 ) : RecyclerView.Adapter<AppListAdapter.ViewHolder>() {
 
+    var defaultPolicy: ClipboardPromptPrefs.Policy = ClipboardPromptPrefs.Policy.ASK
+
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val appIcon: ImageView = itemView.findViewById(R.id.appIcon)
         val appName: TextView = itemView.findViewById(R.id.appName)
@@ -47,6 +49,7 @@ class AppListAdapter(
         holder.itemView.setOnClickListener {
             showPermissionDialog(holder.itemView.context, app) { newState ->
                 app.permissionState = newState
+                app.isConfigured = newState != defaultPolicy
                 updatePermissionText(holder.permissionStatusText, newState)
                 onPermissionChange(app, newState)
             }
@@ -115,7 +118,8 @@ class AppListAdapter(
                 val new = newListRaw[newPos]
                 return old.appName == new.appName && 
                        old.permissionState == new.permissionState &&
-                       old.isSystemApp == new.isSystemApp
+                       old.isSystemApp == new.isSystemApp &&
+                       old.isConfigured == new.isConfigured
             }
         })
 

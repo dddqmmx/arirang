@@ -8,5 +8,6 @@ data class AppInfo(
     val packageName: String,
     var icon: Drawable?,
     var permissionState: ClipboardPromptPrefs.Policy,
-    val isSystemApp: Boolean
+    val isSystemApp: Boolean,
+    var isConfigured: Boolean = false
 )

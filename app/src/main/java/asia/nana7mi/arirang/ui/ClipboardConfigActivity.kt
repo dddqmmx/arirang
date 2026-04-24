@@ -123,6 +123,7 @@ class ClipboardConfigActivity : BaseActivity() {
                     }
                     if (newPolicy != defaultPolicy) {
                         defaultPolicy = newPolicy
+                        adapter.defaultPolicy = defaultPolicy
                         lifecycleScope.launch(Dispatchers.IO) {
                             ClipboardPromptPrefs.setDefaultPolicy(this@ClipboardConfigActivity, defaultPolicy)
                         }
@@ -158,6 +159,7 @@ class ClipboardConfigActivity : BaseActivity() {
     private suspend fun loadInstalledApps() {
         val pm = packageManager
         val context = this
+        val currentDefaultPolicy = defaultPolicy
         val items = withContext(Dispatchers.IO) {
             val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
             val appPolicies = ClipboardPromptPrefs.getAppPolicies(context)
@@ -165,16 +167,18 @@ class ClipboardConfigActivity : BaseActivity() {
             packages.map { pkg ->
                 val isSystem = (pkg.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                 val appPolicy = appPolicies[pkg.packageName]
-                val state = appPolicy ?: defaultPolicy
+                val state = appPolicy ?: currentDefaultPolicy
+                val isConfigured = state != currentDefaultPolicy
                 
                 AppInfo(
                     appName = pm.getApplicationLabel(pkg).toString(),
                     packageName = pkg.packageName,
                     icon = null,
                     permissionState = state,
-                    isSystemApp = isSystem
+                    isSystemApp = isSystem,
+                    isConfigured = isConfigured
                 )
-            }.sortedBy { it.appName.lowercase() }
+            }.sortedWith(compareByDescending<AppInfo> { it.isConfigured }.thenBy { it.appName.lowercase() })
         }
 
         withContext(Dispatchers.Main) {
@@ -233,6 +237,7 @@ class ClipboardConfigActivity : BaseActivity() {
         isFeatureEnabled = config.third
 
         withContext(Dispatchers.Main) {
+            adapter.defaultPolicy = defaultPolicy
             val spinnerPos = when(defaultPolicy) {
                 ClipboardPromptPrefs.Policy.ALLOW -> 0
                 ClipboardPromptPrefs.Policy.DENY -> 1
