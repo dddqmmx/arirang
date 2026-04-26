@@ -126,14 +126,15 @@ class HookNotifyService : Service() {
             // 构建 ResultReceiver 用于接收 UI 决策
             val receiver = buildDecisionReceiver(requestId, pkgName)
 
+            val effectiveTimeout = timeoutMs.coerceIn(200L, MAX_TIMEOUT_MS)
+
             // 在主线程启动确认对话框
             mainHandler.post {
-                launchDialog(pkgName, receiver)
+                launchDialog(pkgName, receiver, effectiveTimeout)
             }
 
             // 阻塞当前线程等待用户决策或超时
             return try {
-                val effectiveTimeout = timeoutMs.coerceIn(200L, MAX_TIMEOUT_MS)
                 val completed = pending.latch.await(
                     if (effectiveTimeout > 0L) effectiveTimeout else DEFAULT_TIMEOUT_MS,
                     TimeUnit.MILLISECONDS
@@ -186,10 +187,11 @@ class HookNotifyService : Service() {
      * @param pkgName 请求的应用包名
      * @param receiver 用于回传决策结果
      */
-    private fun launchDialog(pkgName: String, receiver: ResultReceiver?) {
+    private fun launchDialog(pkgName: String, receiver: ResultReceiver?, timeoutMs: Long = DEFAULT_TIMEOUT_MS) {
         val intent = Intent(this, ConfirmDialogActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra("pkg_name", pkgName)
+            putExtra("timeout_ms", timeoutMs)
             if (receiver != null) {
                 putExtra("receiver", receiver)
             }
