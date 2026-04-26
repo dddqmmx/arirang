@@ -176,8 +176,8 @@ fun ConfirmDialogScreen(
     ) {
         Surface(
             modifier = Modifier
-                .padding(horizontal = 32.dp)
-                .widthIn(max = 320.dp)
+                .padding(horizontal = 20.dp)
+                .widthIn(max = 400.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -185,21 +185,21 @@ fun ConfirmDialogScreen(
                 ),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
-            shadowElevation = 10.dp
+            tonalElevation = 3.dp,
+            shadowElevation = 12.dp
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header: Integrated Icon/Progress + Title
+                // Header: More balanced sizes
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(42.dp)) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
                         CircularProgressIndicator(
                             progress = { animatedProgress },
                             modifier = Modifier.fillMaxSize(),
@@ -227,7 +227,7 @@ fun ConfirmDialogScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = pkgName,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
@@ -239,55 +239,55 @@ fun ConfirmDialogScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
-                        lineHeight = 18.sp
+                        lineHeight = 16.sp
                     )
                 }
 
-                // Primary Action Stack
+                // Substantial Action Stack with refined text
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
                         onClick = { onResult(ConfirmDialogActivity.RESULT_ALLOW_ONCE) },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(14.dp),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.allow_once),
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.5.sp
                         )
                     }
 
                     FilledTonalButton(
                         onClick = { onResult(ConfirmDialogActivity.RESULT_DENY_ONCE) },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f),
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
                             contentColor = MaterialTheme.colorScheme.onErrorContainer
                         )
                     ) {
                         Text(
                             text = "${stringResource(id = R.string.this_deny_close)} (${secondsLeft}s)",
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                // Bottom Secondary Actions: Clean centered grouping
+                // Center grouped actions
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
                         onClick = { onResult(ConfirmDialogActivity.RESULT_ALLOW_ALWAYS) },
-                        modifier = Modifier.height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.always_allow),
@@ -299,8 +299,7 @@ fun ConfirmDialogScreen(
 
                     TextButton(
                         onClick = { onResult(ConfirmDialogActivity.RESULT_DENY_ALWAYS) },
-                        modifier = Modifier.height(36.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Text(
                             text = stringResource(id = R.string.always_deny),
