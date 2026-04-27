@@ -12,10 +12,10 @@
         android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> <!-- 弹窗与后台启动相关权限 -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" /> <!-- 关键：用于全屏通知 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- 关键：Android 13+ 发送通知必须 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 前台服务相关 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -37,15 +37,6 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FQS_SUBTYPE"
                 android:value="Hook service for permission monitoring" />
         </service>
-        <provider
-            android:name=".provider.SecureConfigProvider"
-            android:authorities="${applicationId}.secureconfig"
-            android:exported="true" />
-        <!--
-            修复点 3: 对话框 Activity。
-            为了保证能从后台弹出，建议在 ActivityOptions 中做处理，
-            或者确保用户已经手动授权了“显示在其他应用上层” (SYSTEM_ALERT_WINDOW)。
-        -->
         <activity
             android:name=".ui.ConfirmDialogActivity"
             android:excludeFromRecents="true"
@@ -77,7 +68,7 @@
             android:exported="false" />
         <activity
             android:name=".ui.ClipboardConfigActivity"
-            android:exported="false" /> <!-- Xposed 模块配置 -->
+            android:exported="false" />
         <meta-data
             android:name="xposedmodule"
             android:value="true" />
