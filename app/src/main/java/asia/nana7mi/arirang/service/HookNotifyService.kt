@@ -3,14 +3,16 @@ package asia.nana7mi.arirang.service
 import android.app.KeyguardManager
 import android.app.Service
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.Intent
+import android.os.Binder
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.Process
 import android.os.ResultReceiver
-import androidx.core.content.edit
+import android.util.Log
+import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
 import asia.nana7mi.arirang.hook.IHookNotify
 import asia.nana7mi.arirang.ui.ConfirmDialogActivity
@@ -18,7 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.security.Policy
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -37,6 +38,9 @@ import java.util.concurrent.atomic.AtomicLong
 class HookNotifyService : Service() {
 
     companion object {
+        private const val TAG = "HookNotifyService"
+        private const val PER_USER_RANGE = 100_000
+
         // 内部决策值：允许或拒绝
         private const val DECISION_DENY = 0
         private const val DECISION_ALLOW = 1
@@ -51,6 +55,11 @@ class HookNotifyService : Service() {
         private const val MAX_TIMEOUT_MS = 3000L        // 最大超时 3 秒
         private const val MAX_PENDING_REQUESTS = 8      // 最大同时等待请求数
         private const val LATE_DECISION_GRACE_MS = 15_000L // UI 决策延迟的宽限时间 15 秒
+
+        private val TRUSTED_CALLER_PACKAGES = setOf(
+            "android",
+            BuildConfig.APPLICATION_ID
+        )
     }
 
     // 主线程 Handler，用于 UI 操作
@@ -75,6 +84,7 @@ class HookNotifyService : Service() {
     private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
 
     private var appPolicies = mapOf<String, ClipboardPromptPrefs.Policy>()
+    private val serviceUserId = Process.myUid() / PER_USER_RANGE
 
     /**
      * 内部类表示一个待处理请求
@@ -103,9 +113,25 @@ class HookNotifyService : Service() {
          * @return DECISION_ALLOW 或 DECISION_DENY
          */
         override fun requestClipboardRead(pkgName: String, uid: Int, userId: Int, timeoutMs: Long): Int {
+            val normalizedPkgName = pkgName.trim()
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid) ||
+                !isAuthorizedPackageForCaller(callingUid, normalizedPkgName) ||
+                !isPackageOwnedByUid(uid, normalizedPkgName)
+            ) {
+                Log.w(TAG, "Rejected clipboard decision request from uid=$callingUid for pkg=$pkgName")
+                return DECISION_DENY
+            }
+
+            if (userId != serviceUserId) {
+                Log.w(TAG, "Rejected cross-user clipboard request for pkg=$normalizedPkgName callerUser=$userId serviceUser=$serviceUserId")
+                return DECISION_DENY
+            }
+
             if (!isFeatureEnabled) return DECISION_ALLOW
 
-            val policy = synchronized(policyLock) { appPolicies[pkgName] } ?: defaultPolicy
+            val policyKey = ClipboardPromptPrefs.scopedPolicyId(userId, normalizedPkgName)
+            val policy = synchronized(policyLock) { appPolicies[policyKey] } ?: defaultPolicy
 
             if (policy == ClipboardPromptPrefs.Policy.ALLOW) return DECISION_ALLOW
             if (policy == ClipboardPromptPrefs.Policy.DENY) return DECISION_DENY
@@ -124,13 +150,13 @@ class HookNotifyService : Service() {
             pendingRequests[requestId] = pending
 
             // 构建 ResultReceiver 用于接收 UI 决策
-            val receiver = buildDecisionReceiver(requestId, pkgName)
+            val receiver = buildDecisionReceiver(requestId, userId, normalizedPkgName)
 
             val effectiveTimeout = timeoutMs.coerceIn(200L, MAX_TIMEOUT_MS)
 
             // 在主线程启动确认对话框
             mainHandler.post {
-                launchDialog(pkgName, receiver, effectiveTimeout)
+                launchDialog(normalizedPkgName, receiver, effectiveTimeout)
             }
 
             // 阻塞当前线程等待用户决策或超时
@@ -159,12 +185,29 @@ class HookNotifyService : Service() {
         /**
          * 当应用使用权限时调用（例如读取剪贴板）
          * @param pkgName 应用包名
+         * @param uid 应用 UID
+         * @param userId Android 系统的用户 ID
          * @param opName 操作名称
          */
-        override fun onPermissionUsed(pkgName: String, opName: String) {
+        override fun onPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {
+            val normalizedPkgName = pkgName.trim()
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid) ||
+                !isAuthorizedPackageForCaller(callingUid, normalizedPkgName) ||
+                !isPackageOwnedByUid(uid, normalizedPkgName)
+            ) {
+                Log.w(TAG, "Rejected permission usage event from uid=$callingUid for pkg=$pkgName")
+                return
+            }
+
+            if (userId != serviceUserId) {
+                Log.w(TAG, "Rejected cross-user permission usage event for pkg=$normalizedPkgName callerUser=$userId serviceUser=$serviceUserId")
+                return
+            }
+
             // 弹出确认对话框提醒用户
             mainHandler.post {
-                launchDialog(pkgName, null)
+                launchDialog(normalizedPkgName, null)
             }
         }
     }
@@ -176,11 +219,45 @@ class HookNotifyService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // 不会自动重启
+        // 该服务只接受 bind，不接受显式 start；立即自停避免被外部保活。
+        stopSelfResult(startId)
         return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent): IBinder = binder
+    override fun onBind(intent: Intent): IBinder? {
+        val callingUid = Binder.getCallingUid()
+        return if (isTrustedCaller(callingUid)) {
+            binder
+        } else {
+            Log.w(TAG, "Rejected bind from uid=$callingUid")
+            null
+        }
+    }
+
+    private fun isTrustedCaller(callingUid: Int): Boolean {
+        if (callingUid == Process.SYSTEM_UID || callingUid == Process.myUid()) {
+            return true
+        }
+
+        val packages = packageManager.getPackagesForUid(callingUid)?.toSet().orEmpty()
+        return packages.any { it in TRUSTED_CALLER_PACKAGES }
+    }
+
+    private fun isAuthorizedPackageForCaller(callingUid: Int, pkgName: String): Boolean {
+        if (pkgName.isBlank()) {
+            return false
+        }
+
+        if (callingUid == Process.SYSTEM_UID || callingUid == Process.myUid()) {
+            return true
+        }
+
+        return packageManager.getPackagesForUid(callingUid)?.contains(pkgName) == true
+    }
+
+    private fun isPackageOwnedByUid(uid: Int, pkgName: String): Boolean {
+        return packageManager.getPackagesForUid(uid)?.contains(pkgName) == true
+    }
 
     /**
      * 启动确认对话框 Activity
@@ -215,14 +292,15 @@ class HookNotifyService : Service() {
      */
     private fun buildDecisionReceiver(
         requestId: Long,
+        userId: Int,
         pkgName: String
     ): ResultReceiver {
         return object : ResultReceiver(mainHandler) {
             override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
                 // 更新永久允许/拒绝策略
                 when (resultCode) {
-                    UI_RESULT_ALLOW_ALWAYS -> setAlwaysAllowed(pkgName)
-                    UI_RESULT_DENY_ALWAYS -> setAlwaysDenied(pkgName)
+                    UI_RESULT_ALLOW_ALWAYS -> setAlwaysAllowed(userId, pkgName)
+                    UI_RESULT_DENY_ALWAYS -> setAlwaysDenied(userId, pkgName)
                 }
 
                 // 转换成内部决策值
@@ -261,7 +339,7 @@ class HookNotifyService : Service() {
      */
     private fun loadPolicy() {
         serviceScope.launch {
-            ClipboardPromptPrefs.getAppPoliciesFlow(this@HookNotifyService).collect { policies ->
+            ClipboardPromptPrefs.getAllAppPoliciesFlow(this@HookNotifyService).collect { policies ->
                 synchronized(policyLock) {
                     appPolicies = policies
                 }
@@ -282,33 +360,35 @@ class HookNotifyService : Service() {
     /**
      * 将某个包名设置为永久允许
      */
-    private fun setAlwaysAllowed(pkgName: String) {
+    private fun setAlwaysAllowed(userId: Int, pkgName: String) {
+        val policyKey = ClipboardPromptPrefs.scopedPolicyId(userId, pkgName)
         synchronized(policyLock) {
             val newMap = appPolicies.toMutableMap()
-            newMap[pkgName] = ClipboardPromptPrefs.Policy.ALLOW
+            newMap[policyKey] = ClipboardPromptPrefs.Policy.ALLOW
             appPolicies = newMap
-            persistPolicyLocked(pkgName, ClipboardPromptPrefs.Policy.ALLOW)
+            persistPolicyLocked(userId, pkgName, ClipboardPromptPrefs.Policy.ALLOW)
         }
     }
 
     /**
      * 将某个包名设置为永久拒绝
      */
-    private fun setAlwaysDenied(pkgName: String) {
+    private fun setAlwaysDenied(userId: Int, pkgName: String) {
+        val policyKey = ClipboardPromptPrefs.scopedPolicyId(userId, pkgName)
         synchronized(policyLock) {
             val newMap = appPolicies.toMutableMap()
-            newMap[pkgName] = ClipboardPromptPrefs.Policy.DENY
+            newMap[policyKey] = ClipboardPromptPrefs.Policy.DENY
             appPolicies = newMap
-            persistPolicyLocked(pkgName, ClipboardPromptPrefs.Policy.DENY)
+            persistPolicyLocked(userId, pkgName, ClipboardPromptPrefs.Policy.DENY)
         }
     }
 
     /**
      * 将策略持久化到 ClipboardPromptPrefs
      */
-    private fun persistPolicyLocked(pkgName: String, policy: ClipboardPromptPrefs.Policy) {
+    private fun persistPolicyLocked(userId: Int, pkgName: String, policy: ClipboardPromptPrefs.Policy) {
         serviceScope.launch {
-            ClipboardPromptPrefs.setAppPolicy(this@HookNotifyService, pkgName, policy)
+            ClipboardPromptPrefs.setAppPolicyForUser(this@HookNotifyService, userId, pkgName, policy)
         }
     }
 

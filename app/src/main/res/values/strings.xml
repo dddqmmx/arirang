@@ -93,7 +93,7 @@
 
     <!-- Confirm Dialog -->
     <string name="clipboard_access_warning">Clipboard Access Warning</string>
-    <string name="clipboard_access_desc">App [Unknown] is trying to read the clipboard.\nPlease select a policy:</string>
+    <string name="clipboard_access_desc">This app is accessing the clipboard</string>
     <string name="allow_once">Allow Once</string>
     <string name="always_allow">Always Allow</string>
     <string name="always_deny">Always Deny</string>

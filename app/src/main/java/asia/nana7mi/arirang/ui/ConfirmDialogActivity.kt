@@ -1,5 +1,6 @@
 package asia.nana7mi.arirang.ui
 
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.ResultReceiver
@@ -55,12 +56,14 @@ class ConfirmDialogActivity : ComponentActivity() {
         )
 
         val pkgName = intent.getStringExtra("pkg_name") ?: "Unknown"
+        val appName = resolveAppName(pkgName)
         val timeoutMs = intent.getLongExtra("timeout_ms", 2500L)
         val receiver = getResultReceiver()
 
         setContent {
             DynamicArirangTheme {
                 ConfirmDialogScreen(
+                    appName = appName,
                     pkgName = pkgName,
                     timeoutMs = timeoutMs,
                     onResult = { resultCode ->
@@ -78,6 +81,25 @@ class ConfirmDialogActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra("receiver")
         }
+    }
+
+    private fun resolveAppName(pkgName: String): String {
+        if (pkgName.isBlank() || pkgName == "Unknown") {
+            return pkgName
+        }
+
+        return runCatching {
+            val applicationInfo = if (Build.VERSION.SDK_INT >= 33) {
+                packageManager.getApplicationInfo(
+                    pkgName,
+                    PackageManager.ApplicationInfoFlags.of(0)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getApplicationInfo(pkgName, 0)
+            }
+            packageManager.getApplicationLabel(applicationInfo).toString().ifBlank { pkgName }
+        }.getOrDefault(pkgName)
     }
 
     override fun onTouchEvent(event: android.view.MotionEvent?): Boolean {
@@ -140,6 +162,7 @@ fun DynamicArirangTheme(
 
 @Composable
 fun ConfirmDialogScreen(
+    appName: String,
     pkgName: String,
     timeoutMs: Long,
     onResult: (Int) -> Unit
@@ -226,16 +249,26 @@ fun ConfirmDialogScreen(
                 // App Name + Desc Block
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = pkgName,
+                        text = appName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                         textAlign = TextAlign.Center
                     )
+                    if (appName != pkgName) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = pkgName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = stringResource(id = R.string.clipboard_access_desc).replace(pkgName, "").replace("[Unknown]", "").trim().removeSuffix(":").removeSuffix("："),
+                        text = stringResource(id = R.string.clipboard_access_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -267,8 +300,8 @@ fun ConfirmDialogScreen(
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     ) {
                         Text(
@@ -304,7 +337,7 @@ fun ConfirmDialogScreen(
                         Text(
                             text = stringResource(id = R.string.always_deny),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
                         )
                     }
                 }

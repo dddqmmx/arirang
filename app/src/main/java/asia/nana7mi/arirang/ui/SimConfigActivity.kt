@@ -38,7 +38,7 @@ class SimConfigActivity : AppCompatActivity() {
     @RequiresPermission(Manifest.permission.READ_PHONE_STATE)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        prefs = getSharedPreferences(PREFS_NAME, MODE_WORLD_READABLE)
+        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
         setContentView(R.layout.activity_sim_config)
 

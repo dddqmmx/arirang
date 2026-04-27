@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Binder
 import android.content.ServiceConnection
 import android.os.DeadObjectException
 import android.os.Handler
@@ -39,9 +40,6 @@ object HookNotifyClient {
 
     /** 目标服务所在包名 */
     private const val TARGET_PKG = BuildConfig.APPLICATION_ID
-
-    /** 显式绑定的 Action */
-    private const val ACTION_BIND = "${TARGET_PKG}.BIND_NOTIFY"
 
     /** bindService 连接超时时间（兜底防死锁） */
     private const val BIND_TIMEOUT_MS = 3000L
@@ -100,6 +98,15 @@ object HookNotifyClient {
      * 用于实现 bind 超时兜底逻辑
      */
     private val handler = Handler(Looper.getMainLooper())
+
+    private inline fun <T> withCleanCallingIdentity(block: () -> T): T {
+        val token = Binder.clearCallingIdentity()
+        return try {
+            block()
+        } finally {
+            Binder.restoreCallingIdentity(token)
+        }
+    }
 
     /**
      * 重连延迟任务
@@ -183,13 +190,15 @@ object HookNotifyClient {
      *
      * 异步 fire-and-forget，不等待返回值
      */
-    fun notifyPermissionUsed(pkgName: String, opName: String) {
+    fun notifyPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {
         val ctx = getSystemContext() ?: return
 
         val service = getOrBindService(ctx) ?: return
 
         try {
-            service.onPermissionUsed(pkgName, opName)
+            withCleanCallingIdentity {
+                service.onPermissionUsed(pkgName, uid, userId, opName)
+            }
         } catch (t: Throwable) {
             XposedBridge.log("$TAG notify failed: ${t.stackTraceToString()}")
             // Binder 死亡，清空引用，下次自动重连
@@ -229,12 +238,14 @@ object HookNotifyClient {
 
         return try {
             // 限制 timeout 范围，避免滥用
-            service.requestClipboardRead(
-                pkgName,
-                uid,
-                userId,
-                timeoutMs.coerceIn(200L, 3000L)
-            ) == RESULT_ALLOW
+            withCleanCallingIdentity {
+                service.requestClipboardRead(
+                    pkgName,
+                    uid,
+                    userId,
+                    timeoutMs.coerceIn(200L, 3000L)
+                ) == RESULT_ALLOW
+            }
 
         } catch (_: DeadObjectException) {
             // 远程进程已死亡
@@ -267,7 +278,7 @@ object HookNotifyClient {
         // 这样可以绕过系统对未启动 App 的 Intent 过滤
         unstopPackage()
 
-        val intent = Intent(ACTION_BIND).apply {
+        val intent = Intent().apply {
             component = ComponentName(TARGET_PKG, HookNotifyService::class.java.name)
             // 🟢 核心修复：包含处于停止状态的包
             addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
@@ -285,12 +296,14 @@ object HookNotifyClient {
             XposedBridge.log("$TAG Binding to service $TARGET_PKG as user $systemUser")
 
             // 以 SYSTEM 用户身份绑定服务
-            val success = ctx.bindServiceAsUser(
-                intent,
-                connection,
-                Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT or Context.BIND_ABOVE_CLIENT,
-                systemUser
-            )
+            val success = withCleanCallingIdentity {
+                ctx.bindServiceAsUser(
+                    intent,
+                    connection,
+                    Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT or Context.BIND_ABOVE_CLIENT,
+                    systemUser
+                )
+            }
 
             if (!success) {
                 XposedBridge.log("$TAG bindServiceAsUser returned false")
@@ -323,19 +336,21 @@ object HookNotifyClient {
     @SuppressLint("PrivateApi")
     private fun unstopPackage() {
         try {
-            val b = XposedHelpers.callStaticMethod(
-                Class.forName("android.os.ServiceManager"),
-                "getService",
-                "package"
-            ) as IBinder
-            val ipm = XposedHelpers.callStaticMethod(
-                Class.forName("android.content.pm.IPackageManager\$Stub"),
-                "asInterface",
-                b
-            )
-            // setPackageStoppedState(packageName, stopped, userId)
-            // UserId 0 是主用户
-            XposedHelpers.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
+            withCleanCallingIdentity {
+                val b = XposedHelpers.callStaticMethod(
+                    Class.forName("android.os.ServiceManager"),
+                    "getService",
+                    "package"
+                ) as IBinder
+                val ipm = XposedHelpers.callStaticMethod(
+                    Class.forName("android.content.pm.IPackageManager\$Stub"),
+                    "asInterface",
+                    b
+                )
+                // setPackageStoppedState(packageName, stopped, userId)
+                // UserId 0 是主用户
+                XposedHelpers.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
+            }
             XposedBridge.log("$TAG Success to unstop package $TARGET_PKG")
         } catch (t: Throwable) {
             XposedBridge.log("$TAG Failed to unstop package: ${t.message}")

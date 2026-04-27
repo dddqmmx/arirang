@@ -96,7 +96,7 @@
 
     <!-- Confirm Dialog -->
     <string name="clipboard_access_warning">剪贴板访问警告</string>
-    <string name="clipboard_access_desc">应用 [Unknown] 正在尝试读取剪切板。\n请选择策略：</string>
+    <string name="clipboard_access_desc">这个应用正在尝试读取剪贴板</string>
     <string name="allow_once">允许一次</string>
     <string name="always_allow">始终允许</string>
     <string name="always_deny">始终拒绝</string>

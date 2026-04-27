@@ -94,7 +94,7 @@
 
     <!-- Confirm Dialog -->
     <string name="clipboard_access_warning">クリップボードアクセスの警告</string>
-    <string name="clipboard_access_desc">アプリ [Unknown] がクリップボードを読み取ろうとしています。\nポリシーを選択してください：</string>
+    <string name="clipboard_access_desc">このアプリはクリップボードを読み取ろうとしています</string>
     <string name="allow_once">1回許可</string>
     <string name="always_allow">常に許可</string>
     <string name="always_deny">常に拒否</string>
