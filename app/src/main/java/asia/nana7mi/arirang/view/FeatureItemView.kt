@@ -1,77 +1,55 @@
-package asia.nana7mi.arirang.view;
+package asia.nana7mi.arirang.view
 
-import android.content.Context;
-import android.content.res.TypedArray;
-import android.util.AttributeSet;
-import android.view.LayoutInflater;
-import android.widget.FrameLayout;
-import android.widget.ImageView;
-import android.widget.TextView;
+import android.content.Context
+import android.util.AttributeSet
+import android.view.LayoutInflater
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
+import asia.nana7mi.arirang.R
 
-import asia.nana7mi.arirang.R;
+class FeatureItemView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : FrameLayout(context, attrs, defStyleAttr) {
 
-public class FeatureItemView extends FrameLayout {
+    private val featureNameTextView: TextView
+    private val featureIconView: ImageView
 
-    private TextView featureNameTextView;
-    private ImageView featureIconView;
+    var featureName: String? = null
+        set(value) {
+            field = value
+            featureNameTextView.text = value
+        }
 
-    private String featureName;
-    private int featureIcon;
+    var featureIcon: Int = R.drawable.ic_feature
+        set(value) {
+            field = value
+            featureIconView.setImageResource(value)
+        }
 
-    public FeatureItemView(Context context) {
-        super(context);
-        init(context);
-    }
+    init {
+        LayoutInflater.from(context).inflate(R.layout.item_feature, this, true)
+        featureNameTextView = findViewById(R.id.feature_name)
+        featureIconView = findViewById(R.id.feature_icon)
 
-    public FeatureItemView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        init(context);
-
-        if (attrs != null) {
-            TypedArray a = context.getTheme().obtainStyledAttributes(
-                    attrs,
-                    R.styleable.FeatureItemView,
-                    0, 0
-            );
+        attrs?.let {
+            val a = context.theme.obtainStyledAttributes(
+                it,
+                R.styleable.FeatureItemView,
+                0, 0
+            )
 
             try {
-                featureName = a.getString(R.styleable.FeatureItemView_featureName);
+                featureName = a.getString(R.styleable.FeatureItemView_featureName)
                 featureIcon = a.getResourceId(
-                        R.styleable.FeatureItemView_featureIcon,
-                        R.drawable.ic_feature
-                );
-
-                setFeatureName(featureName);
-                setFeatureIcon(featureIcon);
-
+                    R.styleable.FeatureItemView_featureIcon,
+                    R.drawable.ic_feature
+                )
             } finally {
-                a.recycle();
+                a.recycle()
             }
         }
-    }
-
-    private void init(Context context) {
-        LayoutInflater.from(context).inflate(R.layout.item_feature, this, true);
-
-        featureNameTextView = findViewById(R.id.feature_name);
-        featureIconView = findViewById(R.id.feature_icon);
-    }
-
-    public void setFeatureName(String featureName) {
-        this.featureName = featureName;
-        featureNameTextView.setText(featureName);
-    }
-
-    public void setFeatureIcon(int resId) {
-        this.featureIcon = resId;
-        featureIconView.setImageResource(resId);
-    }
-
-    public String getFeatureName() {
-        return featureName;
-    }
-
-    public int getFeatureIcon() {
-        return featureIcon;
     }
 }
