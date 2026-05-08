@@ -7,7 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="24dp"
-    tools:context=".ui.TestActivity">
+    tools:context=".ui.activity.TestActivity">
 
     <TextView
         android:id="@+id/tv_title"

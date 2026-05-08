@@ -38,7 +38,7 @@
                 android:value="Hook service for permission monitoring" />
         </service>
         <activity
-            android:name=".ui.ConfirmDialogActivity"
+            android:name=".ui.activity.ConfirmDialogActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleInstance"
@@ -46,28 +46,34 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Arirang.Transparent" />
         <activity
-            android:name=".ui.SimScopeActivity"
+            android:name=".ui.activity.SimScopeActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.LocationConfigActivity"
+            android:name=".ui.activity.LocationConfigActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.SimConfigActivity"
+            android:name=".ui.activity.SimConfigActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.PackageListConfigActivity"
+            android:name=".ui.activity.PackageListConfigActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.TestActivity"
+            android:name=".ui.activity.packagelist.PackageTemplateManagerActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.DeviceInfoConfigActivity"
+            android:name=".ui.activity.packagelist.PackageCustomListActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.LanguageSettingsActivity"
+            android:name=".ui.activity.TestActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.ClipboardConfigActivity"
+            android:name=".ui.activity.DeviceInfoConfigActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.activity.LanguageSettingsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.activity.ClipboardConfigActivity"
             android:exported="false" />
         <meta-data
             android:name="xposedmodule"
@@ -83,17 +89,17 @@
             android:resource="@array/xposedscope" />
         <!-- 1. 设置 SplashActivity 为启动页 (Launcher) -->
         <activity
-            android:name=".ui.SplashActivity"
+            android:name=".ui.activity.SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ui.MainActivity"
+        <activity android:name=".ui.activity.MainActivity"
             android:exported="false"/>
         <activity
-            android:name=".ui.InitActivity"
+            android:name=".ui.activity.InitActivity"
             android:exported="false"/>
     </application>
 

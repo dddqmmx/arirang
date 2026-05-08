@@ -2,12 +2,11 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
     android:background="?attr/colorSurface"
-    tools:context=".ui.activity.ClipboardConfigActivity">
+    android:fitsSystemWindows="true"
+    tools:context=".ui.activity.packagelist.PackageCustomListActivity">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -18,7 +17,8 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="@string/clipboard_permission_title"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:title="@string/template_edit_list"
             app:titleCentered="true" />
 
         <LinearLayout
@@ -29,9 +29,9 @@
             android:paddingBottom="12dp">
 
             <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Material3.CardView.Filled"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                style="@style/Widget.Material3.CardView.Filled"
                 app:cardCornerRadius="24dp"
                 app:cardElevation="0dp"
                 app:strokeWidth="0dp">
@@ -60,62 +60,13 @@
                         android:maxLines="1"
                         android:paddingHorizontal="12dp"
                         android:textSize="14sp" />
-
-                    <ImageView
-                        android:id="@+id/featureStatusIcon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_status_disabled"
-                        app:tint="?attr/colorSecondary" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/label_filter"
-                    android:textSize="14sp"
-                    android:textColor="?attr/colorOutline"/>
-
-                <androidx.appcompat.widget.AppCompatSpinner
-                    android:id="@+id/filterAppTypeSpinner"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:entries="@array/app_filter_options"
-                    android:backgroundTint="?attr/colorPrimary" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/label_mode"
-                    android:textSize="14sp"
-                    android:textColor="?attr/colorOutline"/>
-
-                <androidx.appcompat.widget.AppCompatSpinner
-                    android:id="@+id/filterSpinner"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:entries="@array/whitelist_blacklist_mode_options"
-                    android:backgroundTint="?attr/colorPrimary" />
-            </LinearLayout>
         </LinearLayout>
-
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/appListRecyclerView"
+        android:id="@+id/packageRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"

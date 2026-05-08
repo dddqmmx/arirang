@@ -1,9 +1,10 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.ResultReceiver
+import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -11,12 +12,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Security
@@ -24,7 +23,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -102,8 +100,8 @@ class ConfirmDialogActivity : ComponentActivity() {
         }.getOrDefault(pkgName)
     }
 
-    override fun onTouchEvent(event: android.view.MotionEvent?): Boolean {
-        if (event?.action == android.view.MotionEvent.ACTION_OUTSIDE) {
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        if (event?.action == MotionEvent.ACTION_OUTSIDE) {
             sendResult(getResultReceiver(), RESULT_DENY_ONCE)
             return true
         }

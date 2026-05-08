@@ -1,15 +1,13 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.LanguageItem
 import asia.nana7mi.arirang.ui.adapter.LanguageAdapter
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
 import asia.nana7mi.arirang.data.datastore.AppPreferences
 

@@ -15,7 +15,7 @@ import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
 import asia.nana7mi.arirang.hook.IHookNotify
-import asia.nana7mi.arirang.ui.ConfirmDialogActivity
+import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -81,7 +81,7 @@ class HookNotifyService : Service() {
     private var isFeatureEnabled = true
 
     @Volatile
-    private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
+    private var defaultPolicy = ClipboardPromptPrefs.Policy.ALLOW
 
     private var appPolicies = mapOf<String, ClipboardPromptPrefs.Policy>()
     private val serviceUserId = Process.myUid() / PER_USER_RANGE

@@ -1,5 +1,5 @@
 // 新建文件: SplashActivity.kt
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.annotation.SuppressLint
 import android.content.Intent

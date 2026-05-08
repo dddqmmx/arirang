@@ -8,7 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
 import android.widget.Toast
-import asia.nana7mi.arirang.ui.ConfirmDialogActivity
+import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 
 class ClipboardRequestReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

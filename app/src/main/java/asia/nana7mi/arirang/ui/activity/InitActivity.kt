@@ -1,10 +1,9 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.*

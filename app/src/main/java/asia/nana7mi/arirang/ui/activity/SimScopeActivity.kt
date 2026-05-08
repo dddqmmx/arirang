@@ -1,27 +1,7 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import asia.nana7mi.arirang.R
-import asia.nana7mi.arirang.model.AppInfo
-import asia.nana7mi.arirang.ui.adapter.AppListAdapter
-import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.View
-import android.widget.AdapterView
-import android.widget.EditText
-import androidx.appcompat.widget.AppCompatSpinner
-import androidx.core.content.edit
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.Date
 
 class SimScopeActivity : AppCompatActivity() {
 //    private val PREFS_NAME = "sim_config_prefs";

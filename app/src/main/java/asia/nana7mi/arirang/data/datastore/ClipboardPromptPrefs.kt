@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Process
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -166,12 +167,12 @@ object ClipboardPromptPrefs {
 
     suspend fun getDefaultPolicy(context: Context): Policy {
         val value = context.dataStore.data.map { preferences -> preferences[DEFAULT_POLICY] }.first()
-        return value?.let { Policy.valueOf(it) } ?: Policy.ASK
+        return value?.let { Policy.valueOf(it) } ?: Policy.ALLOW
     }
 
     fun getDefaultPolicyFlow(context: Context): kotlinx.coroutines.flow.Flow<Policy> {
         return context.dataStore.data.map { preferences ->
-            preferences[DEFAULT_POLICY]?.let { Policy.valueOf(it) } ?: Policy.ASK
+            preferences[DEFAULT_POLICY]?.let { Policy.valueOf(it) } ?: Policy.ALLOW
         }
     }
 
@@ -179,7 +180,7 @@ object ClipboardPromptPrefs {
         context.dataStore.edit { preferences -> preferences[DEFAULT_POLICY] = policy.name }
     }
 
-    private val IS_FEATURE_ENABLED = androidx.datastore.preferences.core.booleanPreferencesKey("is_feature_enabled")
+    private val IS_FEATURE_ENABLED = booleanPreferencesKey("is_feature_enabled")
 
     suspend fun isFeatureEnabled(context: Context): Boolean {
         return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: true }.first()

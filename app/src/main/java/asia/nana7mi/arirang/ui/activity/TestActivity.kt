@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.content.ComponentName
 import android.content.Intent

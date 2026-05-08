@@ -36,6 +36,11 @@
 
 
     <string name="clipboard_permission_title">剪切板读取权限</string>
+    <string name="clipboard_overlay_permission_title">需要悬浮窗权限</string>
+    <string name="clipboard_overlay_permission_message">剪切板的实时拦截需要显示在其他应用上层，请授予权限。</string>
+    <string name="grant_permission">授予</string>
+    <string name="not_now">暂不授予</string>
+    <string name="keep_original_setting">不授予</string>
     <string name="package_list_config_title">应用列表读取权限</string>
     <string name="sim_config_title">SIM信息配置</string>
     <string name="sim_scope_title">SIM修改作用域</string>
@@ -93,6 +98,33 @@
     <string name="filter_system_apps">系统应用</string>
     <string name="label_filter">筛选: </string>
     <string name="label_mode">模式: </string>
+    <string name="default_display_list">默认显示列表:</string>
+    <string name="display_all_visible">全部显示</string>
+    <string name="display_all_hidden">全部不显示</string>
+    <string name="display_custom">自定义列表</string>
+    <string name="template_manager">模板管理器</string>
+    <string name="template_new">新建模板</string>
+    <string name="template_name">模板名称</string>
+    <string name="template_parent">继承模板</string>
+    <string name="template_none">无模板</string>
+    <string name="template_edit_list">编辑显示列表</string>
+    <string name="template_rename">重命名</string>
+    <string name="template_set_parent">设置继承</string>
+    <string name="template_list_mode">列表模式</string>
+    <string name="template_mode_whitelist">白名单</string>
+    <string name="template_mode_blacklist">黑名单</string>
+    <string name="template_delete">删除</string>
+    <string name="template_empty">暂无模板</string>
+    <string name="open_template_manager">打开模板管理器</string>
+    <string name="app_visibility_title">%1$s 的显示列表</string>
+    <string name="visible_count">%1$d 个应用</string>
+    <string name="selected_count">已选择 %1$d 个</string>
+    <string name="inherits_from">继承 %1$s</string>
+    <string name="rule_status_template">模板: %1$s</string>
+    <string name="rule_status_custom">自定义: %1$d 个应用</string>
+    <string name="select_all">全选</string>
+    <string name="clear_all">全部取消</string>
+    <string name="invert_selection">反选</string>
 
     <!-- Confirm Dialog -->
     <string name="clipboard_access_warning">剪贴板访问警告</string>

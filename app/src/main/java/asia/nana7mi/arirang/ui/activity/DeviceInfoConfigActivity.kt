@@ -1,9 +1,10 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.telephony.TelephonyManager
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -77,7 +78,7 @@ class DeviceInfoConfigActivity : AppCompatActivity() {
         info.append("API 级别 (SDK): ${Build.VERSION.SDK_INT}\n")
         info.append("Fingerprint: ${Build.FINGERPRINT}\n")
 
-        val tm = getSystemService(TELEPHONY_SERVICE) as android.telephony.TelephonyManager
+        val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
         val simCountry = tm.simCountryIso?.uppercase() ?: "Unknown"
         info.append("SIM 国家 (ISO): $simCountry\n")
 

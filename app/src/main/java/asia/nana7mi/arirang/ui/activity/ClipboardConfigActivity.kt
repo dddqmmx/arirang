@@ -1,8 +1,11 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
-import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.AppInfo
 import asia.nana7mi.arirang.ui.adapter.AppListAdapter
@@ -18,12 +21,10 @@ import android.widget.ImageView
 import androidx.appcompat.widget.AppCompatSpinner
 import android.view.Menu
 import android.view.MenuItem
-import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,9 +41,26 @@ class ClipboardConfigActivity : BaseActivity() {
     private val allApps = mutableListOf<AppInfo>()
     
     private var isFeatureEnabled = true 
-    private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
+    private var defaultPolicy = ClipboardPromptPrefs.Policy.ALLOW
 
     private var appFilter = ClipboardPromptPrefs.AppFilter.ALL
+    private var suppressPolicySpinnerSelection = true
+    private var pendingOverlayGrantedAction: (() -> Unit)? = null
+    private var pendingOverlayDeniedAction: (() -> Unit)? = null
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val grantedAction = pendingOverlayGrantedAction
+        val deniedAction = pendingOverlayDeniedAction
+        pendingOverlayGrantedAction = null
+        pendingOverlayDeniedAction = null
+
+        if (Settings.canDrawOverlays(this)) {
+            grantedAction?.invoke()
+        } else {
+            deniedAction?.invoke()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,8 +116,15 @@ class ClipboardConfigActivity : BaseActivity() {
         recyclerView = findViewById(R.id.appListRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        adapter = AppListAdapter(mutableListOf()) { app, newState ->
-            updateAppPermission(app.packageName, newState)
+        adapter = AppListAdapter(mutableListOf()) { app, _, newState, rollback ->
+            if (newState == ClipboardPromptPrefs.Policy.ASK && !Settings.canDrawOverlays(this)) {
+                showAskOverlayPermissionDialog(
+                    onGranted = { updateAppPermission(app.packageName, newState) },
+                    onDenied = rollback
+                )
+            } else {
+                updateAppPermission(app.packageName, newState)
+            }
         }
         recyclerView.adapter = adapter
     }
@@ -116,19 +141,22 @@ class ClipboardConfigActivity : BaseActivity() {
         val spinnerListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (parent?.id == R.id.filterSpinner) {
+                    if (suppressPolicySpinnerSelection) return
                     val newPolicy = when(position) {
                         0 -> ClipboardPromptPrefs.Policy.ALLOW
                         1 -> ClipboardPromptPrefs.Policy.DENY
                         else -> ClipboardPromptPrefs.Policy.ASK
                     }
                     if (newPolicy != defaultPolicy) {
-                        defaultPolicy = newPolicy
-                        adapter.defaultPolicy = defaultPolicy
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            ClipboardPromptPrefs.setDefaultPolicy(this@ClipboardConfigActivity, defaultPolicy)
-                        }
-                        lifecycleScope.launch {
-                            loadInstalledApps()
+                        val oldPolicy = defaultPolicy
+                        if (newPolicy == ClipboardPromptPrefs.Policy.ASK && !Settings.canDrawOverlays(this@ClipboardConfigActivity)) {
+                            restoreDefaultPolicySpinner(oldPolicy)
+                            showAskOverlayPermissionDialog(
+                                onGranted = { applyDefaultPolicy(newPolicy) },
+                                onDenied = { restoreDefaultPolicySpinner(oldPolicy) }
+                            )
+                        } else {
+                            applyDefaultPolicy(newPolicy)
                         }
                     }
                 } else {
@@ -243,6 +271,7 @@ class ClipboardConfigActivity : BaseActivity() {
                 ClipboardPromptPrefs.Policy.DENY -> 1
                 ClipboardPromptPrefs.Policy.ASK -> 2
             }
+            suppressPolicySpinnerSelection = true
             filterSpinner.setSelection(spinnerPos)
             val appTypeSpinnerPos = when(appFilter) {
                 ClipboardPromptPrefs.AppFilter.ALL -> 0
@@ -250,6 +279,7 @@ class ClipboardConfigActivity : BaseActivity() {
                 ClipboardPromptPrefs.AppFilter.SYSTEM -> 2
             }
             filterAppTypeSpinner.setSelection(appTypeSpinnerPos)
+            suppressPolicySpinnerSelection = false
             updateFeatureStatusUI()
         }
     }
@@ -259,5 +289,57 @@ class ClipboardConfigActivity : BaseActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             ClipboardPromptPrefs.setAppPolicy(context, packageName,newState)
         }
+    }
+
+    private fun applyDefaultPolicy(newPolicy: ClipboardPromptPrefs.Policy) {
+        defaultPolicy = newPolicy
+        adapter.defaultPolicy = defaultPolicy
+        lifecycleScope.launch(Dispatchers.IO) {
+            ClipboardPromptPrefs.setDefaultPolicy(this@ClipboardConfigActivity, defaultPolicy)
+        }
+        lifecycleScope.launch {
+            loadInstalledApps()
+        }
+    }
+
+    private fun restoreDefaultPolicySpinner(policy: ClipboardPromptPrefs.Policy) {
+        val spinnerPos = when(policy) {
+            ClipboardPromptPrefs.Policy.ALLOW -> 0
+            ClipboardPromptPrefs.Policy.DENY -> 1
+            ClipboardPromptPrefs.Policy.ASK -> 2
+        }
+        suppressPolicySpinnerSelection = true
+        filterSpinner.setSelection(spinnerPos, false)
+        suppressPolicySpinnerSelection = false
+    }
+
+    private fun showAskOverlayPermissionDialog(
+        onGranted: () -> Unit,
+        onDenied: () -> Unit
+    ) {
+        pendingOverlayGrantedAction = onGranted
+        pendingOverlayDeniedAction = onDenied
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.clipboard_overlay_permission_title)
+            .setMessage(R.string.clipboard_overlay_permission_message)
+            .setPositiveButton(R.string.grant_permission) { _, _ ->
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                overlayPermissionLauncher.launch(intent)
+            }
+            .setNegativeButton(R.string.keep_original_setting) { _, _ ->
+                pendingOverlayGrantedAction = null
+                pendingOverlayDeniedAction = null
+                onDenied()
+            }
+            .setOnCancelListener {
+                pendingOverlayGrantedAction = null
+                pendingOverlayDeniedAction = null
+                onDenied()
+            }
+            .show()
     }
 }

@@ -1,11 +1,11 @@
 package asia.nana7mi.arirang.ui.fragment
 
 import asia.nana7mi.arirang.R
-import asia.nana7mi.arirang.ui.ClipboardConfigActivity
-import asia.nana7mi.arirang.ui.DeviceInfoConfigActivity
-import asia.nana7mi.arirang.ui.LocationConfigActivity
-import asia.nana7mi.arirang.ui.PackageListConfigActivity
-import asia.nana7mi.arirang.ui.SimConfigActivity
+import asia.nana7mi.arirang.ui.activity.ClipboardConfigActivity
+import asia.nana7mi.arirang.ui.activity.DeviceInfoConfigActivity
+import asia.nana7mi.arirang.ui.activity.LocationConfigActivity
+import asia.nana7mi.arirang.ui.activity.PackageListConfigActivity
+import asia.nana7mi.arirang.ui.activity.SimConfigActivity
 import asia.nana7mi.arirang.view.FeatureItemView
 import android.content.Intent
 
@@ -16,7 +16,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
-import asia.nana7mi.arirang.ui.TestActivity
+import asia.nana7mi.arirang.ui.activity.TestActivity
 import android.widget.Toast
 import asia.nana7mi.arirang.BuildConfig
 import com.google.android.material.color.MaterialColors

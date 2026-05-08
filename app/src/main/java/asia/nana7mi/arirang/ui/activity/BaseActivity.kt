@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import asia.nana7mi.arirang.data.datastore.AppPreferences
 import asia.nana7mi.arirang.util.LocaleHelper

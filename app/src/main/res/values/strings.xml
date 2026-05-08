@@ -35,6 +35,11 @@
     <string name="feature_permission_stats">Permission Usage Statistics</string>
 
     <string name="clipboard_permission_title">Clipboard Access Permission</string>
+    <string name="clipboard_overlay_permission_title">Overlay Permission Required</string>
+    <string name="clipboard_overlay_permission_message">Real-time clipboard interception needs permission to display over other apps. Please grant this permission.</string>
+    <string name="grant_permission">Grant</string>
+    <string name="not_now">Not Now</string>
+    <string name="keep_original_setting">Do Not Grant</string>
     <string name="package_list_config_title">App List Access Permission</string>
     <string name="sim_config_title">SIM Info Configuration</string>
     <string name="sim_scope_title">SIM Modification Scope</string>
@@ -90,6 +95,33 @@
     <string name="filter_system_apps">System Apps</string>
     <string name="label_filter">Filter: </string>
     <string name="label_mode">Mode: </string>
+    <string name="default_display_list">Default Display List:</string>
+    <string name="display_all_visible">Show All</string>
+    <string name="display_all_hidden">Show None</string>
+    <string name="display_custom">Custom List</string>
+    <string name="template_manager">Template Manager</string>
+    <string name="template_new">New Template</string>
+    <string name="template_name">Template Name</string>
+    <string name="template_parent">Inherited Template</string>
+    <string name="template_none">No Template</string>
+    <string name="template_edit_list">Edit Display List</string>
+    <string name="template_rename">Rename</string>
+    <string name="template_set_parent">Set Inheritance</string>
+    <string name="template_list_mode">List Mode</string>
+    <string name="template_mode_whitelist">Whitelist</string>
+    <string name="template_mode_blacklist">Blacklist</string>
+    <string name="template_delete">Delete</string>
+    <string name="template_empty">No templates yet</string>
+    <string name="open_template_manager">Open Template Manager</string>
+    <string name="app_visibility_title">Display List for %1$s</string>
+    <string name="visible_count">%1$d apps</string>
+    <string name="selected_count">%1$d selected</string>
+    <string name="inherits_from">Inherits %1$s</string>
+    <string name="rule_status_template">Template: %1$s</string>
+    <string name="rule_status_custom">Custom: %1$d apps</string>
+    <string name="select_all">Select All</string>
+    <string name="clear_all">Clear All</string>
+    <string name="invert_selection">Invert Selection</string>
 
     <!-- Confirm Dialog -->
     <string name="clipboard_access_warning">Clipboard Access Warning</string>

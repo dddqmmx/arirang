@@ -35,6 +35,11 @@
     <string name="feature_permission_stats">アプリの権限使用回数統計</string>
 
     <string name="clipboard_permission_title">クリップボード読み取り権限</string>
+    <string name="clipboard_overlay_permission_title">オーバーレイ権限が必要です</string>
+    <string name="clipboard_overlay_permission_message">クリップボードのリアルタイム遮断には、他のアプリの上に表示する権限が必要です。権限を付与してください。</string>
+    <string name="grant_permission">許可</string>
+    <string name="not_now">今はしない</string>
+    <string name="keep_original_setting">許可しない</string>
     <string name="package_list_config_title">アプリリスト読み取り権限</string>
     <string name="sim_config_title">SIMデータ設定</string>
     <string name="sim_scope_title">SIM改ざんの影響範囲</string>
@@ -91,6 +96,33 @@
     <string name="filter_system_apps">システムアプリ</string>
     <string name="label_filter">フィルター: </string>
     <string name="label_mode">モード: </string>
+    <string name="default_display_list">既定の表示リスト:</string>
+    <string name="display_all_visible">すべて表示</string>
+    <string name="display_all_hidden">すべて非表示</string>
+    <string name="display_custom">カスタムリスト</string>
+    <string name="template_manager">テンプレート管理</string>
+    <string name="template_new">新規テンプレート</string>
+    <string name="template_name">テンプレート名</string>
+    <string name="template_parent">継承テンプレート</string>
+    <string name="template_none">テンプレートなし</string>
+    <string name="template_edit_list">表示リストを編集</string>
+    <string name="template_rename">名前を変更</string>
+    <string name="template_set_parent">継承を設定</string>
+    <string name="template_list_mode">リストモード</string>
+    <string name="template_mode_whitelist">ホワイトリスト</string>
+    <string name="template_mode_blacklist">ブラックリスト</string>
+    <string name="template_delete">削除</string>
+    <string name="template_empty">テンプレートはありません</string>
+    <string name="open_template_manager">テンプレート管理を開く</string>
+    <string name="app_visibility_title">%1$s の表示リスト</string>
+    <string name="visible_count">%1$d 個のアプリ</string>
+    <string name="selected_count">%1$d 個選択済み</string>
+    <string name="inherits_from">%1$s を継承</string>
+    <string name="rule_status_template">テンプレート: %1$s</string>
+    <string name="rule_status_custom">カスタム: %1$d 個のアプリ</string>
+    <string name="select_all">すべて選択</string>
+    <string name="clear_all">すべて解除</string>
+    <string name="invert_selection">選択を反転</string>
 
     <!-- Confirm Dialog -->
     <string name="clipboard_access_warning">クリップボードアクセスの警告</string>
@@ -116,4 +148,6 @@
     <string name="service_not_connected">サービスが接続されていません。再試行してください</string>
 
     <string name="feature_not_available">未開放</string>
+    <string name="reset_all">すべての設定をリセット</string>
+    <string name="reset_all_confirm">すべてのクリップボード設定をリセットしますか？アプリごとのポリシーが消去され、既定の動作に戻ります。</string>
 </resources>

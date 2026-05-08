@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui
+package asia.nana7mi.arirang.ui.activity
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity

@@ -19,10 +19,15 @@ import kotlinx.coroutines.withContext
 
 class AppListAdapter(
     private val appList: MutableList<AppInfo>,
-    private val onPermissionChange: (AppInfo, ClipboardPromptPrefs.Policy) -> Unit
+    private val onPermissionChange: (
+        AppInfo,
+        ClipboardPromptPrefs.Policy,
+        ClipboardPromptPrefs.Policy,
+        () -> Unit
+    ) -> Unit
 ) : RecyclerView.Adapter<AppListAdapter.ViewHolder>() {
 
-    var defaultPolicy: ClipboardPromptPrefs.Policy = ClipboardPromptPrefs.Policy.ASK
+    var defaultPolicy: ClipboardPromptPrefs.Policy = ClipboardPromptPrefs.Policy.ALLOW
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val appIcon: ImageView = itemView.findViewById(R.id.appIcon)
@@ -48,10 +53,15 @@ class AppListAdapter(
 
         holder.itemView.setOnClickListener {
             showPermissionDialog(holder.itemView.context, app) { newState ->
+                val oldState = app.permissionState
                 app.permissionState = newState
                 app.isConfigured = newState != defaultPolicy
                 updatePermissionText(holder.permissionStatusText, newState)
-                onPermissionChange(app, newState)
+                onPermissionChange(app, oldState, newState) {
+                    app.permissionState = oldState
+                    app.isConfigured = oldState != defaultPolicy
+                    updatePermissionText(holder.permissionStatusText, oldState)
+                }
             }
         }
 
