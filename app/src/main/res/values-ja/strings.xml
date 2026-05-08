@@ -15,7 +15,7 @@
     <string name="category_permission">権限</string>
     <string name="category_anonymization">匿名化</string>
     <string name="category_control">制御</string>
-    <string name="category_audit">审计</string>
+    <string name="category_audit">監査</string>
 
     <string name="feature_clipboard">クリップボード</string>
     <string name="feature_sensor">センサー</string>
@@ -32,7 +32,7 @@
     <string name="feature_background_network">バック通信</string>
     <string name="feature_force_proxy">強制プロキシ</string>
 
-    <string name="feature_permission_stats">アプリの権限使用回数統計</string>
+    <string name="feature_permission_stats">プライバシーセルフチェック</string>
 
     <string name="clipboard_permission_title">クリップボード読み取り権限</string>
     <string name="clipboard_overlay_permission_title">オーバーレイ権限が必要です</string>
@@ -146,6 +146,76 @@
     <string name="result_deny">結果: 拒否 (DENY)</string>
     <string name="exception">例外: </string>
     <string name="service_not_connected">サービスが接続されていません。再試行してください</string>
+
+    <!-- Self Check -->
+    <string name="self_check_title">プライバシーセルフチェック</string>
+    <string name="self_check_summary_title">現在の可視性</string>
+    <string name="self_check_summary_idle">チェックを実行して、通常のアプリがこの端末から現在読み取れる情報を確認します。</string>
+    <string name="self_check_summary_running">可視状態の端末情報を確認しています...</string>
+    <string name="self_check_summary_result">%1$d 項目が可視、%2$d 項目はブロック済みまたは利用不可のようです。</string>
+    <string name="self_check_run">セルフチェックを実行</string>
+    <string name="self_check_run_again">再チェック</string>
+    <string name="self_check_nav_device">端末</string>
+    <string name="self_check_nav_build">ビルド</string>
+    <string name="self_check_nav_telephony">電話</string>
+    <string name="self_check_nav_sim">SIM</string>
+    <string name="self_check_nav_apps">アプリ</string>
+    <string name="self_check_nav_wifi">Wi-Fi</string>
+    <string name="self_check_nav_accounts">アカウント</string>
+    <string name="self_check_nav_drm">DRM</string>
+    <string name="self_check_nav_network">ネットワーク</string>
+    <string name="self_check_nav_bluetooth">Bluetooth</string>
+    <string name="self_check_waiting">結果を待機中</string>
+    <string name="self_check_status_checking">確認中</string>
+    <string name="self_check_status_visible">このアプリから可視</string>
+    <string name="self_check_status_not_visible">可視ではありません</string>
+    <string name="self_check_status_not_supported">非対応</string>
+    <string name="self_check_permission_needed">権限が必要です</string>
+    <string name="self_check_device_title">端末識別子</string>
+    <string name="self_check_build_title">ビルドフィンガープリント</string>
+    <string name="self_check_telephony_title">電話識別子</string>
+    <string name="self_check_sim_title">SIMカード情報</string>
+    <string name="self_check_apps_title">インストール済みアプリ</string>
+    <string name="self_check_wifi_title">Wi-Fi情報</string>
+    <string name="self_check_accounts_title">端末アカウント</string>
+    <string name="self_check_drm_title">DRM識別子</string>
+    <string name="self_check_network_title">ネットワークインターフェース</string>
+    <string name="self_check_bluetooth_title">Bluetoothデバイス</string>
+    <string name="self_check_device_visible">Android ID: %1$s</string>
+    <string name="self_check_device_hidden">読み取り可能な端末識別子は返されませんでした。</string>
+    <string name="self_check_build_hidden">読み取り可能なビルド情報は返されませんでした。</string>
+    <string name="self_check_telephony_hidden">電話識別子は返されませんでした。</string>
+    <string name="self_check_sim_hidden">有効なSIMカード情報は返されませんでした。</string>
+    <string name="self_check_apps_hidden">他のインストール済みアプリは返されませんでした。</string>
+    <string name="self_check_wifi_hidden">Wi-Fiネットワークまたはスキャン結果は返されませんでした。</string>
+    <string name="self_check_accounts_hidden">端末アカウントは返されませんでした。</string>
+    <string name="self_check_drm_hidden">DRM端末識別子は返されませんでした。</string>
+    <string name="self_check_network_hidden">ネットワークインターフェース識別子は返されませんでした。</string>
+    <string name="self_check_bluetooth_hidden">ペアリング済みBluetoothデバイスは返されませんでした。</string>
+    <string name="self_check_phone_permission_hint">電話権限を許可すると、SIM、IMEI、加入者ID、電話番号の可視性を確認できます。</string>
+    <string name="self_check_accounts_permission_hint">アカウント権限を許可すると、端末アカウントが可視かどうかを確認できます。</string>
+    <string name="self_check_wifi_permission_hint">位置情報権限を許可すると、Wi-Fi情報が非表示になっているか確認できます。</string>
+    <string name="self_check_bluetooth_permission_hint">付近のデバイス権限を許可すると、ペアリング済みBluetoothデバイスが非表示になっているか確認できます。</string>
+    <string name="self_check_bluetooth_not_supported">この端末はBluetoothアダプターを報告していません。</string>
+    <string name="self_check_unknown_name">不明</string>
+    <string name="self_check_wifi_current">現在のネットワーク: %1$s</string>
+    <string name="self_check_wifi_bssid">アクセスポイント: %1$s</string>
+
+    <plurals name="self_check_apps_status">
+        <item quantity="other">%1$d 個のアプリが返されました</item>
+    </plurals>
+    <plurals name="self_check_wifi_status">
+        <item quantity="other">%1$d 個のWi-Fiネットワークが返されました</item>
+    </plurals>
+    <plurals name="self_check_sim_status">
+        <item quantity="other">%1$d 枚のSIMが返されました</item>
+    </plurals>
+    <plurals name="self_check_accounts_status">
+        <item quantity="other">%1$d 個のアカウントが返されました</item>
+    </plurals>
+    <plurals name="self_check_bluetooth_status">
+        <item quantity="other">%1$d 個のペアリング済みデバイスが返されました</item>
+    </plurals>
 
     <string name="feature_not_available">未開放</string>
     <string name="reset_all">すべての設定をリセット</string>
