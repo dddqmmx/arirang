@@ -12,6 +12,9 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.telephony.CellIdentity
+import android.telephony.CellInfo
+import android.telephony.CellLocation
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.view.View
@@ -251,7 +254,13 @@ class SelfCheckActivity : BaseActivity() {
             "User" to Build.USER,
             "Fingerprint" to Build.FINGERPRINT,
             "Build time" to Build.TIME.takeIf { it > 0 }?.toString(),
-            "Build.SERIAL" to Build.SERIAL
+            "Build.SERIAL" to Build.SERIAL,
+            "Property gsm.sim.operator.iso-country" to readSystemProperty("gsm.sim.operator.iso-country"),
+            "Property gsm.sim.operator.numeric" to readSystemProperty("gsm.sim.operator.numeric"),
+            "Property gsm.sim.operator.alpha" to readSystemProperty("gsm.sim.operator.alpha"),
+            "Property gsm.operator.iso-country" to readSystemProperty("gsm.operator.iso-country"),
+            "Property gsm.operator.numeric" to readSystemProperty("gsm.operator.numeric"),
+            "Property gsm.operator.alpha" to readSystemProperty("gsm.operator.alpha")
         ).filter { !it.second.isNullOrBlank() && it.second != Build.UNKNOWN }
 
         return visibleListResult(
@@ -296,6 +305,90 @@ class SelfCheckActivity : BaseActivity() {
                 ?.takeUnless { it.isBlank() }
                 ?.let { values.add("Subscriber ID: ${it.maskMiddle()}") }
 
+            runCatching { telephonyManager.simCountryIso }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("SIM country ISO: $it") }
+
+            runCatching { telephonyManager.simOperator }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("SIM operator numeric: $it") }
+
+            runCatching { telephonyManager.simOperatorName }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("SIM operator name: $it") }
+
+            runCatching { telephonyManager.simCarrierId }
+                .getOrNull()
+                ?.let { values.add("SIM carrier ID: $it") }
+
+            runCatching { telephonyManager.simCarrierIdName }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("SIM carrier ID name: $it") }
+
+            runCatching { telephonyManager.carrierIdFromSimMccMnc }
+                .getOrNull()
+                ?.let { values.add("Carrier ID from SIM MCC/MNC: $it") }
+
+            runCatching { telephonyManager.networkCountryIso }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("Network country ISO: $it") }
+
+            runCatching { telephonyManager.networkOperator }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("Network operator numeric: $it") }
+
+            runCatching { telephonyManager.networkOperatorName }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("Network operator name: $it") }
+
+            runCatching { telephonyManager.serviceState }
+                .getOrNull()
+                ?.let { values.add("ServiceState: $it") }
+
+            runCatching { telephonyManager.allCellInfo.orEmpty() }
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.joinToString("\n") { "CellInfo: ${it.sanitizeForDisplay()}" }
+                ?.let { values.add(it) }
+
+            runCatching { telephonyManager.cellLocation }
+                .getOrNull()
+                ?.let { values.add("CellLocation: $it") }
+
+            runCatching { telephonyManager.forbiddenPlmns.orEmpty() }
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.joinToString(prefix = "Forbidden PLMNs: ")
+                ?.let { values.add(it) }
+
+            runCatching { telephonyManager.equivalentHomePlmns.orEmpty() }
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.joinToString(prefix = "Equivalent home PLMNs: ")
+                ?.let { values.add(it) }
+
+            runCatching { telephonyManager.groupIdLevel1 }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("Group ID level 1: $it") }
+
+            runCatching { telephonyManager.emergencyNumberList }
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.entries
+                ?.joinToString("\n") { entry ->
+                    val numbers = entry.value.take(6).joinToString { it.toString() }
+                    "Emergency numbers[${entry.key}]: $numbers"
+                }
+                ?.let { values.add(it) }
+
             repeat(phoneCount.coerceAtMost(4)) { slot ->
                 runCatching { telephonyManager.getImei(slot) }
                     .getOrNull()
@@ -306,6 +399,16 @@ class SelfCheckActivity : BaseActivity() {
                     .getOrNull()
                     ?.takeUnless { it.isBlank() }
                     ?.let { values.add("MEID slot $slot: ${it.maskMiddle()}") }
+
+                runCatching { telephonyManager.getNetworkCountryIso(slot) }
+                    .getOrNull()
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("Network country ISO slot $slot: $it") }
+
+                runCatching { telephonyManager.getTypeAllocationCode(slot) }
+                    .getOrNull()
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("Type allocation code slot $slot: ${it.maskMiddle()}") }
             }
 
             visibleListResult(values, getString(R.string.self_check_status_visible), getString(R.string.self_check_telephony_hidden))
@@ -519,6 +622,23 @@ class SelfCheckActivity : BaseActivity() {
 
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun readSystemProperty(key: String): String? {
+        return runCatching {
+            val systemPropertiesClass = Class.forName("android.os.SystemProperties")
+            systemPropertiesClass
+                .getMethod("get", String::class.java, String::class.java)
+                .invoke(null, key, "") as? String
+        }.getOrNull()
+    }
+
+    private fun CellInfo.sanitizeForDisplay(): String {
+        val identity = runCatching {
+            javaClass.methods.firstOrNull { it.name == "getCellIdentity" && it.parameterTypes.isEmpty() }
+                ?.invoke(this) as? CellIdentity
+        }.getOrNull()
+        return identity?.toString() ?: toString()
     }
 
     private fun visibleListResult(values: List<String>, visibleStatus: String, emptyText: String): CheckResult {

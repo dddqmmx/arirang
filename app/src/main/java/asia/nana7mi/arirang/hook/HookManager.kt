@@ -7,9 +7,9 @@ class HookManager : IXposedHookLoadPackage {
     private val modules = listOf(
         SystemServerHook(),
         FuckClipboard(),
+        FuckSim(),
 //        FuckLocation(),
 //        FuckPackageList(),
-//        FuckSIM(),
         XposedActivation()
     )
 
