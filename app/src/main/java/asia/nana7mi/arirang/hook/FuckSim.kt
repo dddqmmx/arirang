@@ -60,7 +60,7 @@ internal object SimNumberHider {
  * This rewrites the telephony-facing subscription and phone-number read paths, but does not touch
  * the low-level radio stack or subscription database writes.
  */
-class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "android")) {
+class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "android"), matchClient = true) {
 
     private data class OperatorProfile(
         val countryIso: String,
@@ -96,11 +96,9 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         runCatching {
             hookServiceStateSurfaces(lpparam.classLoader)
             hookPhoneNumberSurfaces(lpparam.classLoader)
-
-            if (lpparam.packageName == "android") {
-                XposedBridge.log("Arirang: SIM proof system_server hook installed")
-                return
-            }
+            hookTelephonyManagerReadSurfaces(lpparam.classLoader)
+            hookSubscriptionManagerClientReaders(lpparam.classLoader)
+            hookSubscriptionInfoAccessors(lpparam.classLoader)
 
             val serviceClass = XposedHelpers.findClassIfExists(
                 "com.android.internal.telephony.subscription.SubscriptionManagerService",
@@ -112,6 +110,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 hookSubscriptionPhoneNumberReaders(serviceClass)
             } else {
                 XposedBridge.log("Arirang: SubscriptionManagerService not found for SIM country proof")
+            }
+
+            if (lpparam.packageName == "android") {
+                hookGeneratedTelephonyProperties(lpparam.classLoader)
+                writeProofTelephonyProperties()
+                XposedBridge.log("Arirang: SIM proof system_server hook installed")
+                return
             }
 
             hookPhoneInterfaceManager(lpparam.classLoader)
@@ -173,6 +178,86 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         )
     }
 
+    private fun hookTelephonyManagerReadSurfaces(classLoader: ClassLoader) {
+        val telephonyManagerClass = XposedHelpers.findClassIfExists(
+            "android.telephony.TelephonyManager",
+            classLoader
+        ) ?: return
+
+        mapOf(
+            "getSimCountryIso" to operatorProfile.countryIso,
+            "getSimOperator" to operatorProfile.operatorNumeric,
+            "getSimOperatorNumeric" to operatorProfile.operatorNumeric,
+            "getSimOperatorName" to operatorProfile.alphaLong,
+            "getSimOperatorNameForPhone" to operatorProfile.alphaLong,
+            "getNetworkCountryIso" to operatorProfile.countryIso,
+            "getNetworkOperator" to operatorProfile.operatorNumeric,
+            "getNetworkOperatorName" to operatorProfile.alphaLong
+        ).forEach { (methodName, value) ->
+            hookAllExistingMethods(telephonyManagerClass, methodName, value)
+        }
+
+        mapOf(
+            "getSimCarrierId" to operatorProfile.carrierId,
+            "getCarrierIdFromSimMccMnc" to operatorProfile.carrierId
+        ).forEach { (methodName, value) ->
+            hookAllExistingMethods(telephonyManagerClass, methodName, value)
+        }
+
+        hookAllExistingMethods(
+            telephonyManagerClass,
+            "getSimCarrierIdName",
+            operatorProfile.alphaLong
+        )
+    }
+
+    private fun hookSubscriptionManagerClientReaders(classLoader: ClassLoader) {
+        val subscriptionManagerClass = XposedHelpers.findClassIfExists(
+            "android.telephony.SubscriptionManager",
+            classLoader
+        ) ?: return
+
+        listOf(
+            "getActiveSubscriptionInfoList",
+            "getAvailableSubscriptionInfoList",
+            "getAccessibleSubscriptionInfoList",
+            "getCompleteActiveSubscriptionInfoList",
+            "getAllSubscriptionInfoList",
+            "getSubscriptionInfo",
+            "getActiveSubscriptionInfo",
+            "getActiveSubscriptionInfoForSimSlotIndex",
+            "getActiveSubscriptionInfoForIcc"
+        ).forEach { methodName ->
+            hookSubscriptionInfoResult(subscriptionManagerClass, methodName)
+        }
+    }
+
+    private fun hookSubscriptionInfoAccessors(classLoader: ClassLoader) {
+        val subscriptionInfoClass = XposedHelpers.findClassIfExists(
+            "android.telephony.SubscriptionInfo",
+            classLoader
+        ) ?: return
+
+        mapOf(
+            "getDisplayName" to operatorProfile.alphaLong,
+            "getCarrierName" to operatorProfile.alphaLong,
+            "getCountryIso" to operatorProfile.countryIso,
+            "getMccString" to operatorProfile.mcc,
+            "getMncString" to operatorProfile.mnc,
+            "getNumber" to operatorProfile.phoneNumber
+        ).forEach { (methodName, value) ->
+            hookSubscriptionInfoAccessor(subscriptionInfoClass, methodName, value)
+        }
+
+        mapOf(
+            "getCarrierId" to operatorProfile.carrierId,
+            "getMcc" to operatorProfile.mccInt,
+            "getMnc" to operatorProfile.mncInt
+        ).forEach { (methodName, value) ->
+            hookSubscriptionInfoAccessor(subscriptionInfoClass, methodName, value)
+        }
+    }
+
     private fun hookServiceStateSurfaces(classLoader: ClassLoader) {
         val serviceStateClass = XposedHelpers.findClassIfExists(
             "android.telephony.ServiceState",
@@ -223,17 +308,15 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         }
 
         mapOf(
+            "getSimCountryIsoForPhone" to operatorProfile.countryIso,
+            "getSimOperatorForPhone" to operatorProfile.operatorNumeric,
+            "getSimOperatorNumericForPhone" to operatorProfile.operatorNumeric,
+            "getSimOperatorNameForPhone" to operatorProfile.alphaLong,
             "getNetworkCountryIsoForPhone" to operatorProfile.countryIso,
             "getNetworkOperatorForPhone" to operatorProfile.operatorNumeric,
             "getNetworkOperatorName" to operatorProfile.alphaLong
         ).forEach { (methodName, value) ->
-            XposedBridge.hookAllMethods(phoneInterfaceManagerClass, methodName, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (param.result is String || param.result == null) {
-                        param.result = value
-                    }
-                }
-            })
+            hookAllExistingMethods(phoneInterfaceManagerClass, methodName, value)
         }
 
         hookAllExistingStringMethods(
@@ -252,11 +335,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "getSubscriptionInfo",
             "getActiveSubscriptionInfo"
         ).forEach { methodName ->
-            XposedBridge.hookAllMethods(serviceClass, methodName, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    param.result = rewriteSubscriptionResult(param.result)
-                }
-            })
+            hookSubscriptionInfoResult(serviceClass, methodName)
         }
     }
 
@@ -318,6 +397,9 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "icc_operator_iso_country" to operatorProfile.countryIsoList,
             "icc_operator_numeric" to operatorProfile.operatorNumericList,
             "icc_operator_alpha" to operatorProfile.alphaList,
+            "sim_operator_iso_country" to operatorProfile.countryIsoList,
+            "sim_operator_numeric" to operatorProfile.operatorNumericList,
+            "sim_operator_alpha" to operatorProfile.alphaList,
             "operator_iso_country" to operatorProfile.countryIsoList,
             "operator_numeric" to operatorProfile.operatorNumericList,
             "operator_alpha" to operatorProfile.alphaList
@@ -366,7 +448,20 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun rewriteSubscriptionResult(result: Any?): Any? {
-        return SimNumberHider.rewriteSubscriptionResult(result, operatorProfile.phoneNumber)
+        return when (result) {
+            is Iterable<*> -> {
+                result.forEach { rewriteSubscriptionInfo(it) }
+                result
+            }
+            is Array<*> -> {
+                result.forEach { rewriteSubscriptionInfo(it) }
+                result
+            }
+            else -> {
+                rewriteSubscriptionInfo(result)
+                result
+            }
+        }
     }
 
     private fun rewriteSubscriptionInfo(subscriptionInfo: Any?) {
@@ -553,6 +648,50 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             current = current.superclass
         }
         return null
+    }
+
+    private fun hookSubscriptionInfoResult(targetClass: Class<*>, methodName: String) {
+        if (targetClass.declaredMethods.none { it.name == methodName }) return
+
+        XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                param.result = rewriteSubscriptionResult(param.result)
+            }
+        })
+    }
+
+    private fun hookSubscriptionInfoAccessor(targetClass: Class<*>, methodName: String, resultValue: Any) {
+        if (targetClass.declaredMethods.none { it.name == methodName }) return
+
+        XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                rewriteSubscriptionInfo(param.thisObject)
+            }
+
+            override fun afterHookedMethod(param: MethodHookParam) {
+                param.result = coerceHookResult(resultValue, param.result)
+            }
+        })
+    }
+
+    private fun hookAllExistingMethods(targetClass: Class<*>, methodName: String, resultValue: Any?) {
+        if (targetClass.declaredMethods.none { it.name == methodName }) return
+
+        XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                param.result = coerceHookResult(resultValue, param.result)
+            }
+        })
+    }
+
+    private fun coerceHookResult(value: Any?, originalResult: Any?): Any? {
+        return when (originalResult) {
+            null -> value
+            is Int -> value.toString().toIntOrNull() ?: originalResult
+            is CharSequence -> value?.toString()
+            is String -> value?.toString()
+            else -> value
+        }
     }
 
     private fun hookAllExistingStringMethods(
