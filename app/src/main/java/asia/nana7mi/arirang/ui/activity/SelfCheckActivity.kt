@@ -14,9 +14,9 @@ import android.os.Bundle
 import android.provider.Settings
 import android.telephony.CellIdentity
 import android.telephony.CellInfo
-import android.telephony.CellLocation
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.ScrollView
@@ -33,6 +33,10 @@ import java.net.NetworkInterface
 import java.util.UUID
 
 class SelfCheckActivity : BaseActivity() {
+
+    private companion object {
+        private const val PHONE_DIAG_TAG = "Arirang/SelfCheckPhoneDiag"
+    }
 
     private lateinit var summaryText: TextView
     private lateinit var runButton: MaterialButton
@@ -282,18 +286,62 @@ class SelfCheckActivity : BaseActivity() {
 
         return try {
             val telephonyManager = getSystemService(TelephonyManager::class.java)
+            val subscriptionManager = getSystemService(SubscriptionManager::class.java)
             val phoneCount = telephonyManager.phoneCount
             val values = mutableListOf<String>()
+            Log.d(
+                PHONE_DIAG_TAG,
+                "readTelephonyInfo start package=$packageName phoneCount=$phoneCount " +
+                    "telephonyManager=${telephonyManager.javaClass.name} subscriptionManager=${subscriptionManager.javaClass.name}"
+            )
 
             runCatching { Build.getSerial() }
                 .getOrNull()
                 ?.takeUnless { it.isBlank() || it == Build.UNKNOWN }
                 ?.let { values.add("System serial: ${it.maskMiddle()}") }
 
-            runCatching { telephonyManager.line1Number }
-                .getOrNull()
+            val defaultLine1 = runCatching { telephonyManager.line1Number }
+            logPhoneProbe("TelephonyManager.getLine1Number/default", defaultLine1)
+            defaultLine1.getOrNull()
                 ?.takeUnless { it.isBlank() }
                 ?.let { values.add("Phone number: ${it.maskMiddle()}") }
+
+            val activeSubscriptions = runCatching {
+                subscriptionManager.activeSubscriptionInfoList.orEmpty()
+            }.onFailure {
+                Log.e(PHONE_DIAG_TAG, "SubscriptionManager.activeSubscriptionInfoList failed", it)
+            }.getOrDefault(emptyList())
+            Log.d(
+                PHONE_DIAG_TAG,
+                "activeSubscriptions size=${activeSubscriptions.size} " +
+                    activeSubscriptions.joinToString(prefix = "[", postfix = "]") {
+                        "subId=${it.subscriptionId},slot=${it.simSlotIndex},number=${it.number.maskForPhoneDiag()}"
+                    }
+            )
+
+            activeSubscriptions.take(4).forEach { subscription ->
+                val scopedLine1 = runCatching {
+                    telephonyManager.createForSubscriptionId(subscription.subscriptionId).line1Number
+                }
+                logPhoneProbe(
+                    "TelephonyManager.createForSubscriptionId(${subscription.subscriptionId}).getLine1Number",
+                    scopedLine1
+                )
+                scopedLine1.getOrNull()
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("Phone number sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
+
+                val subscriptionPhoneNumber = runCatching {
+                    subscriptionManager.getPhoneNumber(subscription.subscriptionId)
+                }
+                logPhoneProbe(
+                    "SubscriptionManager.getPhoneNumber(${subscription.subscriptionId})",
+                    subscriptionPhoneNumber
+                )
+                subscriptionPhoneNumber.getOrNull()
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("Subscription phone number ${subscription.subscriptionId}: ${it.maskMiddle()}") }
+            }
 
             runCatching { telephonyManager.simSerialNumber }
                 .getOrNull()
@@ -430,6 +478,13 @@ class SelfCheckActivity : BaseActivity() {
         return try {
             val subscriptionManager = getSystemService(SubscriptionManager::class.java)
             val subscriptions = subscriptionManager.activeSubscriptionInfoList.orEmpty()
+            Log.d(
+                PHONE_DIAG_TAG,
+                "readSimInfo subscriptions size=${subscriptions.size} " +
+                    subscriptions.joinToString(prefix = "[", postfix = "]") {
+                        "subId=${it.subscriptionId},slot=${it.simSlotIndex},getNumber=${it.number.maskForPhoneDiag()}"
+                    }
+            )
             val values = subscriptions.take(6).map { sub ->
                 listOfNotNull(
                     "Slot ${sub.simSlotIndex}",
@@ -652,6 +707,22 @@ class SelfCheckActivity : BaseActivity() {
 
     private fun Exception.readableMessage(): String {
         return message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
+    }
+
+    private fun logPhoneProbe(label: String, result: Result<String?>) {
+        result
+            .onSuccess { value ->
+                Log.d(PHONE_DIAG_TAG, "$label success value=${value.maskForPhoneDiag()}")
+            }
+            .onFailure { error ->
+                Log.e(PHONE_DIAG_TAG, "$label failed", error)
+            }
+    }
+
+    private fun String?.maskForPhoneDiag(): String {
+        if (this == null) return "null"
+        if (isBlank()) return "blank(len=$length)"
+        return if (length <= 4) "len=$length,value=$this" else "len=$length,tail=${takeLast(4)}"
     }
 
     private fun String.maskMiddle(): String {
