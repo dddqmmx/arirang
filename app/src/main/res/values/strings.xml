@@ -60,7 +60,26 @@
     <string name="google_fused_location_api">Google Fused Location API</string>
     <string name="fused_cache_waiting">Fused (Cache): Waiting...</string>
     <string name="fused_realtime_waiting">Fused (Real-time): Waiting...</string>
+    <string name="save">Save</string>
     <string name="add_new_slot">Add New Slot</string>
+    <string name="hide_sim">Hide all SIM info</string>
+    <string name="sim_hook_enabled">Enable hook</string>
+    <string name="sim_hook_enabled_summary">Controls whether the SIM hook is enabled.</string>
+    <string name="hide_sim_enabled_summary">Do not show any SIM card information.</string>
+    <string name="hide_sim_disabled_summary">Show the SIM information configured below.</string>
+    <string name="remove_sim_slot">Remove SIM slot</string>
+    <string name="apply_hook_defaults">Apply hook defaults</string>
+    <string name="sim_field_mcc">MCC</string>
+    <string name="sim_field_mnc">MNC</string>
+    <string name="sim_field_country_iso">Country ISO</string>
+    <string name="sim_field_carrier_id">Carrier ID</string>
+    <string name="sim_field_carrier_name">Carrier name</string>
+    <string name="sim_field_display_name">Display name</string>
+    <string name="sim_field_subscription_id">Subscription ID</string>
+    <string name="sim_field_slot_index">Slot index</string>
+    <string name="sim_field_iccid">ICCID</string>
+    <string name="sim_field_card_id">Card ID</string>
+    <string name="sim_field_number">Number</string>
     <string name="set_scope">Set Scope</string>
     <string name="test_clipboard_receiver">Test ClipboardRequestReceiver</string>
 
@@ -211,6 +230,10 @@
     <plurals name="self_check_sim_status">
         <item quantity="one">%1$d SIM returned</item>
         <item quantity="other">%1$d SIMs returned</item>
+    </plurals>
+    <plurals name="sim_config_profile_count">
+        <item quantity="one">%1$d configured SIM profile</item>
+        <item quantity="other">%1$d configured SIM profiles</item>
     </plurals>
     <plurals name="self_check_accounts_status">
         <item quantity="one">%1$d account returned</item>

@@ -5,6 +5,7 @@ import asia.nana7mi.arirang.model.SimInfo
 import android.content.Context
 import android.util.AttributeSet
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -29,6 +30,12 @@ class SimInfoSlotView @JvmOverloads constructor(
 
     fun setTitle(index: Int){
         findViewById<TextView>(R.id.slot_title).text = resources.getString(R.string.slot_title_text,index+1)
+    }
+
+    fun setOnRemoveClickListener(listener: () -> Unit) {
+        findViewById<ImageView>(R.id.removeSimSlotIcon).setOnClickListener {
+            listener()
+        }
     }
 
     fun setSimInfo(simInfo: SimInfo) {

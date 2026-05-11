@@ -61,7 +61,26 @@
     <string name="google_fused_location_api">Google Fused Location API</string>
     <string name="fused_cache_waiting">Fused(缓存): 等待中...</string>
     <string name="fused_realtime_waiting">Fused(实时): 等待中...</string>
+    <string name="save">保存</string>
     <string name="add_new_slot">添加新插槽</string>
+    <string name="hide_sim">隐藏全部 SIM 信息</string>
+    <string name="sim_hook_enabled">启用 Hook</string>
+    <string name="sim_hook_enabled_summary">控制是否启用 SIM Hook。</string>
+    <string name="hide_sim_enabled_summary">不显示任何 SIM 卡信息。</string>
+    <string name="hide_sim_disabled_summary">显示下方配置的 SIM 信息。</string>
+    <string name="remove_sim_slot">移除 SIM 插槽</string>
+    <string name="apply_hook_defaults">应用 Hook 默认值</string>
+    <string name="sim_field_mcc">MCC</string>
+    <string name="sim_field_mnc">MNC</string>
+    <string name="sim_field_country_iso">国家 ISO</string>
+    <string name="sim_field_carrier_id">运营商 ID</string>
+    <string name="sim_field_carrier_name">运营商名称</string>
+    <string name="sim_field_display_name">显示名称</string>
+    <string name="sim_field_subscription_id">订阅 ID</string>
+    <string name="sim_field_slot_index">卡槽序号</string>
+    <string name="sim_field_iccid">ICCID</string>
+    <string name="sim_field_card_id">卡 ID</string>
+    <string name="sim_field_number">手机号</string>
     <string name="set_scope">设置作用域</string>
     <string name="test_clipboard_receiver">测试 ClipboardRequestReceiver</string>
 
@@ -211,6 +230,9 @@
     </plurals>
     <plurals name="self_check_sim_status">
         <item quantity="other">返回 %1$d 张 SIM</item>
+    </plurals>
+    <plurals name="sim_config_profile_count">
+        <item quantity="other">已配置 %1$d 张 SIM 档案</item>
     </plurals>
     <plurals name="self_check_accounts_status">
         <item quantity="other">返回 %1$d 个账号</item>

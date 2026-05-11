@@ -60,7 +60,26 @@
     <string name="google_fused_location_api">Google Fused Location API</string>
     <string name="fused_cache_waiting">Fused(キャッシュ): 待機中...</string>
     <string name="fused_realtime_waiting">Fused(リアルタイム): 待機中...</string>
+    <string name="save">保存</string>
     <string name="add_new_slot">新しいスロットを追加</string>
+    <string name="hide_sim">SIM 情報をすべて非表示</string>
+    <string name="sim_hook_enabled">Hook を有効化</string>
+    <string name="sim_hook_enabled_summary">SIM Hook を有効にするかどうかを切り替えます。</string>
+    <string name="hide_sim_enabled_summary">SIM カード情報を表示しません。</string>
+    <string name="hide_sim_disabled_summary">下に設定した SIM 情報を表示します。</string>
+    <string name="remove_sim_slot">SIM スロットを削除</string>
+    <string name="apply_hook_defaults">Hook の既定値を適用</string>
+    <string name="sim_field_mcc">MCC</string>
+    <string name="sim_field_mnc">MNC</string>
+    <string name="sim_field_country_iso">国 ISO</string>
+    <string name="sim_field_carrier_id">キャリア ID</string>
+    <string name="sim_field_carrier_name">キャリア名</string>
+    <string name="sim_field_display_name">表示名</string>
+    <string name="sim_field_subscription_id">購読 ID</string>
+    <string name="sim_field_slot_index">スロット番号</string>
+    <string name="sim_field_iccid">ICCID</string>
+    <string name="sim_field_card_id">カード ID</string>
+    <string name="sim_field_number">電話番号</string>
     <string name="set_scope">スコープを設定</string>
     <string name="test_clipboard_receiver">ClipboardRequestReceiver をテスト</string>
 
@@ -209,6 +228,9 @@
     </plurals>
     <plurals name="self_check_sim_status">
         <item quantity="other">%1$d 枚のSIMが返されました</item>
+    </plurals>
+    <plurals name="sim_config_profile_count">
+        <item quantity="other">%1$d 件の SIM プロファイルを設定済み</item>
     </plurals>
     <plurals name="self_check_accounts_status">
         <item quantity="other">%1$d 個のアカウントが返されました</item>
