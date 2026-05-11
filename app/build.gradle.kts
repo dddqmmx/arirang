@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.ApplicationExtension
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,19 +7,27 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-android {
+configure<ApplicationExtension>  {
     namespace = "asia.nana7mi.arirang"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "asia.nana7mi.arirang"
         minSdk = 34
+        //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 2
-        versionName = "0.1.2-alpha"
+        versionName = "0.2.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled = false
-        resConfigs("en", "zh-rCN", "ja")
+    }
+    @Suppress("UnstableApiUsage")
+    androidResources {
+        localeFilters += listOf(
+            "en",
+            "zh-rCN",
+            "ja"
+        )
     }
 
     buildFeatures {
@@ -53,12 +63,12 @@ android {
             excludes += "**/dump_syms/**"
         }
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+}
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
 
 dependencies {
