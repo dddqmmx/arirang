@@ -4,11 +4,35 @@ Arirang is named after a smartphone brand from North Korea.
 
 This is a powerful Xposed module for Android designed to enhance user privacy through fine-grained control over sensitive system information and runtime hooks. It allows spoofing of device identifiers, location, SIM information, and app visibility.
 
+## Philosophy
+
+Arirang is designed around a system-level privacy protection model.
+
+Unlike many traditional Xposed privacy modules, Arirang does not aim to inject hooks into arbitrary third-party applications whenever possible.  
+Instead, the project attempts to keep hooks, data interception, and data rewriting inside system-level components and framework layers.
+
+The goal of this design is to:
+- Reduce unnecessary application-side injection
+- Minimize compatibility issues with target applications
+- Lower behavioral detectability from user applications
+- Keep privacy control logic centralized at the system layer
+
 ## ⚠️ Warning
 
 This software is in an early development stage and may cause system instability, crashes, or unexpected behavior.
 
 To achieve certain features, it uses highly aggressive system-level techniques. As a result, it may never become fully stable or suitable for daily use.
+
+This project does **not** prohibit the use of AI-generated code.
+
+During early prototyping and experimental development, a considerable amount of code was generated or assisted by large language models (LLMs).  
+Some parts of the codebase may therefore contain:
+- Inconsistent implementations
+- Redundant abstractions
+- Experimental structures
+- Non-optimal patterns
+
+As the project matures, these sections are gradually being rewritten, simplified, or replaced with manually reviewed implementations.
 
 Use at your own risk.
 
