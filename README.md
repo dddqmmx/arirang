@@ -60,6 +60,9 @@ Use at your own risk.
 - **Nearby Devices List Masking (Planned)**  
   Hide or modify nearby Wi-Fi, Bluetooth, and other discoverable device lists.
 
+- **Privacy Self-Check (Available)**  
+  Inspect what device information is visible to applications and verify whether privacy protection features are working correctly.
+
 - **Modern UI**  
   Built with Material Design 3 and Dynamic Colors support.
 
