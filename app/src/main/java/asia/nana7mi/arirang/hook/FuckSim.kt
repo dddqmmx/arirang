@@ -7,53 +7,6 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
-internal object SimNumberHider {
-    private val subscriptionPhoneNumberFields = listOf("mNumber")
-
-    fun rewriteSubscriptionResult(result: Any?, phoneNumber: String): Any? {
-        return when (result) {
-            is Iterable<*> -> {
-                result.forEach { rewriteSubscriptionInfo(it, phoneNumber) }
-                result
-            }
-            is Array<*> -> {
-                result.forEach { rewriteSubscriptionInfo(it, phoneNumber) }
-                result
-            }
-            else -> {
-                rewriteSubscriptionInfo(result, phoneNumber)
-                result
-            }
-        }
-    }
-
-    fun rewriteSubscriptionInfo(subscriptionInfo: Any?, phoneNumber: String) {
-        if (subscriptionInfo == null) return
-        subscriptionPhoneNumberFields.forEach { fieldName ->
-            setFieldIfExists(subscriptionInfo, fieldName, phoneNumber)
-        }
-    }
-
-    private fun setFieldIfExists(instance: Any, fieldName: String, value: String) {
-        runCatching {
-            val field = findField(instance.javaClass, fieldName) ?: return@runCatching
-            field.isAccessible = true
-            field.set(instance, value)
-        }
-    }
-
-    private fun findField(clazz: Class<*>, fieldName: String): java.lang.reflect.Field? {
-        var current: Class<*>? = clazz
-        while (current != null) {
-            runCatching {
-                return current.getDeclaredField(fieldName)
-            }
-            current = current.superclass
-        }
-        return null
-    }
-}
-
 /**
  * System-side feasibility proof for SIM country and phone-number spoofing.
  *
@@ -467,7 +420,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private fun rewriteSubscriptionInfo(subscriptionInfo: Any?) {
         if (subscriptionInfo == null) return
 
-        SimNumberHider.rewriteSubscriptionInfo(subscriptionInfo, operatorProfile.phoneNumber)
+        setFieldIfExists(subscriptionInfo, "mNumber", operatorProfile.phoneNumber)
         setFieldIfExists(subscriptionInfo, "mCountryIso", operatorProfile.countryIso)
         setFieldIfExists(subscriptionInfo, "mMcc", operatorProfile.mcc)
         setFieldIfExists(subscriptionInfo, "mMnc", operatorProfile.mnc)
