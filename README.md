@@ -12,10 +12,8 @@ Unlike many traditional Xposed privacy modules, Arirang does not aim to inject h
 Instead, the project attempts to keep hooks, data interception, and data rewriting inside system-level components and framework layers.
 
 The goal of this design is to:
-- Reduce unnecessary application-side injection
-- Minimize compatibility issues with target applications
-- Lower behavioral detectability from user applications
-- Keep privacy control logic centralized at the system layer
+- Avoid unnecessary impact on application performance
+- Minimize interference with normal application runtime behavior
 
 ## ⚠️ Warning
 
