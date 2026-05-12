@@ -20,8 +20,8 @@ Use at your own risk.
 - **Real-time Permission Prompt (Available)**  
   Intercept clipboard access attempts and explicitly allow or deny each request.
 
-- **SIM Mocking (In Development)**  
-  Customize or hide SIM card details (IMSI, operator info, etc.).
+- **SIM Mocking (Experimental / Partial)**  
+  Partially implemented SIM information rewriting and masking features. Functionality is incomplete and may be unstable.
 
 - **Location Spoofing (In Development)**  
   Provide mock GPS coordinates to selected applications.
@@ -31,6 +31,12 @@ Use at your own risk.
 
 - **Device Info Masking (Planned)**  
   Modify hardware identifiers and system properties.
+
+- **Wi-Fi Info Masking (Planned)**  
+  Hide or modify Wi-Fi information such as SSID, BSSID, MAC address, and network details.
+
+- **Nearby Devices List Masking (Planned)**  
+  Hide or modify nearby Wi-Fi, Bluetooth, and other discoverable device lists.
 
 - **Modern UI**  
   Built with Material Design 3 and Dynamic Colors support.
