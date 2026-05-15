@@ -60,11 +60,9 @@ Use at your own risk.
 - **Real-time Permission Prompt (Available)**  
   Intercept clipboard access attempts and explicitly allow or deny each request.
 
-- **SIM Mocking (Experimental / Partial / Submodule Required)**
-
-  Partially implemented SIM information rewriting and masking features.
-  Requires `arirang-submodule`.
-  Functionality is incomplete and may be unstable.
+- **SIM Mocking (Experimental / Submodule Required)**
+  Provides SIM information rewriting and masking through the optional Zygisk submodule.
+  This feature is experimental and may be unstable.
 
 - **Location Spoofing (In Development)**  
   Provide mock GPS coordinates to selected applications.
@@ -72,7 +70,7 @@ Use at your own risk.
 - **Package List Management (In Development)**  
   Hide installed applications (Invisible / Whitelist modes).
 
-- **Device Info Masking (In Development / Submodule Required)**  
+- **Device Info Masking (Experimental / Submodule Required)**  
   Modify hardware identifiers and system properties.
 
 - **Wi-Fi Info Masking (Planned)**  
