@@ -26,8 +26,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Install Native Build Dependencies
+        run: yes | sdkmanager "ndk;23.1.7779620"
+
       - name: Build with Gradle
-        run: ./gradlew assembleDebug assembleRelease
+        run: ./gradlew assembleDebug assembleRelease :arirang-submodule:packageModule
 
       - name: Get Build Tools Version
         run: |
@@ -50,6 +53,11 @@ jobs:
           mv ${{ steps.sign_app.outputs.signedReleaseFile }} app/build/outputs/apk/release/arirang-v${{ github.run_number }}-release.apk
           echo "RELEASE_APK_PATH=app/build/outputs/apk/release/arirang-v${{ github.run_number }}-release.apk" >> $GITHUB_ENV
 
+      - name: Rename Submodule Zip
+        run: |
+          mv arirang-submodule/build/outputs/arirang-submodule.zip arirang-submodule/build/outputs/arirang-submodule-v${{ github.run_number }}.zip
+          echo "SUBMODULE_ZIP_PATH=arirang-submodule/build/outputs/arirang-submodule-v${{ github.run_number }}.zip" >> $GITHUB_ENV
+
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -62,6 +70,12 @@ jobs:
           name: arirang-release
           path: ${{ env.RELEASE_APK_PATH }}
 
+      - name: Upload Submodule Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: arirang-submodule
+          path: ${{ env.SUBMODULE_ZIP_PATH }}
+
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -72,6 +86,7 @@ jobs:
           files: |
             app/build/outputs/apk/debug/*.apk
             ${{ env.RELEASE_APK_PATH }}
+            ${{ env.SUBMODULE_ZIP_PATH }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
