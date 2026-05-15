@@ -12,55 +12,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.SimInfo
-import org.xmlpull.v1.XmlPullParser
+import asia.nana7mi.arirang.model.SimPreset
+import asia.nana7mi.arirang.model.SimPresetCatalog
 
-data class SimPreset(
-    val countryName: String,
-    val name: String,
-    val mcc: String,
-    val mnc: String,
-    val countryIso: String,
-    val carrierName: String,
-    val displayName: String,
-    val carrierId: Int? = -1
-)
-
-@Composable
-fun getSimPresets(): List<SimPreset> {
-    val context = LocalContext.current
-    return remember {
-        val presets = mutableListOf<SimPreset>()
-        runCatching {
-            val parser = context.resources.getXml(R.xml.sim_presets)
-            var eventType = parser.eventType
-            while (eventType != XmlPullParser.END_DOCUMENT) {
-                if (eventType == XmlPullParser.START_TAG && parser.name == "preset") {
-                    presets.add(
-                        SimPreset(
-                            countryName = parser.getAttributeValue(null, "country") ?: "",
-                            name = parser.getAttributeValue(null, "name") ?: "",
-                            mcc = parser.getAttributeValue(null, "mcc") ?: "",
-                            mnc = parser.getAttributeValue(null, "mnc") ?: "",
-                            countryIso = parser.getAttributeValue(null, "iso") ?: "",
-                            carrierName = parser.getAttributeValue(null, "carrier") ?: "",
-                            displayName = parser.getAttributeValue(null, "display") ?: "",
-                            carrierId = parser.getAttributeValue(null, "carrierId")?.toIntOrNull() ?: -1
-                        )
-                    )
-                }
-                eventType = parser.next()
-            }
-        }
-        presets
-    }
-}
+fun getSimPresets(): List<SimPreset> = SimPresetCatalog.ALL
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

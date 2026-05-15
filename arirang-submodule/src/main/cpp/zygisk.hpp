@@ -69,6 +69,7 @@ void entry_impl(api_table *table, JNIEnv *env);
 
 struct Api {
     void hookJniNativeMethods(JNIEnv *env, const char *className, JNINativeMethod *methods, int numMethods);
+    int connectCompanion();
     void setOption(Option opt);
 
 private:
@@ -123,6 +124,10 @@ inline void Api::hookJniNativeMethods(JNIEnv *env, const char *className, JNINat
     if (tbl->hookJniNativeMethods) tbl->hookJniNativeMethods(env, className, methods, numMethods);
 }
 
+inline int Api::connectCompanion() {
+    return tbl->connectCompanion ? tbl->connectCompanion(tbl->impl) : -1;
+}
+
 inline void Api::setOption(Option opt) {
     if (tbl->setOption) tbl->setOption(tbl->impl, opt);
 }
@@ -130,6 +135,11 @@ inline void Api::setOption(Option opt) {
 #define REGISTER_ZYGISK_MODULE(clazz) \
 extern "C" [[gnu::visibility("default")]] void zygisk_module_entry(zygisk::internal::api_table *table, JNIEnv *env) { \
     zygisk::internal::entry_impl<clazz>(table, env); \
+}
+
+#define REGISTER_ZYGISK_COMPANION(func) \
+extern "C" [[gnu::visibility("default")]] void zygisk_companion_entry(int fd) { \
+    func(fd); \
 }
 
 } // namespace zygisk

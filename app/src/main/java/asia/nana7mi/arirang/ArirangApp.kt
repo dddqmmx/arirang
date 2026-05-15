@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import asia.nana7mi.arirang.data.datastore.AppPreferences
+import asia.nana7mi.arirang.data.datastore.SubmoduleConfigFiles
 import com.google.android.material.color.DynamicColors
 
 class ArirangApp : Application() {
@@ -19,5 +20,6 @@ class ArirangApp : Application() {
         }
 
         DynamicColors.applyToActivitiesIfAvailable(this)
+        runCatching { SubmoduleConfigFiles.write(this) }
     }
 }

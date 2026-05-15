@@ -7,7 +7,6 @@ import asia.nana7mi.arirang.model.SimInfo
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.json.JSONObject
-import java.io.File
 import java.util.Date
 
 object SimConfigPrefs {
@@ -61,7 +60,7 @@ object SimConfigPrefs {
             remove(KEY_SIM_INFO_LIST)
             putString(KEY_SIM_INFO_MAP, gson.toJson(config.simInfoBySlot.toSortedMap()))
         }
-        makePrefsReadable(context)
+        SubmoduleConfigFiles.write(context, config)
     }
 
     fun lastModified(context: Context): Long {
@@ -98,15 +97,6 @@ object SimConfigPrefs {
 
     private fun prefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    }
-
-    private fun makePrefsReadable(context: Context) {
-        runCatching {
-            File(context.applicationInfo.dataDir).setExecutable(true, false)
-            val prefsFile = File(context.applicationInfo.dataDir, "shared_prefs/$PREFS_NAME.xml")
-            prefsFile.setReadable(true, false)
-            prefsFile.parentFile?.setExecutable(true, false)
-        }
     }
 
     private fun List<SimInfo>.toSlotMap(): Map<Int, SimInfo> {

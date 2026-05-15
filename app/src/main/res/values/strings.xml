@@ -43,6 +43,7 @@
     <string name="package_list_config_title">App List Access Permission</string>
     <string name="sim_config_title">SIM Info Configuration</string>
     <string name="sim_scope_title">SIM Modification Scope</string>
+    <string name="device_info_config_title">Device Info Configuration</string>
 
     <string name="hint_package_or_app_name">Package or App Name</string>
 
@@ -274,4 +275,27 @@
     <string name="sim_mnc_default">05</string>
     <string name="sim_country_default">kp</string>
     <string name="sim_carrier_default">Koryolink</string>
+    <string name="device_hook_enabled">Enable device info hook</string>
+    <string name="device_hook_enabled_summary">Applies the selected device profile to the native Zygisk helper on next target process start.</string>
+    <string name="device_preset_title">Device preset</string>
+    <string name="device_preset_custom">Custom</string>
+    <string name="device_import_current">Use current device</string>
+    <string name="device_section_identity">Identity</string>
+    <string name="device_section_build_target">Build Target</string>
+    <string name="device_section_build_meta">Build Metadata</string>
+    <string name="device_field_brand">Brand</string>
+    <string name="device_field_manufacturer">Manufacturer</string>
+    <string name="device_field_model">Model</string>
+    <string name="device_field_device">Device</string>
+    <string name="device_field_product">Product</string>
+    <string name="device_field_board">Board</string>
+    <string name="device_field_hardware">Hardware</string>
+    <string name="device_field_display">Display</string>
+    <string name="device_field_id">Build ID</string>
+    <string name="device_field_fingerprint">Fingerprint</string>
+    <string name="device_field_tags">Tags</string>
+    <string name="device_field_type">Type</string>
+    <string name="device_field_user">User</string>
+    <string name="device_field_host">Host</string>
+    <string name="device_field_time">Build time</string>
 </resources>

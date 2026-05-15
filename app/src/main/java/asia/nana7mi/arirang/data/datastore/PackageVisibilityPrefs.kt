@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.core.content.edit
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import java.io.File
 import java.util.Date
 
 object PackageVisibilityPrefs {
@@ -77,7 +76,6 @@ object PackageVisibilityPrefs {
             putBoolean(KEY_ENABLED, enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
         }
-        makePrefsReadable(context)
     }
 
     fun setDefaultSelection(context: Context, mode: DisplayMode, templateId: String?) {
@@ -126,7 +124,6 @@ object PackageVisibilityPrefs {
             putString(KEY_APP_RULES, gson.toJson(rules))
             putLong(KEY_LAST_MODIFIED, Date().time)
         }
-        makePrefsReadable(context)
     }
 
     fun createTemplate(
@@ -231,15 +228,6 @@ object PackageVisibilityPrefs {
                 putStringSet(KEY_INVISIBLE_LIST, emptySet())
             }
             putLong(KEY_LAST_MODIFIED, Date().time)
-        }
-        makePrefsReadable(context)
-    }
-
-    private fun makePrefsReadable(context: Context) {
-        runCatching {
-            val prefsFile = File(context.applicationInfo.dataDir, "shared_prefs/$PREFS_NAME.xml")
-            prefsFile.setReadable(true, false)
-            prefsFile.parentFile?.setExecutable(true, false)
         }
     }
 }

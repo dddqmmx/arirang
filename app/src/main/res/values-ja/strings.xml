@@ -43,6 +43,7 @@
     <string name="package_list_config_title">アプリリスト読み取り権限</string>
     <string name="sim_config_title">SIMデータ設定</string>
     <string name="sim_scope_title">SIM改ざんの影響範囲</string>
+    <string name="device_info_config_title">端末情報設定</string>
 
     <string name="hint_package_or_app_name">アプリ名で検索</string>
 
@@ -269,4 +270,27 @@
     <string name="sim_mnc_default">05</string>
     <string name="sim_country_default">kp</string>
     <string name="sim_carrier_default">Koryolink</string>
+    <string name="device_hook_enabled">端末情報 Hook を有効化</string>
+    <string name="device_hook_enabled_summary">次回の対象プロセス起動時に、選択した端末プロファイルをネイティブ Zygisk 補助モジュールへ適用します。</string>
+    <string name="device_preset_title">端末プリセット</string>
+    <string name="device_preset_custom">カスタム</string>
+    <string name="device_import_current">現在の端末を使用</string>
+    <string name="device_section_identity">識別情報</string>
+    <string name="device_section_build_target">ビルド対象</string>
+    <string name="device_section_build_meta">ビルドメタデータ</string>
+    <string name="device_field_brand">ブランド</string>
+    <string name="device_field_manufacturer">メーカー</string>
+    <string name="device_field_model">モデル</string>
+    <string name="device_field_device">デバイス名</string>
+    <string name="device_field_product">プロダクト名</string>
+    <string name="device_field_board">ボード</string>
+    <string name="device_field_hardware">ハードウェア</string>
+    <string name="device_field_display">表示ビルド</string>
+    <string name="device_field_id">Build ID</string>
+    <string name="device_field_fingerprint">Fingerprint</string>
+    <string name="device_field_tags">Tags</string>
+    <string name="device_field_type">Type</string>
+    <string name="device_field_user">User</string>
+    <string name="device_field_host">Host</string>
+    <string name="device_field_time">ビルド時刻</string>
 </resources>
