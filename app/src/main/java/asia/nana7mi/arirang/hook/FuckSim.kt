@@ -16,7 +16,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import java.util.UUID
 import java.lang.reflect.Array as ReflectArray
 
 /**
@@ -25,7 +24,7 @@ import java.lang.reflect.Array as ReflectArray
  * This rewrites the telephony-facing subscription and phone-number read paths, but does not touch
  * the low-level radio stack or subscription database writes.
  */
-class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "android"), matchClient = true) {
+class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "android")) {
 
     private companion object {
         private const val PREFS_NAME = "sim_config_prefs"
@@ -50,23 +49,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "gsm.operator.isroaming",
             "gsm.network.type",
             "persist.radio.multisim.config",
-            "ro.telephony.default_network",
-            "ro.build.fingerprint",
-            "ro.build.description",
-            "ro.build.display.id",
-            "ro.build.id",
-            "ro.build.tags",
-            "ro.build.type",
-            "ro.build.user",
-            "ro.build.host",
-            "ro.product.model",
-            "ro.product.brand",
-            "ro.product.name",
-            "ro.product.device",
-            "ro.product.board",
-            "ro.product.manufacturer",
-            "ro.product.hardware",
-            "ro.board.platform"
+            "ro.telephony.default_network"
         )
 
         private val DEFAULT_PROFILES_BY_SLOT = mapOf(
@@ -174,10 +157,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     hookPhoneProcessSurfaces(lpparam.classLoader)
                     XposedBridge.log("Arirang: SIM proof phone process hook installed enabled=${config.enabled}")
                 }
-                else -> {
-                    hookClientProcessSurfaces(lpparam.classLoader)
-                    XposedBridge.log("Arirang: SIM proof client hook installed enabled=${config.enabled}")
-                }
             }
         }.onFailure {
             XposedBridge.log("Arirang: SIM country proof hook failed: ${Log.getStackTraceString(it)}")
@@ -185,7 +164,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookSystemServerSurfaces(classLoader: ClassLoader) {
-        hookBuildSurfaces(classLoader)
         hookServiceStateSurfaces(classLoader)
         hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = true)
         hookSystemPropertyReaders(classLoader)
@@ -194,7 +172,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookPhoneProcessSurfaces(classLoader: ClassLoader) {
-        hookBuildSurfaces(classLoader)
         hookPhoneConfigServiceBind(classLoader)
         hookServiceStateSurfaces(classLoader)
         hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = true)
@@ -221,272 +198,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }, 5_000L)
             }
         })
-    }
-
-    private fun hookClientProcessSurfaces(classLoader: ClassLoader) {
-        hookBuildSurfaces(classLoader)
-        hookServiceStateSurfaces(classLoader)
-        hookPhoneNumberSurfaces(classLoader)
-        hookTelephonyManagerReadSurfaces(classLoader)
-        hookSubscriptionManagerClientReaders(classLoader)
-        hookSubscriptionInfoAccessors(classLoader)
-        hookSystemPropertyReaders(classLoader)
-        hookGeneratedTelephonyProperties(classLoader)
-        hookSettingsSecureReaders(classLoader)
-    }
-
-    private fun hookSettingsSecureReaders(classLoader: ClassLoader) {
-        val settingsSecureClass = XposedHelpers.findClassIfExists("android.provider.Settings\$Secure", classLoader) ?: return
-        XposedBridge.hookAllMethods(settingsSecureClass, "getString", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!hookConfig.enabled) return
-                if (param.args.getOrNull(1) == "android_id") {
-                    param.result = "8" + UUID.randomUUID().toString().replace("-", "").take(15)
-                }
-            }
-        })
-    }
-
-    private fun hookBuildSurfaces(classLoader: ClassLoader) {
-        val config = hookConfig
-        if (!config.enabled) return
-
-        // Hook android.os.Build fields
-        val buildClass = XposedHelpers.findClassIfExists("android.os.Build", classLoader) ?: return
-        XposedHelpers.setStaticObjectField(buildClass, "BRAND", "google")
-        XposedHelpers.setStaticObjectField(buildClass, "MANUFACTURER", "Google")
-        XposedHelpers.setStaticObjectField(buildClass, "MODEL", "Pixel 9 Pro")
-        XposedHelpers.setStaticObjectField(buildClass, "DEVICE", "caiman")
-        XposedHelpers.setStaticObjectField(buildClass, "PRODUCT", "caiman")
-        XposedHelpers.setStaticObjectField(buildClass, "BOARD", "caiman")
-        XposedHelpers.setStaticObjectField(buildClass, "HARDWARE", "caiman")
-        XposedHelpers.setStaticObjectField(buildClass, "DISPLAY", "BP4A.251205.006")
-        XposedHelpers.setStaticObjectField(buildClass, "ID", "BP4A.251205.006")
-        XposedHelpers.setStaticObjectField(buildClass, "FINGERPRINT", "google/caiman/caiman:15/BP4A.251205.006/1234567:user/release-keys")
-
-        // Also hook methods if they exist
-        listOf("getRadioVersion", "getSerial").forEach { methodName ->
-            XposedBridge.hookAllMethods(buildClass, methodName, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    param.result = "unknown"
-                }
-            })
-        }
-    }
-
-    private fun hookPhoneNumberSurfaces(classLoader: ClassLoader) {
-        listOf(
-            "android.telephony.TelephonyManager",
-            "com.android.internal.telephony.IPhoneSubInfo\$Stub\$Proxy",
-            "com.android.internal.telephony.PhoneSubInfoController"
-        ).forEach { className ->
-            hookAllExistingStringMethods(
-                classLoader = classLoader,
-                className = className,
-                methodNames = listOf(
-                    "getLine1Number",
-                    "getLine1NumberForSubscriber",
-                    "getMsisdn",
-                    "getMsisdnForSubscriber"
-                )
-            ) { param, method ->
-                phoneNumberForCall(param, method)
-            }
-        }
-
-        hookAllExistingStringMethods(
-            classLoader = classLoader,
-            className = "com.android.internal.telephony.ITelephony\$Stub\$Proxy",
-            methodNames = listOf("getLine1NumberForDisplay")
-        ) { param, method ->
-            phoneNumberForCall(param, method)
-        }
-
-        hookAllExistingStringMethods(
-            classLoader = classLoader,
-            className = "android.telephony.SubscriptionManager",
-            methodNames = listOf("getPhoneNumber")
-        ) { param, _ ->
-            profileForSubId(param.args.firstIntOrNull(), allowFallback = false)?.phoneNumber
-        }
-
-        hookAllExistingStringMethods(
-            classLoader = classLoader,
-            className = "com.android.internal.telephony.ISub\$Stub\$Proxy",
-            methodNames = listOf("getPhoneNumber", "getPhoneNumberFromFirstAvailableSource")
-        ) { param, _ ->
-            profileForSubId(param.args.firstIntOrNull(), allowFallback = false)?.phoneNumber
-        }
-
-        hookAllExistingStringMethods(
-            classLoader = classLoader,
-            className = "android.telephony.SubscriptionInfo",
-            methodNames = listOf("getNumber")
-        ) { param, _ ->
-            profileForSubscriptionInfo(param.thisObject)?.phoneNumber
-        }
-    }
-
-    private fun hookTelephonyManagerReadSurfaces(classLoader: ClassLoader) {
-        val telephonyManagerClass = XposedHelpers.findClassIfExists(
-            "android.telephony.TelephonyManager",
-            classLoader
-        ) ?: return
-
-        mapOf<String, (SimProfile) -> Any?>(
-            "getSimCountryIso" to { it.countryIso },
-            "getSimOperator" to { it.operatorNumeric },
-            "getSimOperatorNumeric" to { it.operatorNumeric },
-            "getSimOperatorName" to { it.alphaLong },
-            "getSubscriberId" to { "85005" + it.iccId.takeLast(10) },
-            "getSimSerialNumber" to { it.iccId },
-            "getDeviceId" to { null },
-            "getImei" to { null },
-            "getMeid" to { null },
-            "getTypeAllocationCode" to { it.iccId.take(8) },
-            "getForbiddenPlmns" to { arrayOf<String>() },
-            "getEquivalentHomePlmns" to { listOf<String>() }
-        ).forEach { (methodName, valueProvider) ->
-            hookProfileMethod(telephonyManagerClass, methodName) { param, method ->
-                val profile = if (method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType) {
-                    profileForSubId(param.args.firstIntOrNull(), allowFallback = false)
-                } else {
-                    profileForTelephonyManager(param)
-                }
-                valueProvider(profile ?: return@hookProfileMethod "")
-            }
-        }
-
-        mapOf<String, (SimProfile) -> Any?>(
-            "getSimOperatorNameForPhone" to { it.alphaLong },
-            "getSimOperatorNumericForPhone" to { it.operatorNumeric },
-            "getSimCountryIsoForPhone" to { it.countryIso },
-            "getNetworkCountryIsoForPhone" to { it.countryIso },
-            "getNetworkOperatorForPhone" to { it.operatorNumeric }
-        ).forEach { (methodName, valueProvider) ->
-            hookProfileMethod(telephonyManagerClass, methodName) { param, _ ->
-                valueProvider(
-                    profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
-                        ?: return@hookProfileMethod ""
-                )
-            }
-        }
-
-        mapOf<String, (SimProfile) -> Any?>(
-            "getNetworkCountryIso" to { it.countryIso },
-            "getNetworkOperator" to { it.operatorNumeric },
-            "getNetworkOperatorName" to { it.alphaLong }
-        ).forEach { (methodName, valueProvider) ->
-            hookProfileMethod(telephonyManagerClass, methodName) { param, method ->
-                val profile = when {
-                    methodName == "getNetworkCountryIso" &&
-                        method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
-                        profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
-                    method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
-                        profileForSubId(param.args.firstIntOrNull(), allowFallback = false)
-                    else -> profileForTelephonyManager(param)
-                }
-                valueProvider(profile ?: return@hookProfileMethod "")
-            }
-        }
-
-        mapOf(
-            "getSimCarrierId" to { profile: SimProfile -> profile.carrierId },
-            "getCarrierIdFromSimMccMnc" to { profile: SimProfile -> profile.carrierId },
-            "getSimSpecificCarrierId" to { profile: SimProfile -> profile.carrierId }
-        ).forEach { (methodName, valueProvider) ->
-            hookProfileMethod(telephonyManagerClass, methodName) { param, method ->
-                val profile = if (method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType) {
-                    profileForSubId(param.args.firstIntOrNull(), allowFallback = false)
-                } else {
-                    profileForTelephonyManager(param)
-                }
-                valueProvider(profile ?: return@hookProfileMethod -1)
-            }
-        }
-
-        hookProfileMethod(telephonyManagerClass, "getSimCarrierIdName") { param, _ ->
-            profileForTelephonyManager(param)?.alphaLong ?: ""
-        }
-
-        hookProfileMethod(telephonyManagerClass, "getSimSpecificCarrierIdName") { param, _ ->
-            profileForTelephonyManager(param)?.alphaLong ?: ""
-        }
-
-        hookTelephonyManagerCounts(telephonyManagerClass)
-    }
-
-    private fun hookSubscriptionManagerClientReaders(classLoader: ClassLoader) {
-        val subscriptionManagerClass = XposedHelpers.findClassIfExists(
-            "android.telephony.SubscriptionManager",
-            classLoader
-        ) ?: return
-
-        listOf(
-            "getActiveSubscriptionInfoList",
-            "getAvailableSubscriptionInfoList",
-            "getAccessibleSubscriptionInfoList",
-            "getCompleteActiveSubscriptionInfoList",
-            "getAllSubscriptionInfoList",
-            "getSubscriptionInfo",
-            "getActiveSubscriptionInfo",
-            "getActiveSubscriptionInfoForSimSlotIndex",
-            "getActiveSubscriptionInfoForIcc",
-            "getActiveSubscriptionInfoForIccId"
-        ).forEach { methodName ->
-            hookSubscriptionInfoResult(subscriptionManagerClass, methodName)
-        }
-
-        hookSubscriptionCounts(subscriptionManagerClass)
-        hookSubscriptionIdReaders(subscriptionManagerClass)
-    }
-
-    private fun hookSubscriptionInfoAccessors(classLoader: ClassLoader) {
-        val subscriptionInfoClass = XposedHelpers.findClassIfExists(
-            "android.telephony.SubscriptionInfo",
-            classLoader
-        ) ?: return
-
-        mapOf<String, (SimProfile) -> Any?>(
-            "getDisplayName" to { it.alphaLong },
-            "getCarrierName" to { it.alphaLong },
-            "getCountryIso" to { it.countryIso },
-            "getMccString" to { it.mcc },
-            "getMncString" to { it.mnc },
-            "getNumber" to { it.phoneNumber },
-            "getIccId" to { it.iccId },
-            "getCardString" to { it.cardString },
-            "getGroupOwner" to { it.groupOwner }
-        ).forEach { (methodName, valueProvider) ->
-            hookSubscriptionInfoAccessor(subscriptionInfoClass, methodName, valueProvider)
-        }
-
-        mapOf<String, (SimProfile) -> Any?>(
-            "getSubscriptionId" to { it.subId },
-            "getSimSlotIndex" to { it.slotIndex },
-            "getCarrierId" to { it.carrierId },
-            "getMcc" to { it.mcc.toIntOrNull() ?: 0 },
-            "getMnc" to { it.mnc.toIntOrNull() ?: 0 },
-            "getNameSource" to { it.displayNameSource },
-            "getIconTint" to { it.iconTint },
-            "getDataRoaming" to { it.roaming },
-            "getCardId" to { it.cardId },
-            "getProfileClass" to { it.profileClass },
-            "getSubscriptionType" to { it.subType },
-            "getPortIndex" to { it.portIndex },
-            "getUsageSetting" to { it.usageSetting }
-        ).forEach { (methodName, valueProvider) ->
-            hookSubscriptionInfoAccessor(subscriptionInfoClass, methodName, valueProvider)
-        }
-
-        mapOf<String, (SimProfile) -> Any?>(
-            "isEmbedded" to { it.isEmbedded },
-            "isOpportunistic" to { it.isOpportunistic },
-            "isGroupDisabled" to { it.isGroupDisabled },
-            "areUiccApplicationsEnabled" to { it.areUiccApplicationsEnabled }
-        ).forEach { (methodName, valueProvider) ->
-            hookSubscriptionInfoAccessor(subscriptionInfoClass, methodName, valueProvider)
-        }
     }
 
     private fun hookServiceStateSurfaces(classLoader: ClassLoader) {
@@ -999,16 +710,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 if (slotIndex == null) config.operatorNumericPropertyValue else profile.operatorNumeric
             "gsm.sim.operator.alpha", "gsm.operator.alpha" ->
                 if (slotIndex == null) config.alphaPropertyValue else profile.alphaLong
-            "ro.build.fingerprint" -> "google/caiman/caiman:15/BP4A.251205.006/1234567:user/release-keys"
-            "ro.product.model" -> "Pixel 9 Pro"
-            "ro.product.brand" -> "google"
-            "ro.product.manufacturer" -> "Google"
-            "ro.product.name" -> "caiman"
-            "ro.product.device" -> "caiman"
-            "ro.product.board" -> "caiman"
-            "ro.product.hardware" -> "caiman"
-            "ro.board.platform" -> "caiman"
-            "ro.build.id", "ro.build.display.id" -> "BP4A.251205.006"
             else -> null
         }
     }
@@ -1422,15 +1123,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             }
     }
 
-    private fun hookTelephonyManagerCounts(telephonyManagerClass: Class<*>) {
-        listOf("getPhoneCount", "getActiveModemCount", "getSupportedModemCount", "getSimCount")
-            .forEach { methodName ->
-                hookProfileMethod(telephonyManagerClass, methodName) { _, _ ->
-                    hookConfig.visibleProfiles.size
-                }
-            }
-    }
-
     private fun hookSubscriptionCounts(targetClass: Class<*>, externalClientsOnly: Boolean = false) {
         listOf(
             "getActiveSubscriptionInfoCount",
@@ -1483,29 +1175,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
             })
         }
-    }
-
-    private fun hookSubscriptionInfoAccessor(
-        targetClass: Class<*>,
-        methodName: String,
-        valueProvider: (SimProfile) -> Any?
-    ) {
-        if (targetClass.declaredMethods.none { it.name == methodName }) return
-
-        XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!hookConfig.enabled) return
-                profileForSubscriptionInfo(param.thisObject)?.let {
-                    rewriteSubscriptionInfo(param.thisObject, it)
-                }
-            }
-
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!hookConfig.enabled) return
-                val profile = profileForSubscriptionInfo(param.thisObject) ?: return
-                param.result = coerceHookResult(valueProvider(profile), param.result)
-            }
-        })
     }
 
     private fun hookProfileMethod(
