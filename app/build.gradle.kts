@@ -23,7 +23,7 @@ configure<ApplicationExtension>  {
         //noinspection OldTargetApi
         targetSdk = 36
         versionCode = 2
-        versionName = "0.2.0-alpha"
+        versionName = "0.2.0-experimental"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled = false
         buildConfigField("String", "SUBMODULE_CONFIG_DIR", buildConfigString(arirangSubmoduleConfigDir))
