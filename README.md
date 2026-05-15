@@ -116,15 +116,6 @@ Some advanced process-level features require the optional native Zygisk helper m
   - APatch
 3. Reboot the device
 
-## ⚙️ Configuration
-
-Open Arirang from your launcher:
-
-- **Clipboard Protection**  
-  Configure interception and confirmation behavior
-
-After reboot, open Arirang to verify the module is active.
-
 ## 🛡 Disclaimer
 
 This project is for **testing and educational purposes only**.
