@@ -96,7 +96,7 @@
     <string name="init_button_enter">Enter App</string>
     <string name="init_security_check_title">Environment Check</string>
     <string name="init_core_dependency_title">Core Dependency</string>
-    <string name="init_core_dependency_desc">This app relies on Xposed / Zygisk. Functions will not work if not running in a supported environment.</string>
+    <string name="init_core_dependency_desc">This app relies on Xposed. Functions will not work if not running in a supported environment.</string>
     <string name="init_precondition_title">Precondition</string>
     <string name="init_precondition_desc">This app is not a panacea; it only provides privacy protection when the system itself is trusted.</string>
     <string name="init_risk_cases_title">Such as:</string>

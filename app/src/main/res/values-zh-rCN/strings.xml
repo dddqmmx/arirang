@@ -97,7 +97,7 @@
     <string name="init_button_enter">进入软件</string>
     <string name="init_security_check_title">运行环境检查</string>
     <string name="init_core_dependency_title">核心依赖</string>
-    <string name="init_core_dependency_desc">本软件依赖 Xposed / Zygisk 运行\n若未在受支持环境下运行，任何功能都无法生效</string>
+    <string name="init_core_dependency_desc">本软件依赖 Xposed 运行\n若未在受支持环境下运行，任何功能都无法生效</string>
     <string name="init_precondition_title">使用前提</string>
     <string name="init_precondition_desc">本软件不是万能的，只能在“系统本身可信”的前提下提供隐私保护，而对本就不可信的系统无能为力</string>
     <string name="init_risk_cases_title">如以下情况：</string>

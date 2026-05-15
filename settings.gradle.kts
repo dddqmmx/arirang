@@ -27,3 +27,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Arirang"
 include(":app")
+include(":arirang-submodule")

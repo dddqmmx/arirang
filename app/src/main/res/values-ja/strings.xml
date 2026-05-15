@@ -96,7 +96,7 @@
     <string name="init_button_enter">アプリに入る</string>
     <string name="init_security_check_title">実行环境チェック</string>
     <string name="init_core_dependency_title">コア依存関係</string>
-    <string name="init_core_dependency_desc">本ソフトウェアは Xposed / Zygisk に依存しています。サポートされている環境以外では機能しません。</string>
+    <string name="init_core_dependency_desc">本ソフトウェアは Xposed に依存しています。サポートされている環境以外では機能しません。</string>
     <string name="init_precondition_title">前提条件</string>
     <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保护を提供します。</string>
     <string name="init_risk_cases_title">例えば：</string>

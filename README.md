@@ -15,6 +15,24 @@ The goal of this design is to:
 - Avoid unnecessary impact on application performance
 - Minimize interference with normal application runtime behavior
 
+## 🔌 Optional Native Submodule
+
+Arirang provides an optional native Zygisk extension module named
+`arirang-submodule`.
+
+This submodule is designed as a capability extension layer for functionality
+that cannot be reliably implemented through LSPosed or framework-level Java
+hooks alone.
+
+Depending on the feature, the submodule may be:
+- Required to implement certain low-level behaviors
+- Used to strengthen spoofing consistency and anti-detection capabilities
+- Used to extend privacy protection into native or process-local environments
+
+The goal of this design is to keep most functionality inside the system
+framework whenever possible, while still allowing deeper native integration
+where necessary.
+
 ## ⚠️ Warning
 
 This software is in an early development stage and may cause system instability, crashes, or unexpected behavior.
@@ -42,8 +60,11 @@ Use at your own risk.
 - **Real-time Permission Prompt (Available)**  
   Intercept clipboard access attempts and explicitly allow or deny each request.
 
-- **SIM Mocking (Experimental / Partial)**  
-  Partially implemented SIM information rewriting and masking features. Functionality is incomplete and may be unstable.
+- **SIM Mocking (Experimental / Partial / Submodule Required)**
+
+  Partially implemented SIM information rewriting and masking features.
+  Requires `arirang-submodule`.
+  Functionality is incomplete and may be unstable.
 
 - **Location Spoofing (In Development)**  
   Provide mock GPS coordinates to selected applications.
@@ -51,7 +72,7 @@ Use at your own risk.
 - **Package List Management (In Development)**  
   Hide installed applications (Invisible / Whitelist modes).
 
-- **Device Info Masking (Planned)**  
+- **Device Info Masking (In Development / Submodule Required)**  
   Modify hardware identifiers and system properties.
 
 - **Wi-Fi Info Masking (Planned)**  
@@ -70,8 +91,9 @@ Use at your own risk.
 
 ## 🛠 Requirements
 
-- Rooted Android device  
-- **LSPosed** or compatible Xposed framework  
+- Rooted Android device
+- **LSPosed** or compatible Xposed framework
+- Magisk, KernelSU / KernelSU Next, or APatch (required for advanced submodule features)
 - Android 15+ (recommended)
 
 ## 📦 Installation
@@ -83,6 +105,17 @@ Use at your own risk.
    - System (required)
    - Phone (optional, for SIM simulation)
 5. Reboot your device or restart target apps  
+
+#### Install `arirang-submodule` (Optional but Recommended)
+
+Some advanced process-level features require the optional native Zygisk helper module.
+
+1. Download `arirang-submodule.zip`
+2. Flash the ZIP through:
+  - Magisk
+  - KernelSU / KernelSU Next
+  - APatch
+3. Reboot the device
 
 ## ⚙️ Configuration
 

@@ -165,7 +165,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private fun hookSystemServerSurfaces(classLoader: ClassLoader) {
         hookServiceStateSurfaces(classLoader)
-        hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = true)
+        hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = false)
         hookSystemPropertyReaders(classLoader)
         hookGeneratedTelephonyProperties(classLoader)
         writeProofTelephonyProperties()
@@ -174,7 +174,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private fun hookPhoneProcessSurfaces(classLoader: ClassLoader) {
         hookPhoneConfigServiceBind(classLoader)
         hookServiceStateSurfaces(classLoader)
-        hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = true)
+        hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = false)
         hookPhoneInterfaceManager(classLoader)
         hookPhoneSubInfoController(classLoader)
         hookTelephonyPropertyWriters(classLoader)
@@ -261,6 +261,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         }
 
         mapOf<String, (SimProfile) -> Any?>(
+            "getSimCountryIso" to { it.countryIso },
+            "getSimOperator" to { it.operatorNumeric },
+            "getSimOperatorNumeric" to { it.operatorNumeric },
+            "getSimOperatorName" to { it.alphaLong },
+            "getNetworkCountryIso" to { it.countryIso },
+            "getNetworkOperator" to { it.operatorNumeric },
+            "getNetworkOperatorName" to { it.alphaLong },
             "getSimCountryIsoForPhone" to { it.countryIso },
             "getSimOperatorForPhone" to { it.operatorNumeric },
             "getSimOperatorNumericForPhone" to { it.operatorNumeric },
@@ -277,11 +284,77 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             }
         }
 
+        mapOf<String, (SimProfile) -> Any?>(
+            "getSimCarrierId" to { it.carrierId },
+            "getCarrierIdFromSimMccMnc" to { it.carrierId },
+            "getSimSpecificCarrierId" to { it.carrierId }
+        ).forEach { (methodName, valueProvider) ->
+            hookProfileMethod(phoneInterfaceManagerClass, methodName) { param, method ->
+                val profile = when {
+                    method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
+                        profileForSubId(param.args.firstIntOrNull(), allowFallback = false)
+                            ?: profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
+                    else -> hookConfig.primaryProfile
+                }
+                valueProvider(profile ?: return@hookProfileMethod -1)
+            }
+        }
+
+        mapOf<String, (SimProfile) -> Any?>(
+            "getSimCarrierIdName" to { it.alphaLong },
+            "getSimSpecificCarrierIdName" to { it.alphaLong }
+        ).forEach { (methodName, valueProvider) ->
+            hookProfileMethod(phoneInterfaceManagerClass, methodName) { _, _ ->
+                valueProvider(hookConfig.primaryProfile)
+            }
+        }
+
+        mapOf<String, (SimProfile) -> Any?>(
+            "getForbiddenPlmns" to { emptyArray<String>() },
+            "getEquivalentHomePlmns" to { emptyList<String>() },
+            "getTypeAllocationCode" to { "" },
+            "getImei" to { null },
+            "getMeid" to { null },
+            "getDeviceId" to { null }
+        ).forEach { (methodName, valueProvider) ->
+            hookProfileMethod(phoneInterfaceManagerClass, methodName) { param, method ->
+                val profile = when {
+                    method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
+                        profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
+                    else -> hookConfig.primaryProfile
+                }
+                valueProvider(profile ?: hookConfig.primaryProfile)
+            }
+        }
+
+        hookPhoneInterfaceManagerObjectReaders(phoneInterfaceManagerClass)
+
         hookAllExistingStringMethods(
             targetClass = phoneInterfaceManagerClass,
             methodNames = listOf("getLine1NumberForDisplay")
         ) { param, method ->
             phoneNumberForCall(param, method)
+        }
+    }
+
+    private fun hookPhoneInterfaceManagerObjectReaders(phoneInterfaceManagerClass: Class<*>) {
+        listOf(
+            "getAllCellInfo",
+            "getCellLocation",
+            "getServiceState",
+            "getEmergencyNumberList"
+        ).forEach { methodName ->
+            phoneInterfaceManagerClass.declaredMethods
+                .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
+                .forEach { method ->
+                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            val config = hookConfig
+                            if (!config.enabled) return
+                            rewriteNestedTelephonyObject(param.result, config.primaryProfile)
+                        }
+                    })
+                }
         }
     }
 
@@ -452,6 +525,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private fun hookSubscriptionServiceSurfaces(classLoader: ClassLoader, externalClientsOnly: Boolean) {
         val serviceClasses = listOf(
+            "com.android.server.telephony.subscription.SubscriptionManagerService",
+            "com.android.server.telephony.SubscriptionController",
             "com.android.internal.telephony.subscription.SubscriptionManagerService",
             "com.android.internal.telephony.SubscriptionController"
         ).mapNotNull { XposedHelpers.findClassIfExists(it, classLoader) }
