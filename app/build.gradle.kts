@@ -7,12 +7,18 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val arirangApplicationId = rootProject.extra["arirangApplicationId"] as String
+val arirangSubmoduleConfigDir = rootProject.extra["arirangSubmoduleConfigDir"] as String
+val arirangSubmoduleConfigFile = rootProject.extra["arirangSubmoduleConfigFile"] as String
+
+fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
 configure<ApplicationExtension>  {
-    namespace = "asia.nana7mi.arirang"
+    namespace = arirangApplicationId
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "asia.nana7mi.arirang"
+        applicationId = arirangApplicationId
         minSdk = 34
         //noinspection OldTargetApi
         targetSdk = 36
@@ -20,6 +26,8 @@ configure<ApplicationExtension>  {
         versionName = "0.2.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled = false
+        buildConfigField("String", "SUBMODULE_CONFIG_DIR", buildConfigString(arirangSubmoduleConfigDir))
+        buildConfigField("String", "SUBMODULE_CONFIG_FILE", buildConfigString(arirangSubmoduleConfigFile))
     }
     @Suppress("UnstableApiUsage")
     androidResources {

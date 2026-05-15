@@ -4,3 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
 }
+
+extra["arirangApplicationId"] = "asia.nana7mi.arirang"
+extra["arirangSubmoduleConfigDir"] = "arirang-submodule"
+extra["arirangSubmoduleConfigFile"] = "config.json"

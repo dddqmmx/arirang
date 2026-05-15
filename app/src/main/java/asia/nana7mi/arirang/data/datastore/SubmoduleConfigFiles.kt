@@ -2,17 +2,15 @@ package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
 import androidx.core.content.edit
+import asia.nana7mi.arirang.BuildConfig
 import org.json.JSONObject
 import java.io.File
 import java.util.Date
 
 object SubmoduleConfigFiles {
-    private const val CONFIG_DIR = "arirang-submodule"
-    private const val CONFIG_FILE = "config.json"
-
     fun configFile(context: Context): File {
         val deContext = context.createDeviceProtectedStorageContext()
-        return File(File(deContext.filesDir, CONFIG_DIR), CONFIG_FILE)
+        return File(File(deContext.filesDir, BuildConfig.SUBMODULE_CONFIG_DIR), BuildConfig.SUBMODULE_CONFIG_FILE)
     }
 
     fun write(

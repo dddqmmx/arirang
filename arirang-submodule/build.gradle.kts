@@ -79,6 +79,9 @@ val outputDir = layout.buildDirectory.dir("outputs")
 val outputZip = outputDir.map { it.file("arirang-submodule.zip") }
 val remoteZipPath = "/data/local/tmp/arirang-submodule.zip"
 val remoteInstallScriptPath = "/data/local/tmp/arirang_install_module.sh"
+val arirangApplicationId = rootProject.extra["arirangApplicationId"] as String
+val arirangSubmoduleConfigDir = rootProject.extra["arirangSubmoduleConfigDir"] as String
+val arirangSubmoduleConfigFile = rootProject.extra["arirangSubmoduleConfigFile"] as String
 
 val configureNative by tasks.registering(Exec::class) {
     inputs.files(fileTree("src/main/cpp"))
@@ -100,6 +103,9 @@ val configureNative by tasks.registering(Exec::class) {
             "-DCMAKE_TOOLCHAIN_FILE=$toolchain",
             "-DANDROID_ABI=arm64-v8a",
             "-DANDROID_PLATFORM=android-31",
+            "-DARIRANG_APPLICATION_ID=$arirangApplicationId",
+            "-DARIRANG_SUBMODULE_CONFIG_DIR=$arirangSubmoduleConfigDir",
+            "-DARIRANG_SUBMODULE_CONFIG_FILE=$arirangSubmoduleConfigFile",
             "-G", "Ninja"
         )
     }

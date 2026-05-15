@@ -1,0 +1,9 @@
+#pragma once
+
+namespace arirang {
+
+inline constexpr const char *kApplicationId = "@ARIRANG_APPLICATION_ID@";
+inline constexpr const char *kConfigPathDe = "@ARIRANG_CONFIG_PATH_DE@";
+inline constexpr const char *kConfigPathCe = "@ARIRANG_CONFIG_PATH_CE@";
+
+} // namespace arirang
