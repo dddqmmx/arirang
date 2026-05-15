@@ -45,13 +45,12 @@ class HomeFragment : Fragment() {
             statusText.setText(R.string.status_activated)
         }
 
-        // Only clipboard is enabled in release build
         setupFeature(R.id.clipboard_setting_bottom, ClipboardConfigActivity::class.java, isReleased = true)
+        setupFeature(R.id.sim_info_setting_bottom, SimConfigActivity::class.java, isReleased = true)
+        setupFeature(R.id.device_info_setting_bottom, DeviceInfoConfigActivity::class.java, isReleased = true)
 
         // These are disabled in release build
-        setupFeature(R.id.sim_info_setting_bottom, SimConfigActivity::class.java, isReleased = false)
         setupFeature(R.id.location_setting_bottom, LocationConfigActivity::class.java, isReleased = false)
-        setupFeature(R.id.device_info_setting_bottom, DeviceInfoConfigActivity::class.java, isReleased = false)
         setupFeature(R.id.package_list_bottom, PackageListConfigActivity::class.java, isReleased = false)
         setupFeature(R.id.test_view, SelfCheckActivity::class.java, isReleased = true)
 
