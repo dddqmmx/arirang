@@ -119,9 +119,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         val visibleProfiles: List<SimProfile> = visibleProfilesBySlot.values.toList()
         val primaryProfile: SimProfile = visibleProfiles.firstOrNull()
             ?: DEFAULT_PROFILES_BY_SLOT.values.first()
-        val countryIsoList: List<String> = (0..1).map { profilesBySlot[it]?.countryIso ?: "" }
-        val operatorNumericList: List<String> = (0..1).map { profilesBySlot[it]?.operatorNumeric ?: "" }
-        val alphaList: List<String> = (0..1).map { profilesBySlot[it]?.alphaLong ?: "" }
+        private val visibleSlotRange: IntRange = 0..(visibleProfilesBySlot.keys.maxOrNull() ?: -1)
+        val countryIsoList: List<String> = visibleSlotRange.map { visibleProfilesBySlot[it]?.countryIso ?: "" }
+        val operatorNumericList: List<String> = visibleSlotRange.map { visibleProfilesBySlot[it]?.operatorNumeric ?: "" }
+        val alphaList: List<String> = visibleSlotRange.map { visibleProfilesBySlot[it]?.alphaLong ?: "" }
         val countryIsoPropertyValue: String = countryIsoList.joinToString(",")
         val operatorNumericPropertyValue: String = operatorNumericList.joinToString(",")
         val alphaPropertyValue: String = alphaList.joinToString(",")

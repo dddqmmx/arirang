@@ -62,21 +62,24 @@ object SubmoduleConfigFiles {
     private fun buildSimProperties(config: SimConfigPrefs.Config): SimProperties {
         if (!config.enabled || config.hideSim) return SimProperties()
 
-        val profiles = config.simInfoList
-        if (profiles.isEmpty()) return SimProperties()
+        val profilesBySlot = config.simInfoBySlot
+        if (profilesBySlot.isEmpty()) return SimProperties()
 
-        fun joined(value: (asia.nana7mi.arirang.model.SimInfo) -> String?): String {
-            return profiles.joinToString(",") { value(it).orEmpty() }
+        fun slotPropertyValue(value: (asia.nana7mi.arirang.model.SimInfo) -> String?): String {
+            val lastSlot = profilesBySlot.keys.maxOrNull() ?: return ""
+            return (0..lastSlot).joinToString(",") { slot ->
+                profilesBySlot[slot]?.let(value).orEmpty()
+            }
         }
 
         return SimProperties(
-            countryIso = joined { it.countryIso },
-            operatorNumeric = joined {
+            countryIso = slotPropertyValue { it.countryIso },
+            operatorNumeric = slotPropertyValue {
                 val mcc = it.mcc.orEmpty()
                 val mnc = it.mnc.orEmpty()
                 (mcc + mnc).takeIf { numeric -> numeric.isNotBlank() }
             },
-            alpha = joined { it.carrierName ?: it.displayName }
+            alpha = slotPropertyValue { it.carrierName ?: it.displayName }
         )
     }
 
