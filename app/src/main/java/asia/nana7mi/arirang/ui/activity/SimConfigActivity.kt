@@ -60,13 +60,13 @@ class SimConfigActivity : ComponentActivity() {
     private fun saveSimInfoConfig(enabled: Boolean, hideSim: Boolean, simInfoList: List<SimInfo>) {
         SimConfigPrefs.saveConfig(
             this,
-            SimConfigPrefs.Config(
+            SimConfigPrefs.Config.fromList(
                 enabled = enabled,
                 hideSim = hideSim,
                 simInfoList = simInfoList
             )
         )
-        Toast.makeText(this, "保存完成", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.save_success), Toast.LENGTH_SHORT).show()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -103,13 +103,13 @@ class SimConfigActivity : ComponentActivity() {
                                         simList.clear()
                                         simList.addAll(systemSims)
                                     } else {
-                                        Toast.makeText(context, "No active system SIMs found", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.sim_import_no_active), Toast.LENGTH_SHORT).show()
                                     }
                                 } else {
                                     ActivityCompat.requestPermissions(this@SimConfigActivity, arrayOf(Manifest.permission.READ_PHONE_STATE), 1)
                                 }
                             }) {
-                                Icon(Icons.Default.Refresh, contentDescription = "Import System SIMs")
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.sim_import_desc))
                             }
                         }
                         IconButton(onClick = { onSave(enabled, hideSim, simList.toList()) }) {
@@ -269,16 +269,16 @@ class SimConfigActivity : ComponentActivity() {
             id = index + 1,
             iccId = "",
             simSlotIndex = index,
-            displayName = "Koryolink",
-            carrierName = "Koryolink",
+            displayName = getString(R.string.sim_carrier_default),
+            carrierName = getString(R.string.sim_carrier_default),
             nameSource = null,
             iconTint = null,
             number = "+12025550147",
             roaming = 0,
             icon = null,
-            mcc = "467",
-            mnc = "05",
-            countryIso = "kp",
+            mcc = getString(R.string.sim_mcc_default),
+            mnc = getString(R.string.sim_mnc_default),
+            countryIso = getString(R.string.sim_country_default),
             isEmbedded = false,
             nativeAccessRules = null,
             cardString = "",
@@ -293,7 +293,8 @@ class SimConfigActivity : ComponentActivity() {
             carrierConfigAccessRules = null,
             areUiccApplicationsEnabled = true,
             portIndex = 0,
-            usageSetting = 0
+            usageSetting = 0,
+            isExpanded = true
         )
     }
 
@@ -337,7 +338,8 @@ class SimConfigActivity : ComponentActivity() {
                         carrierConfigAccessRules = null,
                         areUiccApplicationsEnabled = null,
                         nameSource = null,
-                        icon = null
+                        icon = null,
+                        isExpanded = false
                     )
                 )
             }

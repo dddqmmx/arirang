@@ -6,18 +6,63 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.SimInfo
+import org.xmlpull.v1.XmlPullParser
 
+data class SimPreset(
+    val countryName: String,
+    val name: String,
+    val mcc: String,
+    val mnc: String,
+    val countryIso: String,
+    val carrierName: String,
+    val displayName: String,
+    val carrierId: Int? = -1
+)
+
+@Composable
+fun getSimPresets(): List<SimPreset> {
+    val context = LocalContext.current
+    return remember {
+        val presets = mutableListOf<SimPreset>()
+        runCatching {
+            val parser = context.resources.getXml(R.xml.sim_presets)
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG && parser.name == "preset") {
+                    presets.add(
+                        SimPreset(
+                            countryName = parser.getAttributeValue(null, "country") ?: "",
+                            name = parser.getAttributeValue(null, "name") ?: "",
+                            mcc = parser.getAttributeValue(null, "mcc") ?: "",
+                            mnc = parser.getAttributeValue(null, "mnc") ?: "",
+                            countryIso = parser.getAttributeValue(null, "iso") ?: "",
+                            carrierName = parser.getAttributeValue(null, "carrier") ?: "",
+                            displayName = parser.getAttributeValue(null, "display") ?: "",
+                            carrierId = parser.getAttributeValue(null, "carrierId")?.toIntOrNull() ?: -1
+                        )
+                    )
+                }
+                eventType = parser.next()
+            }
+        }
+        presets
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimSlotItem(
     index: Int,
@@ -26,8 +71,6 @@ fun SimSlotItem(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(index == 0) }
-
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -41,7 +84,7 @@ fun SimSlotItem(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded },
+                    .clickable { onSimInfoChange(simInfo.copy(isExpanded = !simInfo.isExpanded)) },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -63,9 +106,9 @@ fun SimSlotItem(
                         maxLines = 1
                     )
                 }
-                IconButton(onClick = { expanded = !expanded }) {
+                IconButton(onClick = { onSimInfoChange(simInfo.copy(isExpanded = !simInfo.isExpanded)) }) {
                     Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        imageVector = if (simInfo.isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null
                     )
                 }
@@ -78,27 +121,152 @@ fun SimSlotItem(
                 }
             }
 
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(visible = simInfo.isExpanded) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    val simPresets = getSimPresets()
+                    val matchedPreset = remember(simInfo.mcc, simInfo.mnc, simPresets) {
+                        simPresets.find { it.mcc == simInfo.mcc && it.mnc == simInfo.mnc }
+                    }
+
+                    val customText = stringResource(R.string.sim_preset_custom)
+                    var selectedCountry by remember(matchedPreset) {
+                        mutableStateOf(matchedPreset?.countryName ?: if (simInfo.mcc.isNullOrBlank()) null else customText)
+                    }
+
+                    var expandedCountries by remember { mutableStateOf(false) }
+                    var expandedCarriers by remember { mutableStateOf(false) }
+
+                    val countries = remember(simPresets) { simPresets.map { it.countryName }.distinct() }
+                    val filteredPresets = remember(selectedCountry, simPresets) {
+                        simPresets.filter { it.countryName == selectedCountry }
+                    }
+
+                    val displayCarrier = remember(matchedPreset, selectedCountry) {
+                        if (matchedPreset != null && matchedPreset.countryName == selectedCountry) {
+                            matchedPreset.name
+                        } else if (selectedCountry == customText) {
+                            customText
+                        } else {
+                            ""
+                        }
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Country Selector
+                        ExposedDropdownMenuBox(
+                            expanded = expandedCountries,
+                            onExpandedChange = { expandedCountries = it },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            OutlinedTextField(
+                                value = selectedCountry ?: "",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(stringResource(R.string.sim_preset_country)) },
+                                placeholder = { Text(stringResource(R.string.sim_preset_country_placeholder)) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCountries) },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                modifier = Modifier
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                    .fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expandedCountries,
+                                onDismissRequest = { expandedCountries = false }
+                            ) {
+                                countries.forEach { country ->
+                                    DropdownMenuItem(
+                                        text = { Text(country) },
+                                        onClick = {
+                                            selectedCountry = country
+                                            expandedCountries = false
+                                            expandedCarriers = true // Open carrier dropdown automatically
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Carrier Selector
+                        ExposedDropdownMenuBox(
+                            expanded = expandedCarriers,
+                            onExpandedChange = { expandedCarriers = it },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            OutlinedTextField(
+                                value = displayCarrier,
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = selectedCountry != null && selectedCountry != customText,
+                                label = { Text(stringResource(R.string.sim_preset_carrier)) },
+                                placeholder = { 
+                                    val text = when {
+                                        selectedCountry == null -> stringResource(R.string.sim_preset_carrier_placeholder_init)
+                                        selectedCountry == customText -> stringResource(R.string.sim_preset_carrier_placeholder_custom)
+                                        else -> stringResource(R.string.sim_preset_carrier_placeholder_select)
+                                    }
+                                    Text(text)
+                                },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCarriers) },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                modifier = Modifier
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                    .fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = expandedCarriers,
+                                onDismissRequest = { expandedCarriers = false }
+                            ) {
+                                filteredPresets.forEach { preset ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(preset.name, fontWeight = FontWeight.Bold)
+                                                Text(
+                                                    "${stringResource(R.string.sim_mcc_prefix)}${preset.mcc} ${stringResource(R.string.sim_mnc_prefix)}${preset.mnc}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            onSimInfoChange(simInfo.copy(
+                                                mcc = preset.mcc,
+                                                mnc = preset.mnc,
+                                                countryIso = preset.countryIso,
+                                                carrierName = preset.carrierName,
+                                                displayName = preset.displayName,
+                                                carrierId = preset.carrierId
+                                            ))
+                                            expandedCarriers = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SimField(
                             label = stringResource(R.string.sim_field_mcc),
                             value = simInfo.mcc ?: "",
                             onValueChange = { onSimInfoChange(simInfo.copy(mcc = it)) },
                             modifier = Modifier.weight(1f),
-                            placeholder = "467"
+                            placeholder = stringResource(R.string.sim_mcc_default)
                         )
                         SimField(
                             label = stringResource(R.string.sim_field_mnc),
                             value = simInfo.mnc ?: "",
                             onValueChange = { onSimInfoChange(simInfo.copy(mnc = it)) },
                             modifier = Modifier.weight(1f),
-                            placeholder = "05"
+                            placeholder = stringResource(R.string.sim_mnc_default)
                         )
                     }
 
@@ -108,7 +276,7 @@ fun SimSlotItem(
                             value = simInfo.countryIso ?: "",
                             onValueChange = { onSimInfoChange(simInfo.copy(countryIso = it)) },
                             modifier = Modifier.weight(1f),
-                            placeholder = "kp"
+                            placeholder = stringResource(R.string.sim_country_default)
                         )
                         SimField(
                             label = stringResource(R.string.sim_field_carrier_id),
@@ -124,14 +292,14 @@ fun SimSlotItem(
                         label = stringResource(R.string.sim_field_carrier_name),
                         value = simInfo.carrierName ?: "",
                         onValueChange = { onSimInfoChange(simInfo.copy(carrierName = it)) },
-                        placeholder = "Koryolink"
+                        placeholder = stringResource(R.string.sim_carrier_default)
                     )
 
                     SimField(
                         label = stringResource(R.string.sim_field_display_name),
                         value = simInfo.displayName ?: "",
                         onValueChange = { onSimInfoChange(simInfo.copy(displayName = it)) },
-                        placeholder = "Koryolink"
+                        placeholder = stringResource(R.string.sim_carrier_default)
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -200,15 +368,16 @@ fun SimField(
     )
 }
 
+@Composable
 private fun simSummary(simInfo: SimInfo): String {
     val name = simInfo.carrierName?.takeIf { it.isNotBlank() }
         ?: simInfo.displayName?.takeIf { it.isNotBlank() }
-        ?: "SIM"
+        ?: stringResource(R.string.sim_summary_fallback)
     val numeric = listOfNotNull(
         simInfo.mcc?.takeIf { it.isNotBlank() },
         simInfo.mnc?.takeIf { it.isNotBlank() }
     ).joinToString("")
-    val slot = simInfo.simSlotIndex?.let { "slot $it" }
+    val slot = simInfo.simSlotIndex?.let { stringResource(R.string.slot_title_text, it) } // Reuse existing slot_title_text or use a specific format
     return listOf(name, numeric.takeIf { it.isNotBlank() }, slot)
         .filterNotNull()
         .joinToString(" / ")

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sim-presets>
+    <preset
+        country="North Korea"
+        name="Koryolink"
+        mcc="467"
+        mnc="05"
+        iso="kp"
+        carrier="Koryolink"
+        display="Koryolink"
+        carrierId="-1" />
+
+    <preset
+        country="Russia"
+        name="MTS"
+        mcc="250"
+        mnc="01"
+        iso="ru"
+        carrier="MTS RUS"
+        display="MTS RUS"
+        carrierId="1358" />
+
+    <preset
+        country="China"
+        name="China Mobile"
+        mcc="460"
+        mnc="00"
+        iso="cn"
+        carrier="中国移动"
+        display="中国移动"
+        carrierId="1435" />
+
+    <preset
+        country="China"
+        name="China Unicom"
+        mcc="460"
+        mnc="01"
+        iso="cn"
+        carrier="中国联通"
+        display="中国联通"
+        carrierId="1436" />
+
+    <preset
+        country="China"
+        name="China Telecom"
+        mcc="460"
+        mnc="11"
+        iso="cn"
+        carrier="中国电信"
+        display="中国电信"
+        carrierId="1437" />
+
+    <preset
+        country="USA"
+        name="T-Mobile"
+        mcc="310"
+        mnc="260"
+        iso="us"
+        carrier="T-Mobile"
+        display="T-Mobile"
+        carrierId="1" />
+
+    <preset
+        country="USA"
+        name="AT&amp;T"
+        mcc="310"
+        mnc="410"
+        iso="us"
+        carrier="AT&amp;T"
+        display="AT&amp;T"
+        carrierId="1187" />
+
+    <preset
+        country="Japan"
+        name="Rakuten"
+        mcc="440"
+        mnc="11"
+        iso="jp"
+        carrier="Rakuten"
+        display="Rakuten"
+        carrierId="2314" />
+
+    <preset
+        country="UK"
+        name="Vodafone"
+        mcc="234"
+        mnc="15"
+        iso="gb"
+        carrier="Vodafone UK"
+        display="Vodafone UK"
+        carrierId="1450" />
+
+    <preset
+        country="Australia"
+        name="Telstra"
+        mcc="505"
+        mnc="01"
+        iso="au"
+        carrier="Telstra"
+        display="Telstra"
+        carrierId="1191" />
+
+    <preset
+        country="Germany"
+        name="Deutsche Telekom"
+        mcc="262"
+        mnc="01"
+        iso="de"
+        carrier="Telekom.de"
+        display="Telekom.de"
+        carrierId="1515" />
+</sim-presets>

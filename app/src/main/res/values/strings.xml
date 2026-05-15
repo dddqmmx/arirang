@@ -247,4 +247,31 @@
     <string name="feature_not_available">Coming Soon</string>
     <string name="reset_all">Reset All Settings</string>
     <string name="reset_all_confirm">Are you sure you want to reset all clipboard settings? This will clear all app-specific policies and restore the default behavior.</string>
+
+    <string name="action_export">Export</string>
+    <string name="export_select_sections">Select sections to export</string>
+    <string name="export_filename">arirang_self_check.txt</string>
+    <string name="export_success">Exported successfully</string>
+    <string name="export_failed">Export failed</string>
+
+    <string name="sim_preset_title">Select Carrier Preset</string>
+    <string name="sim_preset_button">Select Preset</string>
+    <string name="sim_preset_country">Country Preset</string>
+    <string name="sim_preset_carrier">Carrier Preset</string>
+    <string name="sim_preset_custom">Custom</string>
+    <string name="sim_preset_placeholder">Select Country/Carrier preset...</string>
+    <string name="sim_preset_country_placeholder">Select Country...</string>
+    <string name="sim_preset_carrier_placeholder_init">Select Country First</string>
+    <string name="sim_preset_carrier_placeholder_custom">Manual Input</string>
+    <string name="sim_preset_carrier_placeholder_select">Select Carrier...</string>
+    <string name="sim_summary_fallback">SIM</string>
+    <string name="save_success">Saved successfully</string>
+    <string name="sim_import_no_active">No active system SIMs found</string>
+    <string name="sim_import_desc">Import System SIMs</string>
+    <string name="sim_mcc_prefix">MCC:</string>
+    <string name="sim_mnc_prefix">MNC:</string>
+    <string name="sim_mcc_default">467</string>
+    <string name="sim_mnc_default">05</string>
+    <string name="sim_country_default">kp</string>
+    <string name="sim_carrier_default">Koryolink</string>
 </resources>

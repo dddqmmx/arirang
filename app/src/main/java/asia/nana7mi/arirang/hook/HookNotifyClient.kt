@@ -10,6 +10,7 @@ import android.os.DeadObjectException
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.service.HookNotifyService
@@ -50,6 +51,9 @@ object HookNotifyClient {
     /** 默认请求授权等待时间 */
     private const val DEFAULT_REQUEST_TIMEOUT_MS = 2500L
 
+    /** SIM 配置远程读取的本地缓存时间，避免热路径频繁 Binder 调用 */
+    private const val SIM_CONFIG_CACHE_TTL_MS = 300L
+
     /** 服务端定义：允许访问的返回值 */
     private const val RESULT_ALLOW = 1
 
@@ -84,6 +88,15 @@ object HookNotifyClient {
      */
     @Volatile
     private var sConnectLatch: CountDownLatch? = null
+
+    @Volatile
+    private var sSimConfigSnapshot: String? = null
+
+    @Volatile
+    private var sSimConfigVersion = Long.MIN_VALUE
+
+    @Volatile
+    private var sLastSimConfigCheckAt = 0L
 
     /**
      * 同步锁对象
@@ -185,6 +198,12 @@ object HookNotifyClient {
         }
     }
 
+    fun autoBindCurrentUser(ctx: Context) {
+        if (sService == null && !sBinding) {
+            ensureBoundCurrentUser(ctx)
+        }
+    }
+
     /**
      * 上报某个应用使用了某权限
      *
@@ -258,6 +277,47 @@ object HookNotifyClient {
         }
     }
 
+    fun readSimConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
+        val now = SystemClock.uptimeMillis()
+        val cachedSnapshot = sSimConfigSnapshot
+        if (!force && cachedSnapshot != null && now - sLastSimConfigCheckAt < SIM_CONFIG_CACHE_TTL_MS) {
+            return cachedSnapshot
+        }
+
+        val service = if (allowBind) {
+            val ctx = getSystemContext()
+            if (ctx == null) {
+                XposedBridge.log("$TAG readSimConfigSnapshot: no system context")
+                return cachedSnapshot
+            }
+            getOrBindService(ctx)
+        } else {
+            sService
+        } ?: return cachedSnapshot
+
+        return try {
+            withCleanCallingIdentity {
+                val version = service.readSimConfigVersion()
+                if (force || cachedSnapshot == null || version != sSimConfigVersion) {
+                    val snapshot = service.readSimConfigSnapshot()?.takeIf { it.isNotBlank() }
+                    if (snapshot != null) {
+                        sSimConfigSnapshot = snapshot
+                        sSimConfigVersion = version
+                    }
+                }
+                sLastSimConfigCheckAt = now
+                sSimConfigSnapshot
+            }
+        } catch (_: DeadObjectException) {
+            sService = null
+            cachedSnapshot
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG readSimConfigSnapshot failed: ${t.stackTraceToString()}")
+            sService = null
+            cachedSnapshot
+        }
+    }
+
     /**
      * 确保已发起 bind 操作
      */
@@ -324,6 +384,52 @@ object HookNotifyClient {
 
         } catch (t: Throwable) {
             XposedBridge.log("$TAG bind exception: ${t.stackTraceToString()}")
+            sBinding = false
+            connectLatch?.countDown()
+        }
+    }
+
+    private fun ensureBoundCurrentUser(ctx: Context) {
+        var connectLatch: CountDownLatch? = null
+
+        synchronized(LOCK) {
+            if (sBinding || sService != null) return
+
+            sBinding = true
+            connectLatch = CountDownLatch(1)
+            sConnectLatch = connectLatch
+        }
+
+        val intent = Intent().apply {
+            component = ComponentName(TARGET_PKG, HookNotifyService::class.java.name)
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+        }
+
+        try {
+            XposedBridge.log("$TAG Binding to service $TARGET_PKG as current user")
+            val success = withCleanCallingIdentity {
+                ctx.bindService(
+                    intent,
+                    connection,
+                    Context.BIND_AUTO_CREATE
+                )
+            }
+
+            if (!success) {
+                XposedBridge.log("$TAG current-user bindService returned false")
+                sBinding = false
+                connectLatch?.countDown()
+            }
+
+            handler.postDelayed({
+                if (sService == null && sBinding) {
+                    XposedBridge.log("$TAG current-user bind timeout, reset binding")
+                    sBinding = false
+                    connectLatch?.countDown()
+                }
+            }, BIND_TIMEOUT_MS)
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG current-user bind exception: ${t.stackTraceToString()}")
             sBinding = false
             connectLatch?.countDown()
         }

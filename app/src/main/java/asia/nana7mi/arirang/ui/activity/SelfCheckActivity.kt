@@ -17,11 +17,16 @@ import android.telephony.CellInfo
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.util.Log
+import android.net.Uri
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import asia.nana7mi.arirang.R
@@ -29,6 +34,8 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.io.BufferedWriter
+import java.io.OutputStreamWriter
 import java.net.NetworkInterface
 import java.util.UUID
 
@@ -56,6 +63,33 @@ class SelfCheckActivity : BaseActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         runSelfCheck()
+    }
+
+    private var lastResults: List<Pair<Int, CheckResult>>? = null
+
+    private val createFileLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        uri?.let {
+            val selectedIndices = pendingExportIndices ?: return@let
+            performExport(it, selectedIndices)
+            pendingExportIndices = null
+        }
+    }
+
+    private var pendingExportIndices: List<Int>? = null
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_self_check, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_export -> {
+                exportCurrentState()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -176,33 +210,86 @@ class SelfCheckActivity : BaseActivity() {
             val bluetooth = async(Dispatchers.IO) { readBluetoothInfo() }
 
             val results = listOf(
-                device.await(),
-                build.await(),
-                telephony.await(),
-                sim.await(),
-                apps.await(),
-                wifi.await(),
-                accounts.await(),
-                drm.await(),
-                network.await(),
-                bluetooth.await()
+                R.string.self_check_device_title to device.await(),
+                R.string.self_check_build_title to build.await(),
+                R.string.self_check_telephony_title to telephony.await(),
+                R.string.self_check_sim_title to sim.await(),
+                R.string.self_check_apps_title to apps.await(),
+                R.string.self_check_wifi_title to wifi.await(),
+                R.string.self_check_accounts_title to accounts.await(),
+                R.string.self_check_drm_title to drm.await(),
+                R.string.self_check_network_title to network.await(),
+                R.string.self_check_bluetooth_title to bluetooth.await()
             )
-            deviceSection.bindResult(results[0])
-            buildSection.bindResult(results[1])
-            telephonySection.bindResult(results[2])
-            simSection.bindResult(results[3])
-            appsSection.bindResult(results[4])
-            wifiSection.bindResult(results[5])
-            accountsSection.bindResult(results[6])
-            drmSection.bindResult(results[7])
-            networkSection.bindResult(results[8])
-            bluetoothSection.bindResult(results[9])
+            lastResults = results
 
-            val visibleCount = results.count { it.state == CheckState.VISIBLE }
-            val blockedCount = results.count { it.state == CheckState.BLOCKED }
+            deviceSection.bindResult(results[0].second)
+            buildSection.bindResult(results[1].second)
+            telephonySection.bindResult(results[2].second)
+            simSection.bindResult(results[3].second)
+            appsSection.bindResult(results[4].second)
+            wifiSection.bindResult(results[5].second)
+            accountsSection.bindResult(results[6].second)
+            drmSection.bindResult(results[7].second)
+            networkSection.bindResult(results[8].second)
+            bluetoothSection.bindResult(results[9].second)
+
+            val visibleCount = results.count { it.second.state == CheckState.VISIBLE }
+            val blockedCount = results.count { it.second.state == CheckState.BLOCKED }
             summaryText.text = getString(R.string.self_check_summary_result, visibleCount, blockedCount)
             runButton.isEnabled = true
             runButton.setText(R.string.self_check_run_again)
+        }
+    }
+
+    private fun exportCurrentState() {
+        val results = lastResults ?: return
+        val titles = results.map { getString(it.first) }.toTypedArray()
+        val checkedItems = BooleanArray(titles.size) { true }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.export_select_sections)
+            .setMultiChoiceItems(titles, checkedItems) { _, which, isChecked ->
+                checkedItems[which] = isChecked
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val selectedIndices = checkedItems.indices.filter { checkedItems[it] }
+                if (selectedIndices.isNotEmpty()) {
+                    pendingExportIndices = selectedIndices
+                    createFileLauncher.launch(getString(R.string.export_filename))
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun performExport(uri: Uri, selectedIndices: List<Int>) {
+        val results = lastResults ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    BufferedWriter(OutputStreamWriter(outputStream)).use { writer ->
+                        selectedIndices.forEach { index ->
+                            val (titleRes, result) = results[index]
+                            writer.write("=== ${getString(titleRes)} ===")
+                            writer.newLine()
+                            writer.write("${getString(R.string.status_title)}: ${result.status}")
+                            writer.newLine()
+                            writer.write(result.content)
+                            writer.newLine()
+                            writer.newLine()
+                        }
+                    }
+                }
+                launch(Dispatchers.Main) {
+                    Toast.makeText(this@SelfCheckActivity, R.string.export_success, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e(PHONE_DIAG_TAG, "Failed to export", e)
+                launch(Dispatchers.Main) {
+                    Toast.makeText(this@SelfCheckActivity, R.string.export_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 

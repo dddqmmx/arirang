@@ -30,5 +30,6 @@ data class SimInfo(
     val carrierConfigAccessRules: Object?,
     val areUiccApplicationsEnabled: Boolean?,
     val portIndex: Int?,
-    val usageSetting: Int?
+    val usageSetting: Int?,
+    val isExpanded: Boolean = false
 )

@@ -244,4 +244,31 @@
     <string name="feature_not_available">暂未开放</string>
     <string name="reset_all">重置所有设定</string>
     <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为。</string>
+
+    <string name="action_export">导出</string>
+    <string name="export_select_sections">选择要导出的部分</string>
+    <string name="export_filename">arirang_self_check.txt</string>
+    <string name="export_success">导出成功</string>
+    <string name="export_failed">导出失败</string>
+
+    <string name="sim_preset_title">选择运营商预设</string>
+    <string name="sim_preset_button">选择国家/运营商预设</string>
+    <string name="sim_preset_country">国家预设</string>
+    <string name="sim_preset_carrier">运营商预设</string>
+    <string name="sim_preset_custom">自定义</string>
+    <string name="sim_preset_placeholder">点击选择国家/运营商预设...</string>
+    <string name="sim_preset_country_placeholder">选择国家...</string>
+    <string name="sim_preset_carrier_placeholder_init">先选国家</string>
+    <string name="sim_preset_carrier_placeholder_custom">手动输入</string>
+    <string name="sim_preset_carrier_placeholder_select">选择运营商...</string>
+    <string name="sim_summary_fallback">SIM</string>
+    <string name="save_success">保存成功</string>
+    <string name="sim_import_no_active">未发现活跃的系统 SIM 卡</string>
+    <string name="sim_import_desc">从系统导入 SIM 卡信息</string>
+    <string name="sim_mcc_prefix">MCC:</string>
+    <string name="sim_mnc_prefix">MNC:</string>
+    <string name="sim_mcc_default">467</string>
+    <string name="sim_mnc_default">05</string>
+    <string name="sim_country_default">kp</string>
+    <string name="sim_carrier_default">Koryolink</string>
 </resources>

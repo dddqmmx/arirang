@@ -14,6 +14,7 @@ import android.os.ResultReceiver
 import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
+import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.hook.IHookNotify
 import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +59,7 @@ class HookNotifyService : Service() {
 
         private val TRUSTED_CALLER_PACKAGES = setOf(
             "android",
+            "com.android.phone",
             BuildConfig.APPLICATION_ID
         )
     }
@@ -209,6 +211,24 @@ class HookNotifyService : Service() {
             mainHandler.post {
                 launchDialog(normalizedPkgName, null)
             }
+        }
+
+        override fun readSimConfigVersion(): Long {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected SIM config version request from uid=$callingUid")
+                return 0L
+            }
+            return SimConfigPrefs.lastModified(this@HookNotifyService)
+        }
+
+        override fun readSimConfigSnapshot(): String {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected SIM config snapshot request from uid=$callingUid")
+                return ""
+            }
+            return SimConfigPrefs.buildHookSnapshot(this@HookNotifyService)
         }
     }
 
