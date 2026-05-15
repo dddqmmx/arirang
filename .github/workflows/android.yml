@@ -27,7 +27,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Install Native Build Dependencies
-        run: yes | sdkmanager "ndk;23.1.7779620"
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          "$SDKMANAGER" --install "ndk;23.1.7779620"
 
       - name: Build with Gradle
         run: ./gradlew assembleDebug assembleRelease :arirang-submodule:packageModule
