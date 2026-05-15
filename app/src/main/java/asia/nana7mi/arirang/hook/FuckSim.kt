@@ -144,8 +144,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         get() = currentHookConfig()
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (!BuildConfig.DEBUG) return
-
         runCatching {
             preferHookNotifyConfig = lpparam.packageName == "android" || lpparam.packageName == "com.android.phone"
             val config = hookConfig
