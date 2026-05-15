@@ -55,13 +55,13 @@ jobs:
 
       - name: Rename Signed APK
         run: |
-          mv ${{ steps.sign_app.outputs.signedReleaseFile }} app/build/outputs/apk/release/arirang-v${{ github.run_number }}-release.apk
-          echo "RELEASE_APK_PATH=app/build/outputs/apk/release/arirang-v${{ github.run_number }}-release.apk" >> $GITHUB_ENV
+          mv ${{ steps.sign_app.outputs.signedReleaseFile }} app/build/outputs/apk/release/arirang-${{ github.ref_name }}-release.apk
+          echo "RELEASE_APK_PATH=app/build/outputs/apk/release/arirang-${{ github.ref_name }}-release.apk" >> $GITHUB_ENV
 
       - name: Rename Submodule Zip
         run: |
-          mv arirang-submodule/build/outputs/arirang-submodule.zip arirang-submodule/build/outputs/arirang-submodule-v${{ github.run_number }}.zip
-          echo "SUBMODULE_ZIP_PATH=arirang-submodule/build/outputs/arirang-submodule-v${{ github.run_number }}.zip" >> $GITHUB_ENV
+          mv arirang-submodule/build/outputs/arirang-submodule.zip arirang-submodule/build/outputs/arirang-submodule-${{ github.ref_name }}.zip
+          echo "SUBMODULE_ZIP_PATH=arirang-submodule/build/outputs/arirang-submodule-${{ github.ref_name }}.zip" >> $GITHUB_ENV
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
