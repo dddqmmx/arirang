@@ -87,6 +87,16 @@ Use at your own risk.
 
 - **Multi-language Support**
 
+## 📸 Screenshots
+
+| Main | Clipboard | Clipboard Dialog |
+| --- | --- | --- |
+| <img src="screenshorts/main.png" width="240" alt="Main screen"> | <img src="screenshorts/clipboard.png" width="240" alt="Clipboard protection screen"> | <img src="screenshorts/clipboard-dialog.png" width="240" alt="Clipboard confirmation dialog"> |
+
+| Device Info | SIM Mocking | Privacy Self-Check |
+| --- | --- | --- |
+| <img src="screenshorts/device.png" width="240" alt="Device info masking screen"> | <img src="screenshorts/sim.png" width="240" alt="SIM mocking screen"> | <img src="screenshorts/self-check.png" width="240" alt="Privacy self-check screen"> |
+
 ## 🛠 Requirements
 
 - Rooted Android device
