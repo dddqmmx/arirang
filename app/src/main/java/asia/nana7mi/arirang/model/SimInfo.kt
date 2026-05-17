@@ -20,6 +20,8 @@ data class SimInfo(
     val iconTint: Int?,
     @SerializedName("number")
     val number: String?,
+    @SerializedName("imei")
+    val imei: String? = null,
     @SerializedName("roaming")
     val roaming: Int?,
     @SerializedName("icon")

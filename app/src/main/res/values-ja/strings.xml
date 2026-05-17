@@ -79,6 +79,7 @@
     <string name="sim_field_subscription_id">購読 ID</string>
     <string name="sim_field_slot_index">スロット番号</string>
     <string name="sim_field_iccid">ICCID</string>
+    <string name="sim_field_imei">IMEI</string>
     <string name="sim_field_card_id">カード ID</string>
     <string name="sim_field_number">電話番号</string>
     <string name="set_scope">スコープを設定</string>

@@ -418,6 +418,29 @@ class SelfCheckActivity : BaseActivity() {
                     ?.takeUnless { it.isBlank() }
                     ?.let { values.add("Phone number sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
 
+                val scopedImei = runCatching {
+                    telephonyManager.createForSubscriptionId(subscription.subscriptionId).imei
+                }
+                logPhoneProbe(
+                    "TelephonyManager.createForSubscriptionId(${subscription.subscriptionId}).getImei",
+                    scopedImei
+                )
+                scopedImei.getOrNull()
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("IMEI sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
+
+                @Suppress("DEPRECATION")
+                val scopedDeviceId = runCatching {
+                    telephonyManager.createForSubscriptionId(subscription.subscriptionId).deviceId
+                }
+                logPhoneProbe(
+                    "TelephonyManager.createForSubscriptionId(${subscription.subscriptionId}).getDeviceId",
+                    scopedDeviceId
+                )
+                scopedDeviceId.getOrNull()
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("Device ID sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
+
                 val subscriptionPhoneNumber = runCatching {
                     subscriptionManager.getPhoneNumber(subscription.subscriptionId)
                 }
@@ -439,6 +462,17 @@ class SelfCheckActivity : BaseActivity() {
                 .getOrNull()
                 ?.takeUnless { it.isBlank() }
                 ?.let { values.add("Subscriber ID: ${it.maskMiddle()}") }
+
+            runCatching { telephonyManager.imei }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("IMEI default: ${it.maskMiddle()}") }
+
+            @Suppress("DEPRECATION")
+            runCatching { telephonyManager.deviceId }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("Device ID default: ${it.maskMiddle()}") }
 
             runCatching { telephonyManager.simCountryIso }
                 .getOrNull()

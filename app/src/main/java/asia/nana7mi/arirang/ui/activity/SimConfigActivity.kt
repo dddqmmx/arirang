@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.telephony.SubscriptionManager
+import android.telephony.TelephonyManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -274,6 +275,7 @@ class SimConfigActivity : ComponentActivity() {
             nameSource = null,
             iconTint = null,
             number = "+12025550147",
+            imei = defaultImeiForSlot(index),
             roaming = 0,
             icon = null,
             mcc = getString(R.string.sim_mcc_default),
@@ -301,6 +303,7 @@ class SimConfigActivity : ComponentActivity() {
     private fun getSystemSimInfoList(): List<SimInfo> {
         val simInfoList = mutableListOf<SimInfo>()
         val subscriptionManager = getSystemService(SubscriptionManager::class.java)
+        val telephonyManager = getSystemService(TelephonyManager::class.java)
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             return emptyList()
@@ -318,6 +321,7 @@ class SimConfigActivity : ComponentActivity() {
                         carrierName = sub.carrierName.toString(),
                         iconTint = sub.iconTint,
                         number = sub.number,
+                        imei = runCatching { telephonyManager.getImei(sub.simSlotIndex) }.getOrNull(),
                         roaming = sub.dataRoaming,
                         mcc = sub.mccString,
                         mnc = sub.mncString,
@@ -345,5 +349,25 @@ class SimConfigActivity : ComponentActivity() {
             }
         }
         return simInfoList
+    }
+
+    private fun defaultImeiForSlot(slotIndex: Int): String {
+        val tac = "35693803"
+        val serial = (100000 + slotIndex).toString().padStart(6, '0').takeLast(6)
+        val body = tac + serial
+        return body + luhnCheckDigit(body)
+    }
+
+    private fun luhnCheckDigit(body: String): Int {
+        val sum = body.reversed().mapIndexed { index, char ->
+            val digit = char.digitToIntOrNull() ?: 0
+            if (index % 2 == 0) {
+                val doubled = digit * 2
+                if (doubled > 9) doubled - 9 else doubled
+            } else {
+                digit
+            }
+        }.sum()
+        return (10 - (sum % 10)) % 10
     }
 }

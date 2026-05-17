@@ -79,6 +79,7 @@
     <string name="sim_field_subscription_id">Subscription ID</string>
     <string name="sim_field_slot_index">Slot index</string>
     <string name="sim_field_iccid">ICCID</string>
+    <string name="sim_field_imei">IMEI</string>
     <string name="sim_field_card_id">Card ID</string>
     <string name="sim_field_number">Number</string>
     <string name="set_scope">Set Scope</string>

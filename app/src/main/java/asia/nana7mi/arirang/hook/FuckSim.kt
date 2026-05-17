@@ -62,6 +62,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 mnc = "05",
                 alphaLong = "Koryolink",
                 phoneNumber = "+8501912345678",
+                imei = "356938031000004",
                 cardId = 0,
                 portIndex = 0
             ),
@@ -74,6 +75,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 mnc = "01",
                 alphaLong = "MTS RUS",
                 phoneNumber = "+79161234567",
+                imei = "356938031000012",
                 cardId = 1,
                 portIndex = 1
             )
@@ -89,6 +91,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         val mnc: String,
         val alphaLong: String,
         val phoneNumber: String,
+        val imei: String,
         val alphaShort: String = alphaLong,
         val carrierId: Int = -1,
         val cardId: Int = slotIndex,
@@ -107,6 +110,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         val usageSetting: Int = 0
     ) {
         val operatorNumeric: String = mcc + mnc
+        val typeAllocationCode: String = imei.take(8)
     }
 
     private data class HookConfig(
@@ -311,18 +315,21 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         mapOf<String, (SimProfile) -> Any?>(
             "getForbiddenPlmns" to { emptyArray<String>() },
             "getEquivalentHomePlmns" to { emptyList<String>() },
-            "getTypeAllocationCode" to { "" },
-            "getImei" to { null },
+            "getTypeAllocationCode" to { it.typeAllocationCode },
+            "getImei" to { it.imei },
+            "getImeiForSlot" to { it.imei },
             "getMeid" to { null },
-            "getDeviceId" to { null }
+            "getDeviceId" to { it.imei },
+            "getDeviceIdForPhone" to { it.imei },
+            "getDeviceIdWithFeature" to { it.imei }
         ).forEach { (methodName, valueProvider) ->
-            hookProfileMethod(phoneInterfaceManagerClass, methodName) { param, method ->
+            hookProfileMethod(phoneInterfaceManagerClass, methodName, beforeOriginal = true) { param, method ->
                 val profile = when {
                     method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
                         profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
-                    else -> hookConfig.primaryProfile
+                    else -> profileForSlot(null, allowFallback = true)
                 }
-                valueProvider(profile ?: hookConfig.primaryProfile)
+                valueProvider(profile ?: return@hookProfileMethod null)
             }
         }
 
@@ -369,6 +376,21 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             )
         ) { param, method ->
             phoneNumberForCall(param, method)
+        }
+
+        hookAllExistingStringMethods(
+            classLoader = classLoader,
+            className = "com.android.internal.telephony.PhoneSubInfoController",
+            methodNames = listOf(
+                "getDeviceId",
+                "getDeviceIdForPhone",
+                "getDeviceIdWithFeature",
+                "getImei",
+                "getImeiForSubscriber"
+            ),
+            beforeOriginal = true
+        ) { param, method ->
+            imeiForCall(param, method)
         }
     }
 
@@ -1255,6 +1277,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass: Class<*>,
         methodName: String,
         externalClientsOnly: Boolean = false,
+        beforeOriginal: Boolean = false,
         valueProvider: (XC_MethodHook.MethodHookParam, Method) -> Any?
     ) {
         val methods = targetClass.declaredMethods.filter { it.name == methodName }
@@ -1262,7 +1285,14 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
         methods.forEach { method ->
             XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!beforeOriginal) return
+                    if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                    param.result = coerceHookResult(valueProvider(param, method), null)
+                }
+
                 override fun afterHookedMethod(param: MethodHookParam) {
+                    if (beforeOriginal) return
                     if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
                     param.result = coerceHookResult(valueProvider(param, method), param.result)
                 }
@@ -1292,16 +1322,18 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         className: String,
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
+        beforeOriginal: Boolean = false,
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
         val targetClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return
-        hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, resultProvider)
+        hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, beforeOriginal, resultProvider)
     }
 
     private fun hookAllExistingStringMethods(
         targetClass: Class<*>,
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
+        beforeOriginal: Boolean = false,
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
         methodNames.forEach { methodName ->
@@ -1309,7 +1341,14 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 .filter { it.name == methodName }
                 .forEach { method ->
                     XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            if (!beforeOriginal) return
+                            if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                            param.result = resultProvider(param, method)
+                        }
+
                         override fun afterHookedMethod(param: MethodHookParam) {
+                            if (beforeOriginal) return
                             if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
                             if (param.result == null || param.result is String) {
                                 param.result = resultProvider(param, method)
@@ -1332,6 +1371,20 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             else -> profileForTelephonyManager(param)
         }
         return profile?.phoneNumber
+    }
+
+    private fun imeiForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+        val firstInt = param.args.firstIntOrNull()
+        val profile = when {
+            method.name.contains("ForSubscriber", ignoreCase = true) ->
+                profileForSubId(firstInt, allowFallback = firstInt == null)
+            method.name.contains("ForPhone", ignoreCase = true) ->
+                profileForSlot(firstInt, allowFallback = false)
+            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
+                profileForSlot(firstInt, allowFallback = false)
+            else -> profileForTelephonyManager(param)
+        }
+        return profile?.imei
     }
 
     private fun profileForTelephonyManager(param: XC_MethodHook.MethodHookParam): SimProfile? {
@@ -1664,6 +1717,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             alphaLong = carrierName,
             alphaShort = carrierName,
             phoneNumber = item.optCleanString("number") ?: fallback.phoneNumber,
+            imei = item.optCleanString("imei") ?: fallback.imei,
             carrierId = item.optIntOrNull("carrierId") ?: fallback.carrierId,
             cardId = item.optIntOrNull("cardId") ?: fallback.cardId,
             cardString = item.optCleanString("cardString") ?: iccId,
