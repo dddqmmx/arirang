@@ -17,9 +17,9 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
-import android.widget.Toast
 import asia.nana7mi.arirang.BuildConfig
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class HomeFragment : Fragment() {
 
@@ -66,17 +66,22 @@ class HomeFragment : Fragment() {
         val isAvailable = BuildConfig.DEBUG || isReleased
         
         if (!isAvailable) {
-            val originalName = featureView.featureName ?: ""
-            featureView.featureName = "$originalName (${getString(R.string.feature_not_available)})"
             featureView.alpha = 0.5f
             featureView.setOnClickListener {
-                Toast.makeText(requireContext(), R.string.feature_not_available, Toast.LENGTH_SHORT).show()
+                showFeatureNotAvailableDialog()
             }
         } else if (activityClass != null) {
             featureView.setOnClickListener {
                 startActivity(Intent(requireContext(), activityClass))
             }
         }
+    }
+
+    private fun showFeatureNotAvailableDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setMessage(R.string.feature_not_available)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     fun isXposedActivation(): Boolean {
