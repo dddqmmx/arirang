@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.net.NetworkInterface
+import java.util.concurrent.TimeUnit
 import java.util.UUID
 
 class SelfCheckActivity : BaseActivity() {
@@ -311,20 +312,74 @@ class SelfCheckActivity : BaseActivity() {
 
     @SuppressLint("HardwareIds")
     private fun readDeviceIdentifier(): CheckResult {
-        val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-        return if (androidId.isNullOrBlank()) {
-            CheckResult(
-                CheckState.BLOCKED,
-                getString(R.string.self_check_status_not_visible),
-                getString(R.string.self_check_device_hidden)
-            )
-        } else {
-            CheckResult(
-                CheckState.VISIBLE,
-                getString(R.string.self_check_status_visible),
-                getString(R.string.self_check_device_visible, androidId.maskMiddle())
-            )
-        }
+        val values = listOfNotNull(
+            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+                ?.takeUnless { it.isBlank() }
+                ?.let { "Android ID: ${it.maskMiddle()}" },
+            readAdvertisingId()?.let { "GAID: ${it.maskMiddle()}" },
+            readGsfId()?.let { "GSF ID: ${it.maskMiddle()}" },
+            readAppSetId()?.let { "App Set ID: ${it.maskMiddle()}" },
+            runCatching { Build.getSerial() }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() || it == Build.UNKNOWN }
+                ?.let { "Serial: ${it.maskMiddle()}" }
+        )
+
+        return visibleListResult(
+            values,
+            getString(R.string.self_check_status_visible),
+            getString(R.string.self_check_device_hidden)
+        )
+    }
+
+    private fun readAdvertisingId(): String? {
+        return runCatching {
+            val clientClass = Class.forName("com.google.android.gms.ads.identifier.AdvertisingIdClient")
+            val info = clientClass
+                .getMethod("getAdvertisingIdInfo", Context::class.java)
+                .invoke(null, this) ?: return@runCatching null
+            info.javaClass.methods
+                .firstOrNull { it.name == "getId" && it.parameterTypes.isEmpty() }
+                ?.invoke(info) as? String
+        }.getOrNull()?.takeUnless { it.isBlank() }
+    }
+
+    private fun readGsfId(): String? {
+        return runCatching {
+            contentResolver.query(
+                Uri.parse("content://com.google.android.gsf.gservices"),
+                null,
+                null,
+                arrayOf("android_id"),
+                null
+            )?.use { cursor ->
+                if (!cursor.moveToFirst() || cursor.columnCount < 2) {
+                    null
+                } else {
+                    val raw = cursor.getString(1)?.takeUnless { it.isBlank() }
+                    raw?.toLongOrNull()?.toString(16) ?: raw
+                }
+            }
+        }.getOrNull()?.takeUnless { it.isBlank() }
+    }
+
+    private fun readAppSetId(): String? {
+        return runCatching {
+            val appSetClass = Class.forName("com.google.android.gms.appset.AppSet")
+            val client = appSetClass
+                .getMethod("getClient", Context::class.java)
+                .invoke(null, this) ?: return@runCatching null
+            val task = client.javaClass.methods
+                .firstOrNull { it.name == "getAppSetIdInfo" && it.parameterTypes.isEmpty() }
+                ?.invoke(client) ?: return@runCatching null
+            val tasksClass = Class.forName("com.google.android.gms.tasks.Tasks")
+            val info = tasksClass
+                .getMethod("await", Class.forName("com.google.android.gms.tasks.Task"), Long::class.javaPrimitiveType, TimeUnit::class.java)
+                .invoke(null, task, 1500L, TimeUnit.MILLISECONDS) ?: return@runCatching null
+            info.javaClass.methods
+                .firstOrNull { it.name == "getId" && it.parameterTypes.isEmpty() }
+                ?.invoke(info) as? String
+        }.getOrNull()?.takeUnless { it.isBlank() }
     }
 
     @SuppressLint("HardwareIds")

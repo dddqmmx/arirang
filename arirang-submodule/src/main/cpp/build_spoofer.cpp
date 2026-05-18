@@ -50,6 +50,9 @@ void spoof_build_fields(JNIEnv *env, const SubmoduleConfig &config) {
     set_static_string_field(env, build, "USER", config.build_user);
     set_static_string_field(env, build, "FINGERPRINT", config.build_fingerprint);
     set_static_long_field(env, build, "TIME", config.build_time);
+    if (config.unique_identifier_enabled && !config.serial.empty()) {
+        set_static_string_field(env, build, "SERIAL", config.serial);
+    }
     env->DeleteLocalRef(build);
 }
 

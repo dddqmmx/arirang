@@ -21,6 +21,7 @@
     <string name="feature_sensor">Sensors</string>
 
     <string name="feature_device_info">Device Info</string>
+    <string name="feature_unique_identifier">Unique Identifier</string>
     <string name="feature_sim_info">SIM Info</string>
     <string name="feature_location">Location</string>
     <string name="feature_sensor_info">Sensor Info</string>
@@ -44,6 +45,7 @@
     <string name="sim_config_title">SIM Info Configuration</string>
     <string name="sim_scope_title">SIM Modification Scope</string>
     <string name="device_info_config_title">Device Info Configuration</string>
+    <string name="unique_identifier_config_title">Unique Identifier</string>
 
     <string name="hint_package_or_app_name">Package or App Name</string>
 
@@ -83,6 +85,22 @@
     <string name="sim_field_card_id">Card ID</string>
     <string name="sim_field_number">Number</string>
     <string name="set_scope">Set Scope</string>
+    <string name="unique_hook_enabled">Enable hook</string>
+    <string name="unique_hook_enabled_summary">Controls spoofing for Android ID, IMEI and other unique identifiers.</string>
+    <string name="unique_section_device_ids">Device identifiers</string>
+    <string name="unique_section_imei">IMEI</string>
+    <string name="unique_section_imei_summary">IMEI is configured here because it is a device identifier and can be read even when no SIM card is installed.</string>
+    <string name="unique_field_android_id">Android ID</string>
+    <string name="unique_field_gaid">GAID</string>
+    <string name="unique_field_gsf_id">GSF ID</string>
+    <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
+    <string name="unique_field_app_set_id">App Set ID</string>
+    <string name="unique_field_serial">Serial</string>
+    <string name="unique_randomize">Randomize</string>
+    <string name="unique_add_imei_slot">Add IMEI Slot</string>
+    <string name="unique_import_imei">Import current IMEI</string>
+    <string name="unique_import_imei_empty">No readable IMEI was returned.</string>
+    <string name="unique_imei_slot_title">Slot %1$d IMEI</string>
     <string name="test_clipboard_receiver">Test ClipboardRequestReceiver</string>
 
     <!-- InitActivity Adaptation -->

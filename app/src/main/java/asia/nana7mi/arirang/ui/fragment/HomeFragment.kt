@@ -7,6 +7,7 @@ import asia.nana7mi.arirang.ui.activity.LocationConfigActivity
 import asia.nana7mi.arirang.ui.activity.PackageListConfigActivity
 import asia.nana7mi.arirang.ui.activity.SelfCheckActivity
 import asia.nana7mi.arirang.ui.activity.SimConfigActivity
+import asia.nana7mi.arirang.ui.activity.UniqueIdentifierConfigActivity
 import asia.nana7mi.arirang.view.FeatureItemView
 import android.content.Intent
 
@@ -48,6 +49,7 @@ class HomeFragment : Fragment() {
         setupFeature(R.id.clipboard_setting_bottom, ClipboardConfigActivity::class.java, isReleased = true)
         setupFeature(R.id.sim_info_setting_bottom, SimConfigActivity::class.java, isReleased = true)
         setupFeature(R.id.device_info_setting_bottom, DeviceInfoConfigActivity::class.java, isReleased = true)
+        setupFeature(R.id.unique_identifier_setting_bottom, UniqueIdentifierConfigActivity::class.java, isReleased = true)
 
         // These are disabled in release build
         setupFeature(R.id.location_setting_bottom, LocationConfigActivity::class.java, isReleased = false)

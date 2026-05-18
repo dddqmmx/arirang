@@ -16,7 +16,8 @@ object SubmoduleConfigFiles {
     fun write(
         context: Context,
         simConfig: SimConfigPrefs.Config = SimConfigPrefs.loadConfig(context),
-        deviceConfig: DeviceInfoPrefs.Config = DeviceInfoPrefs.loadConfig(context)
+        deviceConfig: DeviceInfoPrefs.Config = DeviceInfoPrefs.loadConfig(context),
+        uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context)
     ) {
         val configFile = configFile(context)
         configFile.parentFile?.mkdirs()
@@ -42,6 +43,14 @@ object SubmoduleConfigFiles {
             .put("buildUser", deviceConfig.user)
             .put("buildFingerprint", deviceConfig.fingerprint)
             .put("buildTime", deviceConfig.time)
+            .put("uniqueIdentifierEnabled", uniqueIdentifierConfig.enabled)
+            .put("androidId", uniqueIdentifierConfig.androidId)
+            .put("gaid", uniqueIdentifierConfig.gaid)
+            .put("gsfId", uniqueIdentifierConfig.gsfId)
+            .put("widevineDrmId", uniqueIdentifierConfig.widevineDrmId)
+            .put("appSetId", uniqueIdentifierConfig.appSetId)
+            .put("serial", uniqueIdentifierConfig.serial)
+            .put("imeiBySlot", JSONObject(uniqueIdentifierConfig.imeiBySlot.mapKeys { it.key.toString() }))
             .put("gsmSimOperatorIsoCountry", simProperties.countryIso)
             .put("gsmOperatorIsoCountry", simProperties.countryIso)
             .put("gsmSimOperatorNumeric", simProperties.operatorNumeric)

@@ -2,6 +2,7 @@
 #include "arirang_build_config.hpp"
 #include "arirang_constants.hpp"
 #include "build_spoofer.hpp"
+#include "id_spoofer.hpp"
 #include "jni_utils.hpp"
 #include "logging.hpp"
 #include "submodule_config.hpp"
@@ -15,6 +16,9 @@ public:
     }
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
+        // Keep Zygisk hooks out of arbitrary third-party app processes. Runtime privacy
+        // enforcement should stay in system/framework components; this process scope is
+        // only for Arirang's own diagnostics and config-backed self checks.
         should_spoof_process_ = arirang::jstring_equals(env_, args->nice_name, arirang::kSelfPackage);
         if (!should_spoof_process_) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
@@ -23,6 +27,7 @@ public:
 
         arirang::load_config_from_companion(api_, config_);
         arirang::install_system_property_spoofer(api_, env_, config_, should_spoof_process_);
+        arirang::install_id_spoofer(api_, env_, config_, should_spoof_process_);
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {

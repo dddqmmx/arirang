@@ -31,6 +31,13 @@ struct SubmoduleConfig {
     std::string gsm_operator_numeric = "46705,";
     std::string gsm_sim_operator_alpha = "Koryolink,";
     std::string gsm_operator_alpha = "Koryolink,";
+    bool unique_identifier_enabled = false;
+    std::string android_id;
+    std::string gaid;
+    std::string gsf_id;
+    std::string widevine_id;
+    std::string app_set_id;
+    std::string serial;
 };
 
 void apply_json_config(SubmoduleConfig &config, const std::string &json);

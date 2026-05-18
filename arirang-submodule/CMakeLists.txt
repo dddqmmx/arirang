@@ -31,6 +31,7 @@ configure_file(
 add_library(arirang_zygisk SHARED
     src/main/cpp/arirang_zygisk.cpp
     src/main/cpp/build_spoofer.cpp
+    src/main/cpp/id_spoofer.cpp
     src/main/cpp/io_utils.cpp
     src/main/cpp/jni_utils.cpp
     src/main/cpp/logging.cpp

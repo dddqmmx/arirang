@@ -124,6 +124,14 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json) {
     config.gsm_sim_operator_alpha =
         parse_json_string(json, "gsmSimOperatorAlpha", config.gsm_sim_operator_alpha);
     config.gsm_operator_alpha = parse_json_string(json, "gsmOperatorAlpha", config.gsm_operator_alpha);
+    config.unique_identifier_enabled =
+        parse_json_bool(json, "uniqueIdentifierEnabled", config.unique_identifier_enabled);
+    config.android_id = parse_json_string(json, "androidId", config.android_id);
+    config.gaid = parse_json_string(json, "gaid", config.gaid);
+    config.gsf_id = parse_json_string(json, "gsfId", config.gsf_id);
+    config.widevine_id = parse_json_string(json, "widevineDrmId", config.widevine_id);
+    config.app_set_id = parse_json_string(json, "appSetId", config.app_set_id);
+    config.serial = parse_json_string(json, "serial", config.serial);
     log_info("loaded submodule config");
 }
 

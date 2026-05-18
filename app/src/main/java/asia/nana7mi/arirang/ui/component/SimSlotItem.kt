@@ -286,13 +286,6 @@ fun SimSlotItem(
                         onValueChange = { onSimInfoChange(simInfo.copy(iccId = it)) }
                     )
 
-                    SimField(
-                        label = stringResource(R.string.sim_field_imei),
-                        value = simInfo.imei ?: "",
-                        onValueChange = { onSimInfoChange(simInfo.copy(imei = it)) },
-                        keyboardType = KeyboardType.Number
-                    )
-
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SimField(
                             label = stringResource(R.string.sim_field_card_id),

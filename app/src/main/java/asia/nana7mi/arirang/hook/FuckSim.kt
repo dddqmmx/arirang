@@ -24,6 +24,9 @@ import java.lang.reflect.Array as ReflectArray
  * This rewrites the telephony-facing subscription and phone-number read paths, but does not touch
  * the low-level radio stack or subscription database writes.
  */
+// Telephony identifiers are rewritten from the phone process and system_server only.
+// Do not broaden this module to arbitrary app packages; callers should observe the
+// rewritten values through framework services.
 class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "android")) {
 
     private companion object {
@@ -33,6 +36,9 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         private const val KEY_LAST_MODIFIED = "last_modified"
         private const val KEY_SIM_INFO_MAP = "sim_info_map"
         private const val KEY_SIM_INFO_LIST = "sim_info_list"
+        private const val UNIQUE_PREFS_NAME = "unique_identifier_prefs"
+        private const val KEY_UNIQUE_ENABLED = "enabled"
+        private const val KEY_IMEI_BY_SLOT = "imei_by_slot"
 
         private const val DEFAULT_DISPLAY_NAME_SOURCE = 0
         private const val DEFAULT_SUBSCRIPTION_TYPE_LOCAL_SIM = 0
@@ -116,7 +122,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private data class HookConfig(
         val enabled: Boolean,
         val hideSim: Boolean,
-        val profilesBySlot: Map<Int, SimProfile>
+        val profilesBySlot: Map<Int, SimProfile>,
+        val uniqueIdentifiers: UniqueIdentifierConfig
     ) {
         val visibleProfilesBySlot: Map<Int, SimProfile> =
             if (hideSim) emptyMap() else profilesBySlot.toSortedMap()
@@ -130,6 +137,19 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         val countryIsoPropertyValue: String = countryIsoList.joinToString(",")
         val operatorNumericPropertyValue: String = operatorNumericList.joinToString(",")
         val alphaPropertyValue: String = alphaList.joinToString(",")
+    }
+
+    private data class UniqueIdentifierConfig(
+        val enabled: Boolean = false,
+        val imeiBySlot: Map<Int, String> = DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.imei }
+    ) {
+        fun imeiForSlot(slotIndex: Int?, fallback: String?): String? {
+            if (!enabled) return fallback
+            if (slotIndex != null) {
+                imeiBySlot[slotIndex]?.let { return it }
+            }
+            return imeiBySlot.toSortedMap().values.firstOrNull() ?: fallback
+        }
     }
 
     @Volatile
@@ -323,13 +343,26 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "getDeviceIdForPhone" to { it.imei },
             "getDeviceIdWithFeature" to { it.imei }
         ).forEach { (methodName, valueProvider) ->
-            hookProfileMethod(phoneInterfaceManagerClass, methodName, beforeOriginal = true) { param, method ->
+            hookProfileMethod(
+                phoneInterfaceManagerClass,
+                methodName,
+                beforeOriginal = true,
+                shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
+            ) { param, method ->
                 val profile = when {
                     method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
                         profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
                     else -> profileForSlot(null, allowFallback = true)
                 }
-                valueProvider(profile ?: return@hookProfileMethod null)
+                if (methodName == "getTypeAllocationCode") {
+                    val slot = param.args.firstIntOrNull() ?: profile?.slotIndex
+                    hookConfig.uniqueIdentifiers.imeiForSlot(slot, profile?.imei)?.take(8)
+                } else if (methodName.contains("Imei", ignoreCase = true) || methodName.contains("DeviceId", ignoreCase = true)) {
+                    val slot = param.args.firstIntOrNull() ?: profile?.slotIndex
+                    hookConfig.uniqueIdentifiers.imeiForSlot(slot, profile?.imei)
+                } else {
+                    valueProvider(profile ?: return@hookProfileMethod null)
+                }
             }
         }
 
@@ -388,7 +421,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 "getImei",
                 "getImeiForSubscriber"
             ),
-            beforeOriginal = true
+            beforeOriginal = true,
+            shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
             imeiForCall(param, method)
         }
@@ -1278,6 +1312,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methodName: String,
         externalClientsOnly: Boolean = false,
         beforeOriginal: Boolean = false,
+        shouldHandle: (HookConfig) -> Boolean = { it.enabled },
         valueProvider: (XC_MethodHook.MethodHookParam, Method) -> Any?
     ) {
         val methods = targetClass.declaredMethods.filter { it.name == methodName }
@@ -1287,13 +1322,15 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             XposedBridge.hookMethod(method, object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     if (!beforeOriginal) return
-                    if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                    val config = hookConfig
+                    if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
                     param.result = coerceHookResult(valueProvider(param, method), null)
                 }
 
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (beforeOriginal) return
-                    if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                    val config = hookConfig
+                    if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
                     param.result = coerceHookResult(valueProvider(param, method), param.result)
                 }
             })
@@ -1323,10 +1360,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
         beforeOriginal: Boolean = false,
+        shouldHandle: (HookConfig) -> Boolean = { it.enabled },
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
         val targetClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return
-        hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, beforeOriginal, resultProvider)
+        hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, beforeOriginal, shouldHandle, resultProvider)
     }
 
     private fun hookAllExistingStringMethods(
@@ -1334,6 +1372,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
         beforeOriginal: Boolean = false,
+        shouldHandle: (HookConfig) -> Boolean = { it.enabled },
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
         methodNames.forEach { methodName ->
@@ -1343,13 +1382,15 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     XposedBridge.hookMethod(method, object : XC_MethodHook() {
                         override fun beforeHookedMethod(param: MethodHookParam) {
                             if (!beforeOriginal) return
-                            if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                            val config = hookConfig
+                            if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
                             param.result = resultProvider(param, method)
                         }
 
                         override fun afterHookedMethod(param: MethodHookParam) {
                             if (beforeOriginal) return
-                            if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                            val config = hookConfig
+                            if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
                             if (param.result == null || param.result is String) {
                                 param.result = resultProvider(param, method)
                             }
@@ -1384,7 +1425,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 profileForSlot(firstInt, allowFallback = false)
             else -> profileForTelephonyManager(param)
         }
-        return profile?.imei
+        val slotIndex = when {
+            method.name.contains("ForSubscriber", ignoreCase = true) -> profile?.slotIndex
+            method.name.contains("ForPhone", ignoreCase = true) -> firstInt
+            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType -> firstInt
+            else -> profile?.slotIndex
+        }
+        return hookConfig.uniqueIdentifiers.imeiForSlot(slotIndex, profile?.imei)
     }
 
     private fun profileForTelephonyManager(param: XC_MethodHook.MethodHookParam): SimProfile? {
@@ -1567,7 +1614,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 ?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_PROFILES_BY_SLOT
         val normalized = normalizeProfiles(profilesBySlot)
-        return HookConfig(enabled = enabled, hideSim = hideSim, profilesBySlot = normalized)
+        val uniqueIdentifiers = readUniqueIdentifierConfig()
+        return HookConfig(
+            enabled = enabled,
+            hideSim = hideSim,
+            profilesBySlot = normalized,
+            uniqueIdentifiers = uniqueIdentifiers
+        )
     }
 
     private fun readConfigValues(force: Boolean): Map<String, String>? {
@@ -1596,7 +1649,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private fun logHookConfig(config: HookConfig) {
         XposedBridge.log(
             "Arirang: SIM proof config loaded enabled=${config.enabled} hideSim=${config.hideSim} " +
-                "slots=${config.visibleProfiles.joinToString { "${it.slotIndex}:${it.countryIso}/${it.operatorNumeric}/${it.alphaLong}" }}"
+                "uniqueIds=${config.uniqueIdentifiers.enabled} slots=${config.visibleProfiles.joinToString { "${it.slotIndex}:${it.countryIso}/${it.operatorNumeric}/${it.alphaLong}" }}"
         )
     }
 
@@ -1625,9 +1678,40 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun readSharedPrefsValues(): Map<String, String>? {
+        return readPrefsValues(PREFS_NAME)
+    }
+
+    private fun readUniqueIdentifierConfig(): UniqueIdentifierConfig {
+        val values = readPrefsValues(UNIQUE_PREFS_NAME) ?: return UniqueIdentifierConfig()
+        val enabled = values[KEY_UNIQUE_ENABLED]?.toBooleanStrictOrNull() ?: false
+        val imeiBySlot = values[KEY_IMEI_BY_SLOT]
+            ?.let(::parseImeiMap)
+            ?.takeIf { it.isNotEmpty() }
+            ?: DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.imei }
+        return UniqueIdentifierConfig(enabled = enabled, imeiBySlot = imeiBySlot)
+    }
+
+    private fun parseImeiMap(json: String): Map<Int, String> {
+        return runCatching {
+            val root = JSONObject(json)
+            buildMap {
+                val keys = root.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val slot = key.toIntOrNull() ?: continue
+                    val imei = root.optString(key).takeIf { it.isNotBlank() } ?: continue
+                    put(slot, imei)
+                }
+            }.toSortedMap()
+        }.onFailure {
+            XposedBridge.log("Arirang: failed to parse IMEI map: ${it.message}")
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun readPrefsValues(prefsName: String): Map<String, String>? {
         val candidates = listOf(
-            File("/data/user/0/${BuildConfig.APPLICATION_ID}/shared_prefs/$PREFS_NAME.xml"),
-            File("/data/data/${BuildConfig.APPLICATION_ID}/shared_prefs/$PREFS_NAME.xml")
+            File("/data/user/0/${BuildConfig.APPLICATION_ID}/shared_prefs/$prefsName.xml"),
+            File("/data/data/${BuildConfig.APPLICATION_ID}/shared_prefs/$prefsName.xml")
         )
         val prefsFile = candidates.firstOrNull { it.isFile && it.canRead() } ?: return null
         return runCatching {
@@ -1655,7 +1739,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             }
             values
         }.onFailure {
-            XposedBridge.log("Arirang: failed to read SIM proof config: ${it.message}")
+            XposedBridge.log("Arirang: failed to read $prefsName config: ${it.message}")
         }.getOrNull()
     }
 
