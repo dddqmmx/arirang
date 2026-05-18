@@ -8,8 +8,7 @@ class HookManager : IXposedHookLoadPackage {
         SystemServerHook(),
         FuckClipboard(),
         FuckSim(),
-//        FuckLocation(),
-//        FuckPackageList(),
+        FuckSettingsProvider(),
         XposedActivation()
     )
 
