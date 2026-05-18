@@ -49,14 +49,13 @@ class SelfCheckActivity : BaseActivity() {
     private lateinit var summaryText: TextView
     private lateinit var runButton: MaterialButton
     private lateinit var scrollView: ScrollView
-    private lateinit var deviceSection: CheckSectionView
+    private lateinit var uniqueSection: CheckSectionView
     private lateinit var buildSection: CheckSectionView
     private lateinit var telephonySection: CheckSectionView
     private lateinit var simSection: CheckSectionView
     private lateinit var appsSection: CheckSectionView
     private lateinit var wifiSection: CheckSectionView
     private lateinit var accountsSection: CheckSectionView
-    private lateinit var drmSection: CheckSectionView
     private lateinit var networkSection: CheckSectionView
     private lateinit var bluetoothSection: CheckSectionView
 
@@ -101,25 +100,23 @@ class SelfCheckActivity : BaseActivity() {
         summaryText = findViewById(R.id.selfCheckSummary)
         runButton = findViewById(R.id.runSelfCheckButton)
         scrollView = findViewById(R.id.selfCheckScrollView)
-        deviceSection = CheckSectionView(findViewById(R.id.deviceSection))
+        uniqueSection = CheckSectionView(findViewById(R.id.uniqueSection))
         buildSection = CheckSectionView(findViewById(R.id.buildSection))
         telephonySection = CheckSectionView(findViewById(R.id.telephonySection))
         simSection = CheckSectionView(findViewById(R.id.simSection))
         appsSection = CheckSectionView(findViewById(R.id.appsSection))
         wifiSection = CheckSectionView(findViewById(R.id.wifiSection))
         accountsSection = CheckSectionView(findViewById(R.id.accountsSection))
-        drmSection = CheckSectionView(findViewById(R.id.drmSection))
         networkSection = CheckSectionView(findViewById(R.id.networkSection))
         bluetoothSection = CheckSectionView(findViewById(R.id.bluetoothSection))
 
-        deviceSection.bindTitle(getString(R.string.self_check_device_title))
+        uniqueSection.bindTitle(getString(R.string.self_check_unique_title))
         buildSection.bindTitle(getString(R.string.self_check_build_title))
         telephonySection.bindTitle(getString(R.string.self_check_telephony_title))
         simSection.bindTitle(getString(R.string.self_check_sim_title))
         appsSection.bindTitle(getString(R.string.self_check_apps_title))
         wifiSection.bindTitle(getString(R.string.self_check_wifi_title))
         accountsSection.bindTitle(getString(R.string.self_check_accounts_title))
-        drmSection.bindTitle(getString(R.string.self_check_drm_title))
         networkSection.bindTitle(getString(R.string.self_check_network_title))
         bluetoothSection.bindTitle(getString(R.string.self_check_bluetooth_title))
 
@@ -129,8 +126,8 @@ class SelfCheckActivity : BaseActivity() {
     }
 
     private fun setupSectionNavigation() {
-        findViewById<View>(R.id.navDeviceChip).setOnClickListener {
-            scrollToSection(deviceSection.root)
+        findViewById<View>(R.id.navUniqueChip).setOnClickListener {
+            scrollToSection(uniqueSection.root)
         }
         findViewById<View>(R.id.navBuildChip).setOnClickListener {
             scrollToSection(buildSection.root)
@@ -149,9 +146,6 @@ class SelfCheckActivity : BaseActivity() {
         }
         findViewById<View>(R.id.navAccountsChip).setOnClickListener {
             scrollToSection(accountsSection.root)
-        }
-        findViewById<View>(R.id.navDrmChip).setOnClickListener {
-            scrollToSection(drmSection.root)
         }
         findViewById<View>(R.id.navNetworkChip).setOnClickListener {
             scrollToSection(networkSection.root)
@@ -199,41 +193,38 @@ class SelfCheckActivity : BaseActivity() {
     private fun runSelfCheck() {
         setLoadingState()
         lifecycleScope.launch {
-            val device = async(Dispatchers.IO) { readDeviceIdentifier() }
+            val unique = async(Dispatchers.IO) { readUniqueIdentifiers() }
             val build = async(Dispatchers.IO) { readBuildInfo() }
             val telephony = async(Dispatchers.IO) { readTelephonyInfo() }
             val sim = async(Dispatchers.IO) { readSimInfo() }
             val apps = async(Dispatchers.IO) { readInstalledApps() }
             val wifi = async(Dispatchers.IO) { readWifiInfo() }
             val accounts = async(Dispatchers.IO) { readAccounts() }
-            val drm = async(Dispatchers.IO) { readDrmIdentifiers() }
             val network = async(Dispatchers.IO) { readNetworkInterfaces() }
             val bluetooth = async(Dispatchers.IO) { readBluetoothInfo() }
 
             val results = listOf(
-                R.string.self_check_device_title to device.await(),
+                R.string.self_check_unique_title to unique.await(),
                 R.string.self_check_build_title to build.await(),
                 R.string.self_check_telephony_title to telephony.await(),
                 R.string.self_check_sim_title to sim.await(),
                 R.string.self_check_apps_title to apps.await(),
                 R.string.self_check_wifi_title to wifi.await(),
                 R.string.self_check_accounts_title to accounts.await(),
-                R.string.self_check_drm_title to drm.await(),
                 R.string.self_check_network_title to network.await(),
                 R.string.self_check_bluetooth_title to bluetooth.await()
             )
             lastResults = results
 
-            deviceSection.bindResult(results[0].second)
+            uniqueSection.bindResult(results[0].second)
             buildSection.bindResult(results[1].second)
             telephonySection.bindResult(results[2].second)
             simSection.bindResult(results[3].second)
             appsSection.bindResult(results[4].second)
             wifiSection.bindResult(results[5].second)
             accountsSection.bindResult(results[6].second)
-            drmSection.bindResult(results[7].second)
-            networkSection.bindResult(results[8].second)
-            bluetoothSection.bindResult(results[9].second)
+            networkSection.bindResult(results[7].second)
+            bluetoothSection.bindResult(results[8].second)
 
             val visibleCount = results.count { it.second.state == CheckState.VISIBLE }
             val blockedCount = results.count { it.second.state == CheckState.BLOCKED }
@@ -298,38 +289,152 @@ class SelfCheckActivity : BaseActivity() {
         runButton.isEnabled = false
         summaryText.setText(R.string.self_check_summary_running)
         val loading = CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_checking), getString(R.string.self_check_waiting))
-        deviceSection.bindResult(loading)
+        uniqueSection.bindResult(loading)
         buildSection.bindResult(loading)
         telephonySection.bindResult(loading)
         simSection.bindResult(loading)
         appsSection.bindResult(loading)
         wifiSection.bindResult(loading)
         accountsSection.bindResult(loading)
-        drmSection.bindResult(loading)
         networkSection.bindResult(loading)
         bluetoothSection.bindResult(loading)
     }
 
-    @SuppressLint("HardwareIds")
-    private fun readDeviceIdentifier(): CheckResult {
-        val values = listOfNotNull(
-            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-                ?.takeUnless { it.isBlank() }
-                ?.let { "Android ID: ${it.maskMiddle()}" },
-            readAdvertisingId()?.let { "GAID: ${it.maskMiddle()}" },
-            readGsfId()?.let { "GSF ID: ${it.maskMiddle()}" },
-            readAppSetId()?.let { "App Set ID: ${it.maskMiddle()}" },
-            runCatching { Build.getSerial() }
-                .getOrNull()
-                ?.takeUnless { it.isBlank() || it == Build.UNKNOWN }
-                ?.let { "Serial: ${it.maskMiddle()}" }
-        )
+    @SuppressLint("HardwareIds", "MissingPermission")
+    private fun readUniqueIdentifiers(): CheckResult {
+        val values = mutableListOf<String>()
+        val notes = mutableListOf<String>()
 
-        return visibleListResult(
-            values,
-            getString(R.string.self_check_status_visible),
-            getString(R.string.self_check_device_hidden)
+        Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            ?.takeUnless { it.isBlank() }
+            ?.let { values.add("Android ID: ${it.maskMiddle()}") }
+
+        readAdvertisingId()?.let { values.add("GAID: ${it.maskMiddle()}") }
+        readGsfId()?.let { values.add("GSF ID: ${it.maskMiddle()}") }
+        readAppSetId()?.let { values.add("App Set ID: ${it.maskMiddle()}") }
+        readWidevineId()?.let { values.add("Widevine DRM ID: ${it.maskMiddle()}") }
+
+        runCatching { Build.getSerial() }
+            .getOrNull()
+            ?.takeUnless { it.isBlank() || it == Build.UNKNOWN }
+            ?.let { values.add("Serial: ${it.maskMiddle()}") }
+
+        Build.SERIAL
+            .takeUnless { it.isBlank() || it == Build.UNKNOWN }
+            ?.let { values.add("Build.SERIAL: ${it.maskMiddle()}") }
+
+        Build.FINGERPRINT
+            .takeUnless { it.isBlank() || it == Build.UNKNOWN }
+            ?.let { values.add("Build fingerprint: $it") }
+
+        readPhoneUniqueIdentifiers(values, notes)
+        readNetworkUniqueIdentifiers(values)
+
+        val content = (values + notes).filter { it.isNotBlank() }
+        return CheckResult(
+            if (values.isEmpty()) CheckState.BLOCKED else CheckState.VISIBLE,
+            if (values.isEmpty()) getString(R.string.self_check_status_not_visible) else getString(R.string.self_check_status_visible),
+            if (content.isEmpty()) getString(R.string.self_check_unique_hidden) else content.joinToString("\n")
         )
+    }
+
+    @SuppressLint("HardwareIds", "MissingPermission")
+    private fun readPhoneUniqueIdentifiers(values: MutableList<String>, notes: MutableList<String>) {
+        if (!hasPermission(Manifest.permission.READ_PHONE_STATE)) {
+            notes.add(getString(R.string.self_check_phone_permission_hint))
+            return
+        }
+
+        val telephonyManager = getSystemService(TelephonyManager::class.java)
+        val subscriptionManager = getSystemService(SubscriptionManager::class.java)
+
+        runCatching { telephonyManager.imei }
+            .getOrNull()
+            ?.takeUnless { it.isBlank() }
+            ?.let { values.add("IMEI default: ${it.maskMiddle()}") }
+
+        runCatching { telephonyManager.meid }
+            .getOrNull()
+            ?.takeUnless { it.isBlank() }
+            ?.let { values.add("MEID default: ${it.maskMiddle()}") }
+
+        @Suppress("DEPRECATION")
+        runCatching { telephonyManager.deviceId }
+            .getOrNull()
+            ?.takeUnless { it.isBlank() }
+            ?.let { values.add("Device ID default: ${it.maskMiddle()}") }
+
+        runCatching { telephonyManager.subscriberId }
+            .getOrNull()
+            ?.takeUnless { it.isBlank() }
+            ?.let { values.add("IMSI / Subscriber ID: ${it.maskMiddle()}") }
+
+        runCatching { telephonyManager.simSerialNumber }
+            .getOrNull()
+            ?.takeUnless { it.isBlank() }
+            ?.let { values.add("SIM serial: ${it.maskMiddle()}") }
+
+        repeat(telephonyManager.phoneCount.coerceAtMost(4)) { slot ->
+            runCatching { telephonyManager.getImei(slot) }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("IMEI slot $slot: ${it.maskMiddle()}") }
+
+            runCatching { telephonyManager.getMeid(slot) }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("MEID slot $slot: ${it.maskMiddle()}") }
+
+            runCatching { telephonyManager.getTypeAllocationCode(slot) }
+                .getOrNull()
+                ?.takeUnless { it.isBlank() }
+                ?.let { values.add("Type allocation code slot $slot: ${it.maskMiddle()}") }
+        }
+
+        runCatching { subscriptionManager.activeSubscriptionInfoList.orEmpty() }
+            .getOrDefault(emptyList())
+            .take(4)
+            .forEach { subscription ->
+                subscription.iccId
+                    ?.takeUnless { it.isBlank() }
+                    ?.let { values.add("ICCID slot ${subscription.simSlotIndex}: ${it.maskMiddle()}") }
+            }
+    }
+
+    @SuppressLint("HardwareIds", "MissingPermission")
+    private fun readNetworkUniqueIdentifiers(values: MutableList<String>) {
+        if (hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            runCatching {
+                val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                wifiManager.connectionInfo
+            }.getOrNull()?.let { connectionInfo ->
+                connectionInfo.macAddress
+                    ?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
+                    ?.let { values.add("Wi-Fi MAC: $it") }
+                connectionInfo.bssid
+                    ?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
+                    ?.let { values.add("Wi-Fi BSSID: $it") }
+            }
+        }
+
+        runCatching {
+            NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+                .mapNotNull { item ->
+                    val mac = item.hardwareAddress?.joinToString(":") { "%02x".format(it) }
+                    mac?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
+                        ?.let { "${item.name} MAC: $it" }
+                }
+                .take(6)
+        }.getOrDefault(emptyList()).forEach(values::add)
+
+        if (hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
+            runCatching {
+                val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+                bluetoothManager.adapter?.address
+            }.getOrNull()
+                ?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
+                ?.let { values.add("Bluetooth MAC: $it") }
+        }
     }
 
     private fun readAdvertisingId(): String? {
@@ -399,9 +504,7 @@ class SelfCheckActivity : BaseActivity() {
             "Tags" to Build.TAGS,
             "Type" to Build.TYPE,
             "User" to Build.USER,
-            "Fingerprint" to Build.FINGERPRINT,
             "Build time" to Build.TIME.takeIf { it > 0 }?.toString(),
-            "Build.SERIAL" to Build.SERIAL,
             "Property gsm.sim.operator.iso-country" to readSystemProperty("gsm.sim.operator.iso-country"),
             "Property gsm.sim.operator.numeric" to readSystemProperty("gsm.sim.operator.numeric"),
             "Property gsm.sim.operator.alpha" to readSystemProperty("gsm.sim.operator.alpha"),
@@ -438,11 +541,6 @@ class SelfCheckActivity : BaseActivity() {
                     "telephonyManager=${telephonyManager.javaClass.name} subscriptionManager=${subscriptionManager.javaClass.name}"
             )
 
-            runCatching { Build.getSerial() }
-                .getOrNull()
-                ?.takeUnless { it.isBlank() || it == Build.UNKNOWN }
-                ?.let { values.add("System serial: ${it.maskMiddle()}") }
-
             val defaultLine1 = runCatching { telephonyManager.line1Number }
             logPhoneProbe("TelephonyManager.getLine1Number/default", defaultLine1)
             defaultLine1.getOrNull()
@@ -474,29 +572,6 @@ class SelfCheckActivity : BaseActivity() {
                     ?.takeUnless { it.isBlank() }
                     ?.let { values.add("Phone number sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
 
-                val scopedImei = runCatching {
-                    telephonyManager.createForSubscriptionId(subscription.subscriptionId).imei
-                }
-                logPhoneProbe(
-                    "TelephonyManager.createForSubscriptionId(${subscription.subscriptionId}).getImei",
-                    scopedImei
-                )
-                scopedImei.getOrNull()
-                    ?.takeUnless { it.isBlank() }
-                    ?.let { values.add("IMEI sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
-
-                @Suppress("DEPRECATION")
-                val scopedDeviceId = runCatching {
-                    telephonyManager.createForSubscriptionId(subscription.subscriptionId).deviceId
-                }
-                logPhoneProbe(
-                    "TelephonyManager.createForSubscriptionId(${subscription.subscriptionId}).getDeviceId",
-                    scopedDeviceId
-                )
-                scopedDeviceId.getOrNull()
-                    ?.takeUnless { it.isBlank() }
-                    ?.let { values.add("Device ID sub ${subscription.subscriptionId}: ${it.maskMiddle()}") }
-
                 val subscriptionPhoneNumber = runCatching {
                     subscriptionManager.getPhoneNumber(subscription.subscriptionId)
                 }
@@ -508,27 +583,6 @@ class SelfCheckActivity : BaseActivity() {
                     ?.takeUnless { it.isBlank() }
                     ?.let { values.add("Subscription phone number ${subscription.subscriptionId}: ${it.maskMiddle()}") }
             }
-
-            runCatching { telephonyManager.simSerialNumber }
-                .getOrNull()
-                ?.takeUnless { it.isBlank() }
-                ?.let { values.add("SIM serial: ${it.maskMiddle()}") }
-
-            runCatching { telephonyManager.subscriberId }
-                .getOrNull()
-                ?.takeUnless { it.isBlank() }
-                ?.let { values.add("Subscriber ID: ${it.maskMiddle()}") }
-
-            runCatching { telephonyManager.imei }
-                .getOrNull()
-                ?.takeUnless { it.isBlank() }
-                ?.let { values.add("IMEI default: ${it.maskMiddle()}") }
-
-            @Suppress("DEPRECATION")
-            runCatching { telephonyManager.deviceId }
-                .getOrNull()
-                ?.takeUnless { it.isBlank() }
-                ?.let { values.add("Device ID default: ${it.maskMiddle()}") }
 
             runCatching { telephonyManager.simCountryIso }
                 .getOrNull()
@@ -615,25 +669,10 @@ class SelfCheckActivity : BaseActivity() {
                 ?.let { values.add(it) }
 
             repeat(phoneCount.coerceAtMost(4)) { slot ->
-                runCatching { telephonyManager.getImei(slot) }
-                    .getOrNull()
-                    ?.takeUnless { it.isBlank() }
-                    ?.let { values.add("IMEI slot $slot: ${it.maskMiddle()}") }
-
-                runCatching { telephonyManager.getMeid(slot) }
-                    .getOrNull()
-                    ?.takeUnless { it.isBlank() }
-                    ?.let { values.add("MEID slot $slot: ${it.maskMiddle()}") }
-
                 runCatching { telephonyManager.getNetworkCountryIso(slot) }
                     .getOrNull()
                     ?.takeUnless { it.isBlank() }
                     ?.let { values.add("Network country ISO slot $slot: $it") }
-
-                runCatching { telephonyManager.getTypeAllocationCode(slot) }
-                    .getOrNull()
-                    ?.takeUnless { it.isBlank() }
-                    ?.let { values.add("Type allocation code slot $slot: ${it.maskMiddle()}") }
             }
 
             visibleListResult(values, getString(R.string.self_check_status_visible), getString(R.string.self_check_telephony_hidden))
@@ -668,7 +707,6 @@ class SelfCheckActivity : BaseActivity() {
                     sub.displayName?.toString()?.takeIf { it.isNotBlank() }?.let { "Display: $it" },
                     sub.carrierName?.toString()?.takeIf { it.isNotBlank() }?.let { "Carrier: $it" },
                     sub.number?.takeIf { it.isNotBlank() }?.let { "Number: ${it.maskMiddle()}" },
-                    sub.iccId?.takeIf { it.isNotBlank() }?.let { "ICCID: ${it.maskMiddle()}" },
                     "MCC/MNC: ${sub.mccString}/${sub.mncString}",
                     sub.countryIso?.takeIf { it.isNotBlank() }?.let { "Country: $it" },
                     "Card ID: ${sub.cardId}",
@@ -733,38 +771,30 @@ class SelfCheckActivity : BaseActivity() {
         }
     }
 
-    private fun readDrmIdentifiers(): CheckResult {
-        return try {
+    private fun readWidevineId(): String? {
+        return runCatching {
             val widevineUuid = UUID(-0x121074568629b532L, -0x5c37d8232ae2de13L)
             MediaDrm(widevineUuid).use { mediaDrm ->
-                val deviceUniqueId = mediaDrm.getPropertyByteArray(MediaDrm.PROPERTY_DEVICE_UNIQUE_ID)
-                val id = deviceUniqueId.joinToString("") { "%02x".format(it) }
-                CheckResult(
-                    if (id.isBlank()) CheckState.BLOCKED else CheckState.VISIBLE,
-                    getString(R.string.self_check_status_visible),
-                    if (id.isBlank()) getString(R.string.self_check_drm_hidden) else "Widevine ID: ${id.maskMiddle()}"
-                )
+                mediaDrm.getPropertyByteArray(MediaDrm.PROPERTY_DEVICE_UNIQUE_ID)
+                    .joinToString("") { "%02x".format(it) }
+                    .takeUnless { it.isBlank() }
             }
-        } catch (e: Exception) {
-            CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
-        }
+        }.getOrNull()
     }
 
     private fun readNetworkInterfaces(): CheckResult {
         return try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             val values = interfaces.take(10).mapNotNull { item ->
-                val hardwareAddress = item.hardwareAddress?.joinToString(":") { "%02x".format(it) }
                 val addresses = item.inetAddresses?.toList().orEmpty()
                     .mapNotNull { it.hostAddress }
                     .filterNot { it.isBlank() }
                     .take(4)
-                if (hardwareAddress == null && addresses.isEmpty()) {
+                if (addresses.isEmpty()) {
                     null
                 } else {
                     listOfNotNull(
                         item.name,
-                        hardwareAddress?.let { "MAC: $it" },
                         addresses.takeIf { it.isNotEmpty() }?.joinToString(prefix = "IP: ")
                     ).joinToString("\n")
                 }
@@ -792,9 +822,6 @@ class SelfCheckActivity : BaseActivity() {
             val currentNetwork = listOfNotNull(
                 connectionInfo?.ssid?.takeUnless { it.isBlank() || it == WifiManager.UNKNOWN_SSID }?.let {
                     getString(R.string.self_check_wifi_current, it)
-                },
-                connectionInfo?.bssid?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }?.let {
-                    getString(R.string.self_check_wifi_bssid, it)
                 }
             )
 

@@ -28,7 +28,7 @@ object UniqueIdentifierPrefs {
     private val random = SecureRandom()
 
     data class Config(
-        val enabled: Boolean = false,
+        val enabled: Boolean = true,
         val androidId: String = "",
         val gaid: String = "",
         val gsfId: String = "",
@@ -48,7 +48,7 @@ object UniqueIdentifierPrefs {
         val migratedImeiBySlot = if (hasSavedConfig) emptyMap() else loadLegacySimImeis(context)
 
         return Config(
-            enabled = prefs.getBoolean(KEY_ENABLED, false),
+            enabled = prefs.getBoolean(KEY_ENABLED, true),
             androidId = prefs.getString(KEY_ANDROID_ID, null) ?: defaultAndroidId(context),
             gaid = prefs.getString(KEY_GAID, null) ?: randomGaid(),
             gsfId = prefs.getString(KEY_GSF_ID, null) ?: randomGsfId(),

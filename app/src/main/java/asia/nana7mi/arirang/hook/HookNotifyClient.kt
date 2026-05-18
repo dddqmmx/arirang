@@ -51,8 +51,8 @@ object HookNotifyClient {
     /** 默认请求授权等待时间 */
     private const val DEFAULT_REQUEST_TIMEOUT_MS = 2500L
 
-    /** SIM 配置远程读取的本地缓存时间，避免热路径频繁 Binder 调用 */
-    private const val SIM_CONFIG_CACHE_TTL_MS = 300L
+    /** 配置远程读取的本地缓存时间，避免热路径频繁 Binder 调用 */
+    private const val CONFIG_CACHE_TTL_MS = 300L
 
     /** 服务端定义：允许访问的返回值 */
     private const val RESULT_ALLOW = 1
@@ -97,6 +97,15 @@ object HookNotifyClient {
 
     @Volatile
     private var sLastSimConfigCheckAt = 0L
+
+    @Volatile
+    private var sUniqueIdentifierConfigSnapshot: String? = null
+
+    @Volatile
+    private var sUniqueIdentifierConfigVersion = Long.MIN_VALUE
+
+    @Volatile
+    private var sLastUniqueIdentifierConfigCheckAt = 0L
 
     /**
      * 同步锁对象
@@ -280,7 +289,7 @@ object HookNotifyClient {
     fun readSimConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
         val now = SystemClock.uptimeMillis()
         val cachedSnapshot = sSimConfigSnapshot
-        if (!force && cachedSnapshot != null && now - sLastSimConfigCheckAt < SIM_CONFIG_CACHE_TTL_MS) {
+        if (!force && cachedSnapshot != null && now - sLastSimConfigCheckAt < CONFIG_CACHE_TTL_MS) {
             return cachedSnapshot
         }
 
@@ -313,6 +322,51 @@ object HookNotifyClient {
             cachedSnapshot
         } catch (t: Throwable) {
             XposedBridge.log("$TAG readSimConfigSnapshot failed: ${t.stackTraceToString()}")
+            sService = null
+            cachedSnapshot
+        }
+    }
+
+    fun readUniqueIdentifierConfigSnapshot(
+        force: Boolean = false,
+        allowBind: Boolean = false,
+        bindContext: Context? = null
+    ): String? {
+        val now = SystemClock.uptimeMillis()
+        val cachedSnapshot = sUniqueIdentifierConfigSnapshot
+        if (!force && cachedSnapshot != null && now - sLastUniqueIdentifierConfigCheckAt < CONFIG_CACHE_TTL_MS) {
+            return cachedSnapshot
+        }
+
+        val service = if (allowBind) {
+            val ctx = bindContext ?: getSystemContext()
+            if (ctx == null) {
+                XposedBridge.log("$TAG readUniqueIdentifierConfigSnapshot: no system context")
+                return cachedSnapshot
+            }
+            getOrBindService(ctx)
+        } else {
+            sService
+        } ?: return cachedSnapshot
+
+        return try {
+            withCleanCallingIdentity {
+                val version = service.readUniqueIdentifierConfigVersion()
+                if (force || cachedSnapshot == null || version != sUniqueIdentifierConfigVersion) {
+                    val snapshot = service.readUniqueIdentifierConfigSnapshot()?.takeIf { it.isNotBlank() }
+                    if (snapshot != null) {
+                        sUniqueIdentifierConfigSnapshot = snapshot
+                        sUniqueIdentifierConfigVersion = version
+                    }
+                }
+                sLastUniqueIdentifierConfigCheckAt = now
+                sUniqueIdentifierConfigSnapshot
+            }
+        } catch (_: DeadObjectException) {
+            sService = null
+            cachedSnapshot
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG readUniqueIdentifierConfigSnapshot failed: ${t.stackTraceToString()}")
             sService = null
             cachedSnapshot
         }

@@ -15,6 +15,7 @@ import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
+import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.hook.IHookNotify
 import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 import kotlinx.coroutines.CoroutineScope
@@ -229,6 +230,24 @@ class HookNotifyService : Service() {
                 return ""
             }
             return SimConfigPrefs.buildHookSnapshot(this@HookNotifyService)
+        }
+
+        override fun readUniqueIdentifierConfigVersion(): Long {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected unique identifier config version request from uid=$callingUid")
+                return 0L
+            }
+            return UniqueIdentifierPrefs.lastModified(this@HookNotifyService)
+        }
+
+        override fun readUniqueIdentifierConfigSnapshot(): String {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected unique identifier config snapshot request from uid=$callingUid")
+                return ""
+            }
+            return UniqueIdentifierPrefs.buildHookSnapshot(this@HookNotifyService)
         }
     }
 

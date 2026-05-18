@@ -5,4 +5,6 @@ interface IHookNotify {
     void onPermissionUsed(String pkgName, int uid, int userId, String opName);
     long readSimConfigVersion();
     String readSimConfigSnapshot();
+    long readUniqueIdentifierConfigVersion();
+    String readUniqueIdentifierConfigSnapshot();
 }

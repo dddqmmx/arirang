@@ -1,22 +1,19 @@
 package asia.nana7mi.arirang.hook
 
+import android.content.Context
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Xml
-import asia.nana7mi.arirang.BuildConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import java.io.File
-import java.io.FileInputStream
+import org.json.JSONObject
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
 // through the normal Settings.Secure path instead of per-app hooks.
 class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.providers.settings")) {
 
     private companion object {
-        private const val PREFS_NAME = "unique_identifier_prefs"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_ANDROID_ID = "android_id"
     }
@@ -50,11 +47,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
                     val callMethodGetSecureField = XposedHelpers.findField(Settings::class.java, "CALL_METHOD_GET_SECURE")
                     val callMethodGetSecure = callMethodGetSecureField.get(null) as String
                     if (method == callMethodGetSecure && request == Settings.Secure.ANDROID_ID) {
-                        val androidId = readUniqueIdentifierValues()
-                            ?.takeIf { it[KEY_ENABLED]?.toBooleanStrictOrNull() == true }
-                            ?.get(KEY_ANDROID_ID)
-                            ?.takeIf { it.isNotBlank() }
-                            ?: return
+                        val androidId = readAndroidIdFromConfig(param.thisObject) ?: return
                         val bundle = Bundle()
                         bundle.putString(Settings.NameValueTable.VALUE, androidId)
                         param.result = bundle
@@ -64,38 +57,25 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         )
     }
 
-    private fun readUniqueIdentifierValues(): Map<String, String>? {
-        val candidates = listOf(
-            File("/data/user/0/${BuildConfig.APPLICATION_ID}/shared_prefs/$PREFS_NAME.xml"),
-            File("/data/data/${BuildConfig.APPLICATION_ID}/shared_prefs/$PREFS_NAME.xml")
-        )
-        val prefsFile = candidates.firstOrNull { it.isFile && it.canRead() } ?: return null
-        return runCatching {
-            val values = linkedMapOf<String, String>()
-            FileInputStream(prefsFile).use { input ->
-                val parser = Xml.newPullParser()
-                parser.setInput(input, Charsets.UTF_8.name())
-
-                var event = parser.eventType
-                while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
-                    if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
-                        val tagName = parser.name
-                        val key = parser.getAttributeValue(null, "name")
-                        if (!key.isNullOrBlank()) {
-                            when (tagName) {
-                                "boolean", "int", "long", "float" -> {
-                                    parser.getAttributeValue(null, "value")?.let { values[key] = it }
-                                }
-                                "string" -> values[key] = parser.nextText()
-                            }
-                        }
-                    }
-                    event = parser.next()
-                }
-            }
-            values
-        }.onFailure {
-            XposedBridge.log("FuckSetting: failed to read unique identifier config - ${it.message}")
+    private fun readAndroidIdFromConfig(settingsProvider: Any?): String? {
+        val context = runCatching {
+            XposedHelpers.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
+        val snapshot = HookNotifyClient.readUniqueIdentifierConfigSnapshot(
+            allowBind = true,
+            bindContext = context
+        )
+            ?: return null
+        return runCatching {
+            val root = JSONObject(snapshot)
+            if (!root.optString(KEY_ENABLED).toBooleanStrictOrNull().orFalse()) return@runCatching null
+            root.optString(KEY_ANDROID_ID).takeIf { it.isNotBlank() }
+        }.onFailure {
+            XposedBridge.log("FuckSetting: failed to parse unique identifier config - ${it.message}")
+        }.getOrNull()
+    }
+
+    private fun Boolean?.orFalse(): Boolean {
+        return this ?: false
     }
 }

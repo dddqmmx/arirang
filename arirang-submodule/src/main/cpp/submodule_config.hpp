@@ -41,6 +41,7 @@ struct SubmoduleConfig {
 };
 
 void apply_json_config(SubmoduleConfig &config, const std::string &json);
+bool load_config_from_disk(SubmoduleConfig &config);
 void load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config);
 void companion_handler(int fd);
 

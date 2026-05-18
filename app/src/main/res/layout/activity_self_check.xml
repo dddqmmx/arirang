@@ -38,12 +38,12 @@
                 app:singleSelection="true">
 
                 <com.google.android.material.chip.Chip
-                    android:id="@+id/navDeviceChip"
+                    android:id="@+id/navUniqueChip"
                     style="@style/Widget.Material3.Chip.Filter"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:checked="true"
-                    android:text="@string/self_check_nav_device" />
+                    android:text="@string/self_check_nav_unique" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/navBuildChip"
@@ -86,13 +86,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/self_check_nav_accounts" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navDrmChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_drm" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/navNetworkChip"
@@ -169,7 +162,7 @@
             </com.google.android.material.card.MaterialCardView>
 
             <include
-                android:id="@+id/deviceSection"
+                android:id="@+id/uniqueSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -212,13 +205,6 @@
 
             <include
                 android:id="@+id/accountsSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/drmSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

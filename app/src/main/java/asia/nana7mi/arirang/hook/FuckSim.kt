@@ -1614,7 +1614,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 ?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_PROFILES_BY_SLOT
         val normalized = normalizeProfiles(profilesBySlot)
-        val uniqueIdentifiers = readUniqueIdentifierConfig()
+        val uniqueIdentifiers = readUniqueIdentifierConfig(force)
         return HookConfig(
             enabled = enabled,
             hideSim = hideSim,
@@ -1681,8 +1681,19 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         return readPrefsValues(PREFS_NAME)
     }
 
-    private fun readUniqueIdentifierConfig(): UniqueIdentifierConfig {
-        val values = readPrefsValues(UNIQUE_PREFS_NAME) ?: return UniqueIdentifierConfig()
+    private fun readUniqueIdentifierConfig(force: Boolean = false): UniqueIdentifierConfig {
+        val hookNotifyValues = HookNotifyClient.readUniqueIdentifierConfigSnapshot(force = force)
+            ?.let(::parseConfigSnapshot)
+            ?.takeIf { it.isNotEmpty() }
+        val sharedPrefsValues = if (hookNotifyValues == null || force) {
+            readPrefsValues(UNIQUE_PREFS_NAME)
+        } else {
+            null
+        }
+        val values = freshestConfigValues(hookNotifyValues, sharedPrefsValues)
+            ?: hookNotifyValues
+            ?: sharedPrefsValues
+            ?: return UniqueIdentifierConfig()
         val enabled = values[KEY_UNIQUE_ENABLED]?.toBooleanStrictOrNull() ?: false
         val imeiBySlot = values[KEY_IMEI_BY_SLOT]
             ?.let(::parseImeiMap)

@@ -132,7 +132,27 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json) {
     config.widevine_id = parse_json_string(json, "widevineDrmId", config.widevine_id);
     config.app_set_id = parse_json_string(json, "appSetId", config.app_set_id);
     config.serial = parse_json_string(json, "serial", config.serial);
-    log_info("loaded submodule config");
+    log_info(
+        std::string("loaded submodule config uniqueIdentifierEnabled=") +
+        (config.unique_identifier_enabled ? "true" : "false") +
+        " widevineLen=" + std::to_string(config.widevine_id.size())
+    );
+}
+
+bool load_config_from_disk(SubmoduleConfig &config) {
+    std::string json = read_file(kConfigPathDe, kMaxConfigSize);
+    const char *path = kConfigPathDe;
+    if (json.empty()) {
+        json = read_file(kConfigPathCe, kMaxConfigSize);
+        path = kConfigPathCe;
+    }
+    if (json.empty()) {
+        log_warn("submodule config disk reload found no config file");
+        return false;
+    }
+    apply_json_config(config, json);
+    log_info(std::string("submodule config reloaded from ") + path);
+    return true;
 }
 
 void load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config) {
