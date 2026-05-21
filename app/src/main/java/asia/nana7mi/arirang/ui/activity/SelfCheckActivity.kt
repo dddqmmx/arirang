@@ -30,7 +30,10 @@ import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import asia.nana7mi.arirang.R
+import com.google.android.gms.ads.identifier.AdvertisingIdClient
+import com.google.android.gms.appset.AppSet
 import com.google.android.material.button.MaterialButton
+import com.google.android.gms.tasks.Tasks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -439,13 +442,9 @@ class SelfCheckActivity : BaseActivity() {
 
     private fun readAdvertisingId(): String? {
         return runCatching {
-            val clientClass = Class.forName("com.google.android.gms.ads.identifier.AdvertisingIdClient")
-            val info = clientClass
-                .getMethod("getAdvertisingIdInfo", Context::class.java)
-                .invoke(null, this) ?: return@runCatching null
-            info.javaClass.methods
-                .firstOrNull { it.name == "getId" && it.parameterTypes.isEmpty() }
-                ?.invoke(info) as? String
+            AdvertisingIdClient.getAdvertisingIdInfo(this).id
+        }.onFailure {
+            Log.e(PHONE_DIAG_TAG, "readAdvertisingId failed", it)
         }.getOrNull()?.takeUnless { it.isBlank() }
     }
 
@@ -470,20 +469,10 @@ class SelfCheckActivity : BaseActivity() {
 
     private fun readAppSetId(): String? {
         return runCatching {
-            val appSetClass = Class.forName("com.google.android.gms.appset.AppSet")
-            val client = appSetClass
-                .getMethod("getClient", Context::class.java)
-                .invoke(null, this) ?: return@runCatching null
-            val task = client.javaClass.methods
-                .firstOrNull { it.name == "getAppSetIdInfo" && it.parameterTypes.isEmpty() }
-                ?.invoke(client) ?: return@runCatching null
-            val tasksClass = Class.forName("com.google.android.gms.tasks.Tasks")
-            val info = tasksClass
-                .getMethod("await", Class.forName("com.google.android.gms.tasks.Task"), Long::class.javaPrimitiveType, TimeUnit::class.java)
-                .invoke(null, task, 1500L, TimeUnit.MILLISECONDS) ?: return@runCatching null
-            info.javaClass.methods
-                .firstOrNull { it.name == "getId" && it.parameterTypes.isEmpty() }
-                ?.invoke(info) as? String
+            val client = AppSet.getClient(applicationContext)
+            Tasks.await(client.appSetIdInfo, 1500L, TimeUnit.MILLISECONDS).id
+        }.onFailure {
+            Log.e(PHONE_DIAG_TAG, "readAppSetId failed", it)
         }.getOrNull()?.takeUnless { it.isBlank() }
     }
 

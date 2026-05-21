@@ -23,6 +23,7 @@ object UniqueIdentifierPrefs {
     private const val KEY_APP_SET_ID = "app_set_id"
     private const val KEY_SERIAL = "serial"
     private const val KEY_IMEI_BY_SLOT = "imei_by_slot"
+    private const val KEY_TAC_BY_SLOT = "tac_by_slot"
 
     private val gson = Gson()
     private val random = SecureRandom()
@@ -35,10 +36,15 @@ object UniqueIdentifierPrefs {
         val widevineDrmId: String = "",
         val appSetId: String = "",
         val serial: String = "",
-        val imeiBySlot: Map<Int, String> = emptyMap()
+        val imeiBySlot: Map<Int, String> = emptyMap(),
+        val tacBySlot: Map<Int, String> = emptyMap()
     ) {
         fun imeiList(): List<Pair<Int, String>> {
             return imeiBySlot.toSortedMap().toList()
+        }
+
+        fun tacForSlot(slotIndex: Int, imei: String): String {
+            return tacBySlot[slotIndex]?.takeIf { it.isNotBlank() } ?: imei.take(8)
         }
     }
 
@@ -57,7 +63,8 @@ object UniqueIdentifierPrefs {
             serial = prefs.getString(KEY_SERIAL, null) ?: defaultSerial(),
             imeiBySlot = loadImeiBySlot(prefs.getString(KEY_IMEI_BY_SLOT, null)).ifEmpty {
                 migratedImeiBySlot.ifEmpty { mapOf(0 to defaultImeiForSlot(0)) }
-            }
+            },
+            tacBySlot = loadSlotStringMap(prefs.getString(KEY_TAC_BY_SLOT, null))
         )
     }
 
@@ -72,6 +79,7 @@ object UniqueIdentifierPrefs {
             putString(KEY_APP_SET_ID, config.appSetId)
             putString(KEY_SERIAL, config.serial)
             putString(KEY_IMEI_BY_SLOT, gson.toJson(config.imeiBySlot.toSortedMap()))
+            putString(KEY_TAC_BY_SLOT, gson.toJson(config.tacBySlot.toSortedMap()))
         }
         SubmoduleConfigFiles.write(context, uniqueIdentifierConfig = config)
     }
@@ -93,6 +101,7 @@ object UniqueIdentifierPrefs {
             .put(KEY_APP_SET_ID, config.appSetId)
             .put(KEY_SERIAL, config.serial)
             .put(KEY_IMEI_BY_SLOT, gson.toJson(config.imeiBySlot.toSortedMap()))
+            .put(KEY_TAC_BY_SLOT, gson.toJson(config.tacBySlot.toSortedMap()))
             .toString()
     }
 
@@ -125,11 +134,19 @@ object UniqueIdentifierPrefs {
     }
 
     fun randomImeiForSlot(slotIndex: Int): String {
-        val tac = "35693803"
+        return randomImeiForSlot(slotIndex, randomTac())
+    }
+
+    fun randomImeiForSlot(slotIndex: Int, tac: String): String {
+        val normalizedTac = tac.filter(Char::isDigit).padEnd(8, '0').take(8)
         val serialBase = random.nextInt(900000) + ((slotIndex + 1) * 1000)
         val serial = serialBase.toString().padStart(6, '0').takeLast(6)
-        val body = tac + serial
+        val body = normalizedTac + serial
         return body + luhnCheckDigit(body)
+    }
+
+    fun randomTac(): String {
+        return randomDigits(8)
     }
 
     private fun defaultAndroidId(context: Context): String {
@@ -151,6 +168,10 @@ object UniqueIdentifierPrefs {
     }
 
     private fun loadImeiBySlot(json: String?): Map<Int, String> {
+        return loadSlotStringMap(json)
+    }
+
+    private fun loadSlotStringMap(json: String?): Map<Int, String> {
         if (json.isNullOrBlank()) return emptyMap()
         val type = object : TypeToken<Map<Int, String>>() {}.type
         return runCatching { gson.fromJson<Map<Int, String>>(json, type) }
@@ -168,6 +189,14 @@ object UniqueIdentifierPrefs {
         val chars = CharArray(length)
         repeat(length) { index ->
             chars[index] = "0123456789abcdef"[random.nextInt(16)]
+        }
+        return String(chars)
+    }
+
+    private fun randomDigits(length: Int): String {
+        val chars = CharArray(length)
+        repeat(length) { index ->
+            chars[index] = "0123456789"[random.nextInt(10)]
         }
         return String(chars)
     }

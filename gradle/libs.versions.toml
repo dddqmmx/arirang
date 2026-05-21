@@ -19,6 +19,8 @@ composeBom = "2026.03.01"
 material3 = "1.4.0"
 materialIconsExtended = "1.7.8"
 playServicesLocation = "21.3.0"
+playServicesAdsIdentifier = "18.3.0"
+playServicesAppSet = "16.1.0"
 ui = "1.10.6"
 
 [libraries]
@@ -47,6 +49,8 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+play-services-ads-identifier = { module = "com.google.android.gms:play-services-ads-identifier", version.ref = "playServicesAdsIdentifier" }
+play-services-appset = { module = "com.google.android.gms:play-services-appset", version.ref = "playServicesAppSet" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

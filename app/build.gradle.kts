@@ -94,6 +94,8 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.play.services.location)
+    implementation(libs.play.services.ads.identifier)
+    implementation(libs.play.services.appset)
     compileOnly(libs.api)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)

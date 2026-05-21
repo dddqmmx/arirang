@@ -51,6 +51,7 @@ object SubmoduleConfigFiles {
             .put("appSetId", uniqueIdentifierConfig.appSetId)
             .put("serial", uniqueIdentifierConfig.serial)
             .put("imeiBySlot", JSONObject(uniqueIdentifierConfig.imeiBySlot.mapKeys { it.key.toString() }))
+            .put("tacBySlot", JSONObject(uniqueIdentifierConfig.tacBySlot.mapKeys { it.key.toString() }))
             .put("gsmSimOperatorIsoCountry", simProperties.countryIso)
             .put("gsmOperatorIsoCountry", simProperties.countryIso)
             .put("gsmSimOperatorNumeric", simProperties.operatorNumeric)

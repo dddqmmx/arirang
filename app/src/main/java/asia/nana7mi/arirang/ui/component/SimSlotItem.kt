@@ -20,8 +20,11 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.SimInfo
 import asia.nana7mi.arirang.model.SimPreset
 import asia.nana7mi.arirang.model.SimPresetCatalog
+import java.security.SecureRandom
 
 fun getSimPresets(): List<SimPreset> = SimPresetCatalog.ALL
+
+private val iccidRandom = SecureRandom()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -283,7 +286,9 @@ fun SimSlotItem(
                     SimField(
                         label = stringResource(R.string.sim_field_iccid),
                         value = simInfo.iccId ?: "",
-                        onValueChange = { onSimInfoChange(simInfo.copy(iccId = it)) }
+                        onValueChange = { onSimInfoChange(simInfo.copy(iccId = it.filter(Char::isDigit))) },
+                        keyboardType = KeyboardType.Number,
+                        onRandom = { onSimInfoChange(simInfo.copy(iccId = randomIccid(simInfo))) }
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -315,18 +320,55 @@ fun SimField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
-    placeholder: String? = null
+    placeholder: String? = null,
+    onRandom: (() -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
         placeholder = placeholder?.let { { Text(it) } },
+        trailingIcon = {
+            if (onRandom != null) {
+                IconButton(onClick = onRandom) {
+                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
+                }
+            }
+        },
         modifier = modifier.fillMaxWidth(),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         singleLine = true,
         shape = RoundedCornerShape(8.dp)
     )
+}
+
+private fun randomIccid(simInfo: SimInfo): String {
+    val issuer = when (simInfo.countryIso?.lowercase()) {
+        "kp" -> "89850"
+        "ru" -> "89701"
+        else -> "89860"
+    }
+    val bodyLength = 18
+    val body = buildString(bodyLength) {
+        append(issuer)
+        while (length < bodyLength) {
+            append(iccidRandom.nextInt(10))
+        }
+    }
+    return body + luhnCheckDigit(body)
+}
+
+private fun luhnCheckDigit(body: String): Int {
+    val sum = body.reversed().mapIndexed { index, char ->
+        val digit = char.digitToIntOrNull() ?: 0
+        if (index % 2 == 0) {
+            val doubled = digit * 2
+            if (doubled > 9) doubled - 9 else doubled
+        } else {
+            digit
+        }
+    }.sum()
+    return (10 - (sum % 10)) % 10
 }
 
 @Composable

@@ -61,6 +61,7 @@ class HookNotifyService : Service() {
         private val TRUSTED_CALLER_PACKAGES = setOf(
             "android",
             "com.android.phone",
+            "com.google.android.gms",
             BuildConfig.APPLICATION_ID
         )
     }

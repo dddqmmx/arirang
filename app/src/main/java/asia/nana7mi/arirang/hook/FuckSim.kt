@@ -39,6 +39,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         private const val UNIQUE_PREFS_NAME = "unique_identifier_prefs"
         private const val KEY_UNIQUE_ENABLED = "enabled"
         private const val KEY_IMEI_BY_SLOT = "imei_by_slot"
+        private const val KEY_TAC_BY_SLOT = "tac_by_slot"
 
         private const val DEFAULT_DISPLAY_NAME_SOURCE = 0
         private const val DEFAULT_SUBSCRIPTION_TYPE_LOCAL_SIM = 0
@@ -141,7 +142,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private data class UniqueIdentifierConfig(
         val enabled: Boolean = false,
-        val imeiBySlot: Map<Int, String> = DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.imei }
+        val imeiBySlot: Map<Int, String> = DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.imei },
+        val tacBySlot: Map<Int, String> = DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.typeAllocationCode }
     ) {
         fun imeiForSlot(slotIndex: Int?, fallback: String?): String? {
             if (!enabled) return fallback
@@ -149,6 +151,17 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 imeiBySlot[slotIndex]?.let { return it }
             }
             return imeiBySlot.toSortedMap().values.firstOrNull() ?: fallback
+        }
+
+        fun typeAllocationCodeForSlot(slotIndex: Int?, fallback: String?): String? {
+            if (!enabled) return fallback
+            if (slotIndex != null) {
+                tacBySlot[slotIndex]?.let { return it }
+                imeiBySlot[slotIndex]?.take(8)?.let { return it }
+            }
+            return tacBySlot.toSortedMap().values.firstOrNull()
+                ?: imeiBySlot.toSortedMap().values.firstOrNull()?.take(8)
+                ?: fallback
         }
     }
 
@@ -187,6 +200,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookSystemServerSurfaces(classLoader: ClassLoader) {
+        hookTelephonyManagerUniqueIdentifierReaders(classLoader)
         hookServiceStateSurfaces(classLoader)
         hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = false)
         hookSystemPropertyReaders(classLoader)
@@ -200,6 +214,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = false)
         hookPhoneInterfaceManager(classLoader)
         hookPhoneSubInfoController(classLoader)
+        hookTelephonyManagerUniqueIdentifierReaders(classLoader)
         hookTelephonyPropertyWriters(classLoader)
         hookSystemPropertyWriters(classLoader)
         hookSystemPropertyReaders(classLoader)
@@ -356,7 +371,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
                 if (methodName == "getTypeAllocationCode") {
                     val slot = param.args.firstIntOrNull() ?: profile?.slotIndex
-                    hookConfig.uniqueIdentifiers.imeiForSlot(slot, profile?.imei)?.take(8)
+                    hookConfig.uniqueIdentifiers.typeAllocationCodeForSlot(slot, profile?.typeAllocationCode)
                 } else if (methodName.contains("Imei", ignoreCase = true) || methodName.contains("DeviceId", ignoreCase = true)) {
                     val slot = param.args.firstIntOrNull() ?: profile?.slotIndex
                     hookConfig.uniqueIdentifiers.imeiForSlot(slot, profile?.imei)
@@ -425,6 +440,22 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
             imeiForCall(param, method)
+        }
+    }
+
+    private fun hookTelephonyManagerUniqueIdentifierReaders(classLoader: ClassLoader) {
+        val telephonyManagerClass = XposedHelpers.findClassIfExists(
+            "android.telephony.TelephonyManager",
+            classLoader
+        ) ?: return
+
+        hookAllExistingStringMethods(
+            targetClass = telephonyManagerClass,
+            methodNames = listOf("getTypeAllocationCode"),
+            beforeOriginal = true,
+            shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
+        ) { param, method ->
+            typeAllocationCodeForCall(param, method)
         }
     }
 
@@ -1434,6 +1465,26 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         return hookConfig.uniqueIdentifiers.imeiForSlot(slotIndex, profile?.imei)
     }
 
+    private fun typeAllocationCodeForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+        val firstInt = param.args.firstIntOrNull()
+        val profile = when {
+            method.name.contains("ForSubscriber", ignoreCase = true) ->
+                profileForSubId(firstInt, allowFallback = firstInt == null)
+            method.name.contains("ForPhone", ignoreCase = true) ->
+                profileForSlot(firstInt, allowFallback = false)
+            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
+                profileForSlot(firstInt, allowFallback = false)
+            else -> profileForTelephonyManager(param)
+        }
+        val slotIndex = when {
+            method.name.contains("ForSubscriber", ignoreCase = true) -> profile?.slotIndex
+            method.name.contains("ForPhone", ignoreCase = true) -> firstInt
+            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType -> firstInt
+            else -> profile?.slotIndex
+        }
+        return hookConfig.uniqueIdentifiers.typeAllocationCodeForSlot(slotIndex, profile?.typeAllocationCode)
+    }
+
     private fun profileForTelephonyManager(param: XC_MethodHook.MethodHookParam): SimProfile? {
         val subId = getIntFieldIfExists(param.thisObject, "mSubId")
         if (subId != null && subId > 0) {
@@ -1699,7 +1750,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             ?.let(::parseImeiMap)
             ?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.imei }
-        return UniqueIdentifierConfig(enabled = enabled, imeiBySlot = imeiBySlot)
+        val tacBySlot = values[KEY_TAC_BY_SLOT]
+            ?.let(::parseImeiMap)
+            ?.takeIf { it.isNotEmpty() }
+            ?: imeiBySlot.mapValues { it.value.take(8) }
+        return UniqueIdentifierConfig(enabled = enabled, imeiBySlot = imeiBySlot, tacBySlot = tacBySlot)
     }
 
     private fun parseImeiMap(json: String): Map<Int, String> {

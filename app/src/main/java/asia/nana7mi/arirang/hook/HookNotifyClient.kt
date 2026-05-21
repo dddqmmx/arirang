@@ -330,7 +330,8 @@ object HookNotifyClient {
     fun readUniqueIdentifierConfigSnapshot(
         force: Boolean = false,
         allowBind: Boolean = false,
-        bindContext: Context? = null
+        bindContext: Context? = null,
+        bindCurrentUser: Boolean = false
     ): String? {
         val now = SystemClock.uptimeMillis()
         val cachedSnapshot = sUniqueIdentifierConfigSnapshot
@@ -344,7 +345,11 @@ object HookNotifyClient {
                 XposedBridge.log("$TAG readUniqueIdentifierConfigSnapshot: no system context")
                 return cachedSnapshot
             }
-            getOrBindService(ctx)
+            if (bindCurrentUser) {
+                getOrBindServiceCurrentUser(ctx)
+            } else {
+                getOrBindService(ctx)
+            }
         } else {
             sService
         } ?: return cachedSnapshot
@@ -530,6 +535,21 @@ object HookNotifyClient {
         sService?.let { return it }
 
         ensureBound(ctx)
+
+        val latch = sConnectLatch
+        if (latch != null) {
+            runCatching {
+                latch.await(BIND_WAIT_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+
+        return sService
+    }
+
+    private fun getOrBindServiceCurrentUser(ctx: Context): IHookNotify? {
+        sService?.let { return it }
+
+        ensureBoundCurrentUser(ctx)
 
         val latch = sConnectLatch
         if (latch != null) {

@@ -92,14 +92,27 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         var config by remember { mutableStateOf(initialConfig) }
         var revision by remember { mutableLongStateOf(0L) }
         val imeiRows = remember {
-            mutableStateListOf<Pair<Int, String>>().apply {
-                addAll(initialConfig.imeiList().ifEmpty { listOf(0 to UniqueIdentifierPrefs.defaultImeiForSlot(0)) })
+            mutableStateListOf<ImeiRowState>().apply {
+                addAll(
+                    initialConfig.imeiList()
+                        .ifEmpty { listOf(0 to UniqueIdentifierPrefs.defaultImeiForSlot(0)) }
+                        .map { (slot, imei) ->
+                            ImeiRowState(
+                                slot = slot,
+                                imei = imei,
+                                tac = initialConfig.tacForSlot(slot, imei)
+                            )
+                        }
+                )
             }
         }
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
         fun updateImeis() {
-            config = config.copy(imeiBySlot = imeiRows.toMap().toSortedMap())
+            config = config.copy(
+                imeiBySlot = imeiRows.associate { it.slot to it.imei }.toSortedMap(),
+                tacBySlot = imeiRows.associate { it.slot to it.tac }.toSortedMap()
+            )
         }
 
         Scaffold(
@@ -117,7 +130,11 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                             val imported = onImportImeis()
                             if (imported.isNotEmpty()) {
                                 imeiRows.clear()
-                                imeiRows.addAll(imported.toSortedMap().toList())
+                                imeiRows.addAll(
+                                    imported.toSortedMap().map { (slot, imei) ->
+                                        ImeiRowState(slot = slot, imei = imei, tac = imei.take(8))
+                                    }
+                                )
                                 updateImeis()
                                 revision++
                             }
@@ -126,7 +143,12 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         }
                         IconButton(onClick = {
                             updateImeis()
-                            onSave(config.copy(imeiBySlot = imeiRows.toMap().toSortedMap()))
+                            onSave(
+                                config.copy(
+                                    imeiBySlot = imeiRows.associate { it.slot to it.imei }.toSortedMap(),
+                                    tacBySlot = imeiRows.associate { it.slot to it.tac }.toSortedMap()
+                                )
+                            )
                         }) {
                             Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
                         }
@@ -137,8 +159,15 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
             floatingActionButton = {
                 ExtendedFloatingActionButton(
                     onClick = {
-                        val nextSlot = ((imeiRows.maxOfOrNull { it.first } ?: -1) + 1).coerceAtLeast(0)
-                        imeiRows.add(nextSlot to UniqueIdentifierPrefs.defaultImeiForSlot(nextSlot))
+                        val nextSlot = ((imeiRows.maxOfOrNull { it.slot } ?: -1) + 1).coerceAtLeast(0)
+                        val tac = UniqueIdentifierPrefs.randomTac()
+                        imeiRows.add(
+                            ImeiRowState(
+                                slot = nextSlot,
+                                imei = UniqueIdentifierPrefs.randomImeiForSlot(nextSlot, tac),
+                                tac = tac
+                            )
+                        )
                         updateImeis()
                         revision++
                     },
@@ -265,22 +294,29 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     }
                 }
 
-                items(imeiRows, key = { it.first }) { row ->
-                    val index = imeiRows.indexOfFirst { it.first == row.first }
+                items(imeiRows, key = { it.slot }) { row ->
+                    val index = imeiRows.indexOfFirst { it.slot == row.slot }
                     ImeiRow(
-                        slot = row.first,
-                        imei = row.second,
+                        slot = row.slot,
+                        imei = row.imei,
+                        tac = row.tac,
                         revision = revision,
                         canRemove = imeiRows.size > 1,
                         onSlotChange = { slot ->
                             if (index >= 0) {
-                                imeiRows[index] = slot to imeiRows[index].second
+                                imeiRows[index] = imeiRows[index].copy(slot = slot)
                                 updateImeis()
                             }
                         },
                         onImeiChange = { imei ->
                             if (index >= 0) {
-                                imeiRows[index] = imeiRows[index].first to imei
+                                imeiRows[index] = imeiRows[index].copy(imei = imei)
+                                updateImeis()
+                            }
+                        },
+                        onTacChange = { tac ->
+                            if (index >= 0) {
+                                imeiRows[index] = imeiRows[index].copy(tac = tac)
                                 updateImeis()
                             }
                         },
@@ -354,10 +390,12 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
     private fun ImeiRow(
         slot: Int,
         imei: String,
+        tac: String,
         revision: Long,
         canRemove: Boolean,
         onSlotChange: (Int) -> Unit,
         onImeiChange: (String) -> Unit,
+        onTacChange: (String) -> Unit,
         onRemove: () -> Unit
     ) {
         ElevatedCard(
@@ -399,10 +437,22 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         revision = revision,
                         modifier = Modifier.weight(0.65f),
                         keyboardType = KeyboardType.Number,
-                        onRandom = { onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(slot)) },
+                        onRandom = { onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(slot, tac)) },
                         onValueChange = { onImeiChange(it.filter(Char::isDigit)) }
                     )
                 }
+                IdentifierTextField(
+                    label = stringResource(R.string.unique_field_type_allocation_code),
+                    value = tac,
+                    revision = revision,
+                    keyboardType = KeyboardType.Number,
+                    onRandom = {
+                        val nextTac = UniqueIdentifierPrefs.randomTac()
+                        onTacChange(nextTac)
+                        onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(slot, nextTac))
+                    },
+                    onValueChange = { onTacChange(it.filter(Char::isDigit).take(8)) }
+                )
             }
         }
     }
@@ -457,4 +507,10 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         }
         return result
     }
+
+    private data class ImeiRowState(
+        val slot: Int,
+        val imei: String,
+        val tac: String
+    )
 }

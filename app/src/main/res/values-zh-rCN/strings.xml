@@ -97,6 +97,7 @@
     <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
     <string name="unique_field_app_set_id">App Set ID</string>
     <string name="unique_field_serial">Serial</string>
+    <string name="unique_field_type_allocation_code">Type Allocation Code</string>
     <string name="unique_randomize">随机生成</string>
     <string name="unique_add_imei_slot">添加 IMEI 槽位</string>
     <string name="unique_import_imei">导入当前 IMEI</string>

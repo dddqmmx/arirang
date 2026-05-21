@@ -3,6 +3,7 @@
     <string-array name="xposedscope">
         <item>android</item>
         <item>com.android.phone</item>
+        <item>com.google.android.gms</item>
     </string-array>
     <array name="whitelist_blacklist_mode_options">
         <item>白名单模式 (全部允许)</item>
