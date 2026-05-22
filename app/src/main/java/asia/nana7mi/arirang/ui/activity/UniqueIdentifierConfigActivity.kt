@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,22 +16,27 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,15 +55,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import kotlin.math.roundToInt
 
 class UniqueIdentifierConfigActivity : ComponentActivity() {
 
@@ -107,11 +120,14 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
             }
         }
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+        val lazyListState = rememberLazyListState()
+        var draggedItemIndex by remember { mutableStateOf<Int?>(null) }
+        var draggingOffset by remember { mutableFloatStateOf(0f) }
 
         fun updateImeis() {
             config = config.copy(
-                imeiBySlot = imeiRows.associate { it.slot to it.imei }.toSortedMap(),
-                tacBySlot = imeiRows.associate { it.slot to it.tac }.toSortedMap()
+                imeiBySlot = imeiRows.mapIndexed { index, row -> index to row.imei }.toMap().toSortedMap(),
+                tacBySlot = imeiRows.mapIndexed { index, row -> index to row.tac }.toMap().toSortedMap()
             )
         }
 
@@ -143,12 +159,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         }
                         IconButton(onClick = {
                             updateImeis()
-                            onSave(
-                                config.copy(
-                                    imeiBySlot = imeiRows.associate { it.slot to it.imei }.toSortedMap(),
-                                    tacBySlot = imeiRows.associate { it.slot to it.tac }.toSortedMap()
-                                )
-                            )
+                            onSave(config)
                         }) {
                             Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
                         }
@@ -177,6 +188,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
             }
         ) { padding ->
             LazyColumn(
+                state = lazyListState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
@@ -187,6 +199,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                 item {
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.elevatedCardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         )
@@ -194,6 +207,12 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .toggleable(
+                                    value = config.enabled,
+                                    onValueChange = { config = config.copy(enabled = it) },
+                                    role = Role.Switch
+                                )
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -212,7 +231,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                             }
                             Switch(
                                 checked = config.enabled,
-                                onCheckedChange = { config = config.copy(enabled = it) }
+                                onCheckedChange = null
                             )
                         }
                     }
@@ -284,30 +303,38 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                 }
 
                 item {
-                    SectionCard(title = stringResource(R.string.unique_section_imei)) {
-                        Text(
-                            text = stringResource(R.string.unique_section_imei_summary),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
                         )
-                        HorizontalDivider()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.unique_section_slot_info),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = stringResource(R.string.unique_section_imei_summary),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
-                items(imeiRows, key = { it.slot }) { row ->
-                    val index = imeiRows.indexOfFirst { it.slot == row.slot }
+                itemsIndexed(imeiRows, key = { _, row -> row.slot }) { index, row ->
+                    val isDragging = draggedItemIndex == index
                     ImeiRow(
-                        slot = row.slot,
+                        index = index,
                         imei = row.imei,
                         tac = row.tac,
                         revision = revision,
                         canRemove = imeiRows.size > 1,
-                        onSlotChange = { slot ->
-                            if (index >= 0) {
-                                imeiRows[index] = imeiRows[index].copy(slot = slot)
-                                updateImeis()
-                            }
-                        },
                         onImeiChange = { imei ->
                             if (index >= 0) {
                                 imeiRows[index] = imeiRows[index].copy(imei = imei)
@@ -325,7 +352,63 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                                 imeiRows.removeAt(index)
                                 updateImeis()
                             }
-                        }
+                        },
+                        modifier = Modifier
+                            .animateItem()
+                            .zIndex(if (isDragging) 1f else 0f)
+                            .offset {
+                                if (isDragging) {
+                                    IntOffset(x = 0, y = draggingOffset.roundToInt())
+                                } else {
+                                    IntOffset.Zero
+                                }
+                            }
+                            .pointerInput(Unit) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedItemIndex = index
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        draggingOffset += dragAmount.y
+
+                                        val currentDraggedIndex = draggedItemIndex ?: return@detectDragGesturesAfterLongPress
+                                        val layoutInfo = lazyListState.layoutInfo
+                                        // Header items count:
+                                        // Hook(1) + Device IDs(1) + Slot info intro(1) = 3 items
+                                        // We have:
+                                        // 0: Hook
+                                        // 1: Device IDs
+                                        // 2: Slot info intro
+                                        val absoluteIndex = currentDraggedIndex + 3
+                                        val draggedItemInfo = layoutInfo.visibleItemsInfo.find { it.index == absoluteIndex }
+
+                                        if (draggedItemInfo != null) {
+                                            if (draggingOffset > draggedItemInfo.size / 2 && currentDraggedIndex < imeiRows.size - 1) {
+                                                imeiRows.add(currentDraggedIndex + 1, imeiRows.removeAt(currentDraggedIndex))
+                                                draggedItemIndex = currentDraggedIndex + 1
+                                                draggingOffset -= draggedItemInfo.size
+                                                updateImeis()
+                                                revision++
+                                            } else if (draggingOffset < -draggedItemInfo.size / 2 && currentDraggedIndex > 0) {
+                                                imeiRows.add(currentDraggedIndex - 1, imeiRows.removeAt(currentDraggedIndex))
+                                                draggedItemIndex = currentDraggedIndex - 1
+                                                draggingOffset += draggedItemInfo.size
+                                                updateImeis()
+                                                revision++
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggedItemIndex = null
+                                        draggingOffset = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggedItemIndex = null
+                                        draggingOffset = 0f
+                                    }
+                                )
+                            }
                     )
                 }
             }
@@ -359,6 +442,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         label: String,
         value: String,
         revision: Long,
+        modifier: Modifier = Modifier,
         singleLine: Boolean = true,
         keyboardType: KeyboardType = KeyboardType.Text,
         onRandom: (() -> Unit)? = null,
@@ -382,30 +466,33 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             singleLine = singleLine,
             minLines = if (singleLine) 1 else 3,
-            modifier = Modifier.fillMaxWidth()
+            modifier = modifier.fillMaxWidth()
         )
     }
 
     @Composable
     private fun ImeiRow(
-        slot: Int,
+        index: Int,
         imei: String,
         tac: String,
         revision: Long,
         canRemove: Boolean,
-        onSlotChange: (Int) -> Unit,
         onImeiChange: (String) -> Unit,
         onTacChange: (String) -> Unit,
-        onRemove: () -> Unit
+        onRemove: () -> Unit,
+        modifier: Modifier = Modifier
     ) {
-        ElevatedCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.elevatedCardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             )
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
@@ -413,34 +500,31 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = stringResource(R.string.unique_imei_slot_title, slot),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = stringResource(R.string.unique_imei_slot_title, index + 1),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     IconButton(onClick = onRemove, enabled = canRemove) {
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.remove_sim_slot))
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IdentifierTextField(
-                        label = stringResource(R.string.sim_field_slot_index),
-                        value = slot.toString(),
-                        revision = revision,
-                        modifier = Modifier.weight(0.35f),
-                        keyboardType = KeyboardType.Number,
-                        onValueChange = { onSlotChange(it.toIntOrNull() ?: slot) }
-                    )
-                    IdentifierTextField(
-                        label = stringResource(R.string.sim_field_imei),
-                        value = imei,
-                        revision = revision,
-                        modifier = Modifier.weight(0.65f),
-                        keyboardType = KeyboardType.Number,
-                        onRandom = { onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(slot, tac)) },
-                        onValueChange = { onImeiChange(it.filter(Char::isDigit)) }
-                    )
-                }
+                IdentifierTextField(
+                    label = stringResource(R.string.sim_field_imei),
+                    value = imei,
+                    revision = revision,
+                    keyboardType = KeyboardType.Number,
+                    onRandom = { onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(index, tac)) },
+                    onValueChange = { onImeiChange(it.filter(Char::isDigit)) }
+                )
                 IdentifierTextField(
                     label = stringResource(R.string.unique_field_type_allocation_code),
                     value = tac,
@@ -449,7 +533,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     onRandom = {
                         val nextTac = UniqueIdentifierPrefs.randomTac()
                         onTacChange(nextTac)
-                        onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(slot, nextTac))
+                        onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(index, nextTac))
                     },
                     onValueChange = { onTacChange(it.filter(Char::isDigit).take(8)) }
                 )
@@ -457,36 +541,6 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         }
     }
 
-    @Composable
-    private fun IdentifierTextField(
-        label: String,
-        value: String,
-        revision: Long,
-        modifier: Modifier,
-        keyboardType: KeyboardType,
-        onRandom: (() -> Unit)? = null,
-        onValueChange: (String) -> Unit
-    ) {
-        var localValue by remember(revision, label, value) { mutableStateOf(value) }
-        OutlinedTextField(
-            value = localValue,
-            onValueChange = {
-                localValue = it
-                onValueChange(it)
-            },
-            label = { Text(label) },
-            trailingIcon = {
-                if (onRandom != null) {
-                    IconButton(onClick = onRandom) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
-                    }
-                }
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            singleLine = true,
-            modifier = modifier
-        )
-    }
 
     private fun importCurrentImeis(): Map<Int, String> {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {

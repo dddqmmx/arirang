@@ -80,6 +80,9 @@
     <string name="sim_field_slot_index">スロット番号</string>
     <string name="sim_field_iccid">ICCID</string>
     <string name="sim_field_imei">IMEI</string>
+    <string name="unique_section_slot_info">スロット情報</string>
+    <string name="unique_section_imei_summary">スロット関連の識別子はここで設定できます。SIMカードが挿入されていない場合でも、IMEIなどの一部の識別子は読み取られる可能性があります。長押しでスロットを並べ替えることができます。</string>
+    <string name="unique_imei_slot_title">スロット %1$d</string>
     <string name="sim_field_card_id">カード ID</string>
     <string name="sim_field_number">電話番号</string>
     <string name="set_scope">スコープを設定</string>
