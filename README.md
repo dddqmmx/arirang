@@ -60,18 +60,24 @@ Use at your own risk.
 - **Real-time Permission Prompt (Available)**  
   Intercept clipboard access attempts and explicitly allow or deny each request.
 
-- **SIM Mocking (Experimental / Submodule Required)**
-  Provides SIM information rewriting and masking through the optional Zygisk submodule.
-  This feature is experimental and may be unstable.
+- **SIM Info Mocking (Experimental)**
+  Configure SIM profiles, hide SIM information, and rewrite visible telephony data.
 
-- **Location Spoofing (In Development)**  
-  Provide mock GPS coordinates to selected applications.
+- **Device Info Masking (Experimental)**
+  Configure visible device model, brand, manufacturer, product, hardware, board,
+  bootloader, fingerprint, and related Android build fields.
+
+- **Unique Identifier Spoofing (Experimental)**
+  Configure Android ID, advertising ID, SSAID-style identifiers, IMEI/MEID, serial
+  number, subscriber ID, phone number, and SIM ICCID values.
+
+- **Virtual Location (Experimental)**
+  Configure a virtual latitude, longitude, altitude, accuracy, speed, bearing, and
+  satellite count. The implementation covers Android framework location APIs,
+  fused location paths, Google Fused Location APIs, GNSS status, and NMEA reports.
 
 - **Package List Management (In Development)**  
   Hide installed applications (Invisible / Whitelist modes).
-
-- **Device Info Masking (Experimental / Submodule Required)**  
-  Modify hardware identifiers and system properties.
 
 - **Wi-Fi Info Masking (Planned)**  
   Hide or modify Wi-Fi information such as SSID, BSSID, MAC address, and network details.
@@ -80,12 +86,18 @@ Use at your own risk.
   Hide or modify nearby Wi-Fi, Bluetooth, and other discoverable device lists.
 
 - **Privacy Self-Check (Available)**  
-  Inspect what device information is visible to applications and verify whether privacy protection features are working correctly.
+  Inspect what device information is visible to applications and verify whether
+  privacy protection features are working correctly. Current checks include
+  device info, unique identifiers, SIM information, Android location APIs, Google
+  Fused Location APIs, accounts, Bluetooth devices, Wi-Fi information, sensors,
+  and installed packages.
 
 - **Modern UI**  
-  Built with Material Design 3 and Dynamic Colors support.
+  Built with Material Design 3, Dynamic Colors support, and native configuration
+  pages for the currently released features.
 
 - **Multi-language Support**
+  English, Simplified Chinese, and Japanese translations are included.
 
 ## 📸 Screenshots
 
@@ -101,9 +113,10 @@ Use at your own risk.
 
 - Rooted Android device
 - **LSPosed** or compatible Xposed framework
-- Magisk, KernelSU / KernelSU Next, or APatch (required for advanced submodule features)
-- Zygisk
-- Android 16 (recommended)
+- Android 14 or later
+- Android 16 is the current recommended target for testing
+- Magisk, KernelSU / KernelSU Next, or APatch (required only for optional native submodule features)
+- Zygisk (required only for optional native submodule features)
 
 ## 📦 Installation
 
@@ -111,8 +124,9 @@ Use at your own risk.
 2. Open your Xposed Manager (e.g., LSPosed)  
 3. Enable the **Arirang** module  
 4. Select scope:
-   - System (required)
-   - Phone (optional, for SIM simulation)
+   - System / Android framework (required)
+   - `com.android.phone` (required for SIM information rewriting)
+   - `com.google.android.gms` (required for Google Fused Location API rewriting)
 5. Reboot your device or restart target apps  
 
 #### Install `arirang-submodule` (Optional but Recommended)

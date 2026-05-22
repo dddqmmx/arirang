@@ -46,6 +46,7 @@
     <string name="sim_scope_title">SIM Modification Scope</string>
     <string name="device_info_config_title">Device Info Configuration</string>
     <string name="unique_identifier_config_title">Unique Identifier</string>
+    <string name="location_config_title">Virtual Location</string>
 
     <string name="hint_package_or_app_name">Package or App Name</string>
 
@@ -103,6 +104,19 @@
     <string name="unique_import_imei_empty">No readable IMEI was returned.</string>
     <string name="unique_imei_slot_title">Slot %1$d</string>
     <string name="test_clipboard_receiver">Test ClipboardRequestReceiver</string>
+    <string name="location_hook_enabled">Enable virtual location</string>
+    <string name="location_hook_enabled_summary">Applies the configured coordinates to hooked native and fused location reads.</string>
+    <string name="location_section_coordinates">Coordinates</string>
+    <string name="location_section_motion">Motion and signal</string>
+    <string name="location_field_latitude">Latitude</string>
+    <string name="location_field_longitude">Longitude</string>
+    <string name="location_field_altitude">Altitude (m)</string>
+    <string name="location_field_accuracy">Accuracy (m)</string>
+    <string name="location_field_speed">Speed (m/s)</string>
+    <string name="location_field_bearing">Bearing (degrees)</string>
+    <string name="location_field_satellites">Satellites</string>
+    <string name="location_default_pyongyang">Use Pyongyang default</string>
+    <string name="location_invalid_number">%1$s must be between %2$s and %3$s.</string>
 
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">Select Language</string>
@@ -199,6 +213,7 @@
     <string name="self_check_nav_telephony">Phone</string>
     <string name="self_check_nav_sim">SIM</string>
     <string name="self_check_nav_apps">Apps</string>
+    <string name="self_check_nav_location">Location</string>
     <string name="self_check_nav_wifi">Wi-Fi</string>
     <string name="self_check_nav_accounts">Accounts</string>
     <string name="self_check_nav_network">Network</string>
@@ -214,6 +229,7 @@
     <string name="self_check_telephony_title">Phone Identifiers</string>
     <string name="self_check_sim_title">SIM Card Information</string>
     <string name="self_check_apps_title">Installed Apps</string>
+    <string name="self_check_location_title">Location</string>
     <string name="self_check_wifi_title">Wi-Fi Information</string>
     <string name="self_check_accounts_title">Device Accounts</string>
     <string name="self_check_network_title">Network Interfaces</string>
@@ -223,6 +239,7 @@
     <string name="self_check_telephony_hidden">No phone identifier was returned.</string>
     <string name="self_check_sim_hidden">No active SIM card information was returned.</string>
     <string name="self_check_apps_hidden">No other installed apps were returned.</string>
+    <string name="self_check_location_hidden">No location was returned.</string>
     <string name="self_check_wifi_hidden">No Wi-Fi network or scan result was returned.</string>
     <string name="self_check_accounts_hidden">No device account was returned.</string>
     <string name="self_check_network_hidden">No network interface identifier was returned.</string>
@@ -230,10 +247,18 @@
     <string name="self_check_phone_permission_hint">Grant phone permission to check SIM, IMEI, subscriber and phone number visibility.</string>
     <string name="self_check_accounts_permission_hint">Grant account permission to check whether device accounts are visible.</string>
     <string name="self_check_wifi_permission_hint">Grant location permission to check whether Wi-Fi information is hidden.</string>
+    <string name="self_check_location_permission_hint">Grant location permission to check native and fused location results.</string>
     <string name="self_check_bluetooth_permission_hint">Grant nearby device permission to check whether paired Bluetooth devices are hidden.</string>
     <string name="self_check_bluetooth_not_supported">This device does not report a Bluetooth adapter.</string>
     <string name="self_check_unknown_name">Unknown</string>
     <string name="self_check_wifi_current">Current network: %1$s</string>
+    <string name="self_check_location_native_cache">Native Android API (cache)</string>
+    <string name="self_check_location_native_realtime">Native Android API (real-time)</string>
+    <string name="self_check_location_fused_cache">Google Fused Location API (cache)</string>
+    <string name="self_check_location_fused_realtime">Google Fused Location API (real-time)</string>
+    <string name="self_check_location_no_data">No data returned</string>
+    <string name="self_check_location_coordinates">Coordinates: %1$.6f, %2$.6f</string>
+    <string name="self_check_location_accuracy_time">Accuracy: %1$.1fm | Time: %2$s</string>
 
     <plurals name="self_check_apps_status">
         <item quantity="one">%1$d app returned</item>

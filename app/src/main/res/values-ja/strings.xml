@@ -44,6 +44,8 @@
     <string name="sim_config_title">SIMデータ設定</string>
     <string name="sim_scope_title">SIM改ざんの影響範囲</string>
     <string name="device_info_config_title">端末情報設定</string>
+    <string name="unique_identifier_config_title">一意識別子</string>
+    <string name="location_config_title">仮想位置情報</string>
 
     <string name="hint_package_or_app_name">アプリ名で検索</string>
 
@@ -86,7 +88,34 @@
     <string name="sim_field_card_id">カード ID</string>
     <string name="sim_field_number">電話番号</string>
     <string name="set_scope">スコープを設定</string>
+    <string name="unique_hook_enabled">Hook を有効化</string>
+    <string name="unique_hook_enabled_summary">Android ID、IMEI、その他の一意識別子の偽装を制御します。</string>
+    <string name="unique_section_device_ids">端末識別子</string>
+    <string name="unique_field_android_id">Android ID</string>
+    <string name="unique_field_gaid">GAID</string>
+    <string name="unique_field_gsf_id">GSF ID</string>
+    <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
+    <string name="unique_field_app_set_id">App Set ID</string>
+    <string name="unique_field_serial">Serial</string>
+    <string name="unique_field_type_allocation_code">Type Allocation Code</string>
+    <string name="unique_randomize">ランダム生成</string>
+    <string name="unique_add_imei_slot">IMEI スロットを追加</string>
+    <string name="unique_import_imei">現在の IMEI をインポート</string>
+    <string name="unique_import_imei_empty">読み取り可能な IMEI は返されませんでした。</string>
     <string name="test_clipboard_receiver">ClipboardRequestReceiver をテスト</string>
+    <string name="location_hook_enabled">仮想位置情報を有効化</string>
+    <string name="location_hook_enabled_summary">設定した座標を、Hook 済みのネイティブおよび Fused 位置情報の読み取りに適用します。</string>
+    <string name="location_section_coordinates">座標</string>
+    <string name="location_section_motion">移動と信号</string>
+    <string name="location_field_latitude">緯度</string>
+    <string name="location_field_longitude">経度</string>
+    <string name="location_field_altitude">高度 (m)</string>
+    <string name="location_field_accuracy">精度 (m)</string>
+    <string name="location_field_speed">速度 (m/s)</string>
+    <string name="location_field_bearing">方位角 (度)</string>
+    <string name="location_field_satellites">衛星数</string>
+    <string name="location_default_pyongyang">平壌の既定値を使用</string>
+    <string name="location_invalid_number">%1$s は %2$s から %3$s の範囲で入力してください。</string>
 
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">言語を選択</string>
@@ -184,6 +213,7 @@
     <string name="self_check_nav_telephony">電話</string>
     <string name="self_check_nav_sim">SIM</string>
     <string name="self_check_nav_apps">アプリ</string>
+    <string name="self_check_nav_location">位置情報</string>
     <string name="self_check_nav_wifi">Wi-Fi</string>
     <string name="self_check_nav_accounts">アカウント</string>
     <string name="self_check_nav_network">ネットワーク</string>
@@ -199,6 +229,7 @@
     <string name="self_check_telephony_title">電話識別子</string>
     <string name="self_check_sim_title">SIMカード情報</string>
     <string name="self_check_apps_title">インストール済みアプリ</string>
+    <string name="self_check_location_title">位置情報</string>
     <string name="self_check_wifi_title">Wi-Fi情報</string>
     <string name="self_check_accounts_title">端末アカウント</string>
     <string name="self_check_network_title">ネットワークインターフェース</string>
@@ -208,6 +239,7 @@
     <string name="self_check_telephony_hidden">電話識別子は返されませんでした。</string>
     <string name="self_check_sim_hidden">有効なSIMカード情報は返されませんでした。</string>
     <string name="self_check_apps_hidden">他のインストール済みアプリは返されませんでした。</string>
+    <string name="self_check_location_hidden">位置情報は返されませんでした。</string>
     <string name="self_check_wifi_hidden">Wi-Fiネットワークまたはスキャン結果は返されませんでした。</string>
     <string name="self_check_accounts_hidden">端末アカウントは返されませんでした。</string>
     <string name="self_check_network_hidden">ネットワークインターフェース識別子は返されませんでした。</string>
@@ -215,10 +247,18 @@
     <string name="self_check_phone_permission_hint">電話権限を許可すると、SIM、IMEI、加入者ID、電話番号の可視性を確認できます。</string>
     <string name="self_check_accounts_permission_hint">アカウント権限を許可すると、端末アカウントが可視かどうかを確認できます。</string>
     <string name="self_check_wifi_permission_hint">位置情報権限を許可すると、Wi-Fi情報が非表示になっているか確認できます。</string>
+    <string name="self_check_location_permission_hint">位置情報権限を許可すると、ネイティブおよび Fused の位置情報結果を確認できます。</string>
     <string name="self_check_bluetooth_permission_hint">付近のデバイス権限を許可すると、ペアリング済みBluetoothデバイスが非表示になっているか確認できます。</string>
     <string name="self_check_bluetooth_not_supported">この端末はBluetoothアダプターを報告していません。</string>
     <string name="self_check_unknown_name">不明</string>
     <string name="self_check_wifi_current">現在のネットワーク: %1$s</string>
+    <string name="self_check_location_native_cache">ネイティブ Android API（キャッシュ）</string>
+    <string name="self_check_location_native_realtime">ネイティブ Android API（リアルタイム）</string>
+    <string name="self_check_location_fused_cache">Google Fused Location API（キャッシュ）</string>
+    <string name="self_check_location_fused_realtime">Google Fused Location API（リアルタイム）</string>
+    <string name="self_check_location_no_data">データは返されませんでした</string>
+    <string name="self_check_location_coordinates">座標: %1$.6f, %2$.6f</string>
+    <string name="self_check_location_accuracy_time">精度: %1$.1fm | 時刻: %2$s</string>
 
     <plurals name="self_check_apps_status">
         <item quantity="other">%1$d 個のアプリが返されました</item>

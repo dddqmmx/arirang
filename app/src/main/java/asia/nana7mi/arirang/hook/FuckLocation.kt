@@ -5,290 +5,694 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import de.robv.android.xposed.IXposedHookLoadPackage
+import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.lang.reflect.Method
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
-class FuckLocation : BaseHookModule(matchSystem = true) {
+class FuckLocation : BaseHookModule(
+    targetPackages = setOf(
+        "android",
+        "com.android.location.fused",
+        "com.google.android.gms"
+    ),
+    matchClient = true
+) {
+
+    private companion object {
+        private const val MOCK_VERTICAL_ACCURACY = 2.0f
+        private const val MOCK_SPEED_ACCURACY = 0.1f
+        private const val MOCK_BEARING_ACCURACY = 0.5f
+        private const val MOCK_HDOP = 0.9f
+        private const val CONFIG_REFRESH_INTERVAL_MS = 300L
+
+        private val GNSS_CLASSES = arrayOf(
+            "com.android.server.location.gnss.hal.GnssNative",
+            "com.android.server.location.gnss.GnssLocationProvider",
+            "com.android.server.location.gnss.GnssLocationProviderImpl"
+        )
+    }
+
+    private val hookedClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
+
+    @Volatile
+    private var cachedConfig = HookLocationConfig()
+
+    @Volatile
+    private var cachedConfigAt = 0L
+
+    private data class HookLocationConfig(
+        val enabled: Boolean = false,
+        val latitude: Double = LocationConfigPrefs.DEFAULT_LATITUDE,
+        val longitude: Double = LocationConfigPrefs.DEFAULT_LONGITUDE,
+        val altitude: Double = LocationConfigPrefs.DEFAULT_ALTITUDE,
+        val accuracy: Float = LocationConfigPrefs.DEFAULT_ACCURACY,
+        val speed: Float = LocationConfigPrefs.DEFAULT_SPEED,
+        val bearing: Float = LocationConfigPrefs.DEFAULT_BEARING,
+        val satellites: Int = LocationConfigPrefs.DEFAULT_SATELLITES
+    )
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val classLoader = lpparam.classLoader
-
-        try {
-            val lmsClass = XposedHelpers.findClass(
-                "com.android.server.location.LocationManagerService",
-                classLoader
-            )
-            // 1. 劫持最后已知位置 (getLastLocation)
-            hookLastLocation(lmsClass, classLoader)
-
-            // 2. 劫持单次实时位置请求 (getCurrentLocation)
-            hookCurrentLocation(lmsClass, classLoader)
-
-            // 3. 劫持 Provider 汇报逻辑 (核心：处理流式定位更新)
-            hookProviderManager(classLoader)
-
-        } catch (t: Throwable) {
-            HookLog.e(HookLog.Module.LOCATION, "hook failed", t)
+        runCatching {
+            when (lpparam.packageName) {
+                "android" -> {
+                    hookLocationManagerService(lpparam.classLoader)
+                    hookProviderManager(lpparam.classLoader)
+                    hookAndroidFusedProvider(lpparam.classLoader)
+                    hookGnssReports(lpparam.classLoader)
+                    hookFrameworkLocationResult(lpparam.classLoader)
+                }
+                "com.android.location.fused" -> {
+                    hookAndroidFusedProvider(lpparam.classLoader)
+                    hookFrameworkLocationResult(lpparam.classLoader)
+                }
+                "com.google.android.gms", BuildConfig.APPLICATION_ID -> {
+                    hookLocationAccessors()
+                    hookFrameworkLocationManagerClient(lpparam.classLoader)
+                    hookFrameworkLocationResult(lpparam.classLoader)
+                    hookGoogleFusedClient(lpparam.classLoader)
+                    hookGoogleLocationResult(lpparam.classLoader)
+                    hookGoogleTasks(lpparam.classLoader)
+                }
+            }
+            HookLog.i(HookLog.Module.LOCATION, "location hook installed for ${lpparam.packageName}")
+        }.onFailure {
+            HookLog.e(HookLog.Module.LOCATION, "location hook failed for ${lpparam.packageName}", it)
         }
     }
 
-    private fun hookLastLocation(lmsClass: Class<*>, classLoader: ClassLoader) {
-        val lastLocationRequestClass =
-            XposedHelpers.findClass("android.location.LastLocationRequest", classLoader)
+    private fun currentConfig(): HookLocationConfig {
+        val now = SystemClock.uptimeMillis()
+        if (now - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) return cachedConfig
 
-        XposedHelpers.findAndHookMethod(
-            lmsClass, "getLastLocation",
-            String::class.java,
-            lastLocationRequestClass,
-            String::class.java,
-            String::class.java,
-            object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val pkg = param.args[2] as? String
-                    HookLog.i(HookLog.Module.LOCATION, "intercept last location for app=$pkg")
-
-                    // 统一调用 modifyLocation
-                    param.result = modifyLocation(Location(LocationManager.GPS_PROVIDER))
-                }
+        return synchronized(this) {
+            val checkedAt = SystemClock.uptimeMillis()
+            if (checkedAt - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) {
+                return@synchronized cachedConfig
             }
-        )
+
+            val prefs = XSharedPreferences(BuildConfig.APPLICATION_ID, LocationConfigPrefs.PREFS_NAME).apply {
+                makeWorldReadable()
+                reload()
+            }
+            cachedConfig = HookLocationConfig(
+                enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
+                latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_LATITUDE,
+                longitude = prefs.getString(LocationConfigPrefs.KEY_LONGITUDE, null)?.toDoubleOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
+                altitude = prefs.getString(LocationConfigPrefs.KEY_ALTITUDE, null)?.toDoubleOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
+                accuracy = prefs.getString(LocationConfigPrefs.KEY_ACCURACY, null)?.toFloatOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_ACCURACY,
+                speed = prefs.getString(LocationConfigPrefs.KEY_SPEED, null)?.toFloatOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_SPEED,
+                bearing = prefs.getString(LocationConfigPrefs.KEY_BEARING, null)?.toFloatOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_BEARING,
+                satellites = prefs.getInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
+                    .coerceIn(0, 64)
+            )
+            cachedConfigAt = checkedAt
+            cachedConfig
+        }
     }
 
-    private fun hookCurrentLocation(lmsClass: Class<*>, classLoader: ClassLoader) {
-        val locationRequestClass =
-            XposedHelpers.findClass("android.location.LocationRequest", classLoader)
-        val iLocationCallbackClass =
-            XposedHelpers.findClass("android.location.ILocationCallback", classLoader)
+    private fun hookLocationAccessors() {
+        if (!hookedClasses.add(Location::class.java)) return
 
-        XposedHelpers.findAndHookMethod(
-            lmsClass, "getCurrentLocation",
-            String::class.java,
-            locationRequestClass,
-            iLocationCallbackClass,
-            String::class.java,
-            String::class.java,
-            String::class.java,
-            object : XC_MethodHook() {
+        XposedBridge.hookAllMethods(Location::class.java, "getLatitude", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                currentConfig().takeIf { it.enabled }?.let { param.result = it.latitude }
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getLongitude", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                currentConfig().takeIf { it.enabled }?.let { param.result = it.longitude }
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getAltitude", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                currentConfig().takeIf { it.enabled }?.let { param.result = it.altitude }
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getAccuracy", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                currentConfig().takeIf { it.enabled }?.let { param.result = it.accuracy }
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getSpeed", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                currentConfig().takeIf { it.enabled }?.let { param.result = it.speed }
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getBearing", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                currentConfig().takeIf { it.enabled }?.let { param.result = it.bearing }
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getProvider", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (currentConfig().enabled) param.result = LocationManager.GPS_PROVIDER
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getTime", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (currentConfig().enabled) param.result = System.currentTimeMillis()
+            }
+        })
+        XposedBridge.hookAllMethods(Location::class.java, "getElapsedRealtimeNanos", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (currentConfig().enabled) param.result = SystemClock.elapsedRealtimeNanos()
+            }
+        })
+
+        runCatching {
+            XposedBridge.hookAllMethods(Location::class.java, "isFromMockProvider", object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    val pkg = param.args[3] as? String
-                    HookLog.i(HookLog.Module.LOCATION, "intercept current location for app=$pkg")
+                    if (currentConfig().enabled) param.result = false
+                }
+            })
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching {
+                XposedBridge.hookAllMethods(Location::class.java, "isMock", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (currentConfig().enabled) param.result = false
+                    }
+                })
+            }
+        }
 
-                    // 统一调用 modifyLocation
-                    param.result = modifyLocation(Location(LocationManager.GPS_PROVIDER))
+        HookLog.i(HookLog.Module.LOCATION, "hooked Location accessors")
+    }
+
+    private fun hookLocationManagerService(classLoader: ClassLoader) {
+        val lmsClass = XposedHelpers.findClassIfExists(
+            "com.android.server.location.LocationManagerService",
+            classLoader
+        ) ?: return
+        if (!hookedClasses.add(lmsClass)) return
+
+        XposedBridge.hookAllMethods(lmsClass, "getLastLocation", object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                val provider = providerFromArgs(param.args)
+                param.result = fakeLocation(provider)
+                HookLog.d(HookLog.Module.LOCATION, "spoofed getLastLocation provider=$provider caller=${callerFromArgs(param.args)}")
+            }
+        })
+
+        XposedBridge.hookAllMethods(lmsClass, "getCurrentLocation", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                val callback = param.args.firstOrNull { it?.javaClass?.hasLocationCallbackMethod() == true } ?: return
+                val location = fakeLocation(providerFromArgs(param.args))
+                if (callback.dispatchLocation(location)) {
+                    param.result = null
+                    HookLog.d(
+                        HookLog.Module.LOCATION,
+                        "spoofed getCurrentLocation provider=${location.provider} caller=${callerFromArgs(param.args)}"
+                    )
                 }
             }
-        )
+        })
+
+        listOf("requestLocationUpdates", "requestLocationUpdatesWithPackageName").forEach { methodName ->
+            XposedBridge.hookAllMethods(lmsClass, methodName, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    param.args.forEachIndexed { index, arg ->
+                        if (arg is Location) {
+                            param.args[index] = arg.spoofed()
+                        }
+                    }
+                }
+            })
+        }
     }
 
     private fun hookProviderManager(classLoader: ClassLoader) {
-        try {
-            val locationResultClass =
-                XposedHelpers.findClass("android.location.LocationResult", classLoader)
-            val providerManagerClass = XposedHelpers.findClass(
-                "com.android.server.location.provider.LocationProviderManager",
-                classLoader
-            )
+        val providerManagerClass = XposedHelpers.findClassIfExists(
+            "com.android.server.location.provider.LocationProviderManager",
+            classLoader
+        ) ?: return
+        if (!hookedClasses.add(providerManagerClass)) return
 
-            XposedHelpers.findAndHookMethod(
-                providerManagerClass,
-                "onReportLocation",
-                locationResultClass,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val locationResult = param.args[0] ?: return
+        XposedBridge.hookAllMethods(providerManagerClass, "onReportLocation", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                val report = param.args.firstOrNull() ?: return
+                if (report is Location) {
+                    param.args[0] = report.spoofed()
+                    return
+                }
 
-                        // 反射获取 mLocations 列表 (LocationResult 内部维护一个 List<Location>)
-                        val mLocationsField =
-                            XposedHelpers.findFieldIfExists(locationResult.javaClass, "mLocations")
-                                ?: return
-                        mLocationsField.isAccessible = true
+                if (rewriteLocationResult(report)) {
+                    HookLog.d(HookLog.Module.LOCATION, "rewrote provider LocationResult ${report.javaClass.name}")
+                }
+            }
+        })
+    }
 
-                        val originList = mLocationsField.get(locationResult) as? List<*> ?: return
-                        if (originList.isEmpty()) return
+    private fun hookAndroidFusedProvider(classLoader: ClassLoader) {
+        val fusedProviderClass = XposedHelpers.findClassIfExists(
+            "com.android.location.fused.FusedLocationProvider",
+            classLoader
+        ) ?: return
+        if (!hookedClasses.add(fusedProviderClass)) return
 
-                        // 创建新的列表，并将原始位置经过 modifyLocation 处理
-                        val newList = ArrayList<Location>()
-                        originList.forEach {
-                            if (it is Location) {
-                                newList.add(modifyLocation(it))
-                            }
-                        }
+        XposedBridge.hookAllMethods(fusedProviderClass, "chooseBestLocation", object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                if (param.result is Location) {
+                    param.result = (param.result as Location).spoofed()
+                }
+            }
+        })
 
-                        // 写回修改后的位置列表
-                        mLocationsField.set(locationResult, newList)
+        XposedBridge.hookAllMethods(fusedProviderClass, "reportBestLocationLocked", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                param.args.forEachIndexed { index, arg ->
+                    param.args[index] = rewriteLocationContainer(arg)
+                }
+            }
+        })
+
+        HookLog.i(HookLog.Module.LOCATION, "hooked Android fused provider")
+    }
+
+    private fun hookFrameworkLocationManagerClient(classLoader: ClassLoader) {
+        val locationManagerClass = XposedHelpers.findClassIfExists("android.location.LocationManager", classLoader)
+            ?: return
+        if (hookedClasses.add(locationManagerClass)) {
+            XposedBridge.hookAllMethods(locationManagerClass, "getLastKnownLocation", object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    if (param.result is Location) {
+                        param.result = (param.result as Location).spoofed()
                     }
                 }
-            )
-        } catch (e: Throwable) {
-            HookLog.e(HookLog.Module.LOCATION, "ProviderManager hook failed", e)
+            })
+        }
+
+        listOf(
+            "android.location.LocationManager\$GetCurrentLocationTransport" to "onLocation",
+            "android.location.LocationManager\$LocationListenerTransport" to "onLocationChanged",
+            "android.location.LocationManager\$BatchedLocationCallbackWrapper" to "onLocationChanged"
+        ).forEach { (className, methodName) ->
+            val transportClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
+            if (!hookedClasses.add(transportClass)) return@forEach
+            XposedBridge.hookAllMethods(transportClass, methodName, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    param.args.forEachIndexed { index, arg ->
+                        param.args[index] = rewriteLocationContainer(arg)
+                    }
+                }
+            })
         }
     }
 
-    /**
-     * 升级版 Gnss Hook
-     * 涵盖了 Android 9.0 - 14+ 的主流实现
-     */
-    private fun hookGnssLocation(classLoader: ClassLoader) {
-        // 1. 自动寻找目标类 (适配不同 Android 版本)
-        val gnssClasses = arrayOf(
-            "com.android.server.location.gnss.hal.GnssNative", // Android 12+
-            "com.android.server.location.gnss.GnssLocationProviderImpl", // 部分厂商定制版本
-            "com.android.server.location.gnss.GnssLocationProvider" // Android 11 及以下
+    private fun hookFrameworkLocationResult(classLoader: ClassLoader) {
+        hookLocationResultClass(
+            XposedHelpers.findClassIfExists("android.location.LocationResult", classLoader)
+                ?: return
         )
+    }
 
-        var targetClass: Class<*>? = null
-        for (className in gnssClasses) {
-            targetClass = XposedHelpers.findClassIfExists(className, classLoader)
-            if (targetClass != null) {
-                log("成功锁定 GNSS 核心类: $className")
-                break
-            }
+    private fun hookGoogleLocationResult(classLoader: ClassLoader) {
+        val resultClass = XposedHelpers.findClassIfExists(
+            "com.google.android.gms.location.LocationResult",
+            classLoader
+        ) ?: return
+        hookLocationResultClass(resultClass)
+    }
+
+    private fun hookGoogleFusedClient(classLoader: ClassLoader) {
+        val clientClass = XposedHelpers.findClassIfExists(
+            "com.google.android.gms.location.FusedLocationProviderClient",
+            classLoader
+        ) ?: return
+        if (!hookedClasses.add(clientClass)) return
+
+        listOf("getLastLocation", "getCurrentLocation").forEach { methodName ->
+            XposedBridge.hookAllMethods(clientClass, methodName, object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    hookConcreteGoogleTask(param.result)
+                }
+            })
         }
 
-        if (targetClass == null) {
-            log("未找到兼容的 GNSS 核心类")
+        HookLog.i(HookLog.Module.LOCATION, "hooked Google FusedLocationProviderClient")
+    }
+
+    private fun hookLocationResultClass(resultClass: Class<*>) {
+        if (!hookedClasses.add(resultClass)) return
+
+        listOf("asList", "getLocations").forEach { methodName ->
+            XposedBridge.hookAllMethods(resultClass, methodName, object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    param.result = rewriteLocationContainer(param.result)
+                }
+            })
+        }
+
+        XposedBridge.hookAllMethods(resultClass, "getLastLocation", object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                if (param.result is Location) {
+                    param.result = (param.result as Location).spoofed()
+                }
+            }
+        })
+
+        XposedBridge.hookAllMethods(resultClass, "writeToParcel", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                rewriteLocationResult(param.thisObject)
+            }
+        })
+
+        HookLog.i(HookLog.Module.LOCATION, "hooked LocationResult ${resultClass.name}")
+    }
+
+    private fun hookGoogleTasks(classLoader: ClassLoader) {
+        val taskClass = XposedHelpers.findClassIfExists("com.google.android.gms.tasks.Task", classLoader)
+            ?: return
+        if (!hookedClasses.add(taskClass)) return
+
+        XposedBridge.hookAllMethods(taskClass, "getResult", object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                param.result = rewriteLocationContainer(param.result)
+            }
+        })
+
+        listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
+            XposedBridge.hookAllMethods(taskClass, methodName, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    param.args.forEach { arg ->
+                        hookGoogleTaskListener(arg)
+                    }
+                }
+
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    hookConcreteGoogleTask(param.thisObject)
+                    hookConcreteGoogleTask(param.result)
+                }
+            })
+        }
+
+        HookLog.i(HookLog.Module.LOCATION, "hooked Google Task base")
+    }
+
+    private fun hookConcreteGoogleTask(task: Any?) {
+        task ?: return
+        val taskClass = task.javaClass
+        if (!taskClass.name.startsWith("com.google.android.gms.tasks.")) return
+        if (!hookedClasses.add(taskClass)) return
+
+        XposedBridge.hookAllMethods(taskClass, "getResult", object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                param.result = rewriteLocationContainer(param.result)
+            }
+        })
+
+        listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
+            XposedBridge.hookAllMethods(taskClass, methodName, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    if (!currentConfig().enabled) return
+                    param.args.forEach { arg ->
+                        hookGoogleTaskListener(arg)
+                    }
+                }
+            })
+        }
+
+        HookLog.i(HookLog.Module.LOCATION, "hooked concrete Google Task ${taskClass.name}")
+    }
+
+    private fun hookGoogleTaskListener(listener: Any?) {
+        listener ?: return
+        val listenerClass = listener.javaClass
+        if (!listenerClass.name.startsWith(BuildConfig.APPLICATION_ID) &&
+            !listenerClass.name.startsWith("com.google.android.gms.")
+        ) {
             return
         }
+        if (!hookedClasses.add(listenerClass)) return
 
-        // --- A. Hook 位置上报 (基础功能升级) ---
-
-        // Hook 单点上报
-        XposedBridge.hookAllMethods(targetClass, "reportLocation", object : XC_MethodHook() {
+        XposedBridge.hookAllMethods(listenerClass, "onSuccess", object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
-                val args = param.args ?: return
-                for (i in args.indices) {
-                    val arg = args[i]
-                    if (arg is Location) {
-                        modifyLocation(arg) // 使用你现有的修改逻辑
+                if (!currentConfig().enabled) return
+                param.args.forEachIndexed { index, arg ->
+                    param.args[index] = rewriteLocationContainer(arg)
+                }
+            }
+        })
+
+        XposedBridge.hookAllMethods(listenerClass, "onComplete", object : XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (!currentConfig().enabled) return
+                param.args.forEach { arg ->
+                    hookConcreteGoogleTask(arg)
+                }
+            }
+        })
+
+        HookLog.i(HookLog.Module.LOCATION, "hooked Google Task listener ${listenerClass.name}")
+    }
+
+    private fun hookGnssReports(classLoader: ClassLoader) {
+        GNSS_CLASSES
+            .mapNotNull { XposedHelpers.findClassIfExists(it, classLoader) }
+            .forEach { targetClass ->
+                if (!hookedClasses.add(targetClass)) return@forEach
+
+                listOf("reportLocation", "reportLocationBatch").forEach { methodName ->
+                    XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            if (!currentConfig().enabled) return
+                            param.args.forEachIndexed { index, arg ->
+                                param.args[index] = rewriteLocationContainer(arg)
+                            }
+                        }
+                    })
+                }
+
+                XposedBridge.hookAllMethods(targetClass, "reportNmea", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!currentConfig().enabled) return
+                        param.args.forEachIndexed { index, arg ->
+                            if (arg is String) {
+                                param.args[index] = spoofNmea(arg)
+                            }
+                        }
+                    }
+                })
+
+                listOf(
+                    "reportMeasurementData",
+                    "reportAntennaInfo",
+                    "reportNavigationMessage"
+                ).forEach { methodName ->
+                    XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            if (!currentConfig().enabled) return
+                            param.result = null
+                        }
+                    })
+                }
+
+                HookLog.i(HookLog.Module.LOCATION, "hooked GNSS class ${targetClass.name}")
+            }
+    }
+
+    private fun rewriteLocationResult(locationResult: Any): Boolean {
+        val locationsField = XposedHelpers.findFieldIfExists(locationResult.javaClass, "mLocations") ?: return false
+        locationsField.isAccessible = true
+        val original = locationsField.get(locationResult)
+        val rewritten = rewriteLocationContainer(original)
+        if (rewritten === original) return false
+        locationsField.set(locationResult, rewritten)
+        return true
+    }
+
+    private fun rewriteLocationContainer(value: Any?): Any? {
+        if (!currentConfig().enabled) return value
+        return when (value) {
+            is Location -> value.spoofed()
+            is Array<*> -> {
+                value.forEachIndexed { index, item ->
+                    if (item is Location) {
+                        @Suppress("UNCHECKED_CAST")
+                        (value as Array<Any?>)[index] = item.spoofed()
                     }
                 }
+                value
             }
-        })
-
-        // Hook 批量上报 (由于底层可能混淆或版本差异，这里做了更强的兼容)
-        XposedBridge.hookAllMethods(targetClass, "reportLocationBatch", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val arg = param.args?.getOrNull(0) ?: return
-                when (arg) {
-                    is Array<*> -> arg.forEach { if (it is Location) modifyLocation(it) }
-                    is List<*> -> arg.forEach { if (it is Location) modifyLocation(it) }
-                }
-            }
-        })
-
-        // --- B. Hook NMEA 数据 (进阶功能：同步篡改原始报文) ---
-        // 很多高德/百度地图的高精定位会校验 NMEA 字符串，如果不改，定位会跳变
-        XposedBridge.hookAllMethods(targetClass, "reportNmea", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                // reportNmea(long timestamp, String nmea) 或 (String nmea)
-                val args = param.args ?: return
-                for (i in args.indices) {
-                    if (args[i] is String) {
-                        val originalNmea = args[i] as String
-                        args[i] = injectNmea(originalNmea) // 见下方 injectNmea 实现
-                    }
-                }
-            }
-        })
-
-        // --- C. 屏蔽硬件层面的检测 (防检测关键) ---
-        // 很多 App 会通过监听“卫星原始测量数据”来判断是否是模拟定位（模拟器通常没这些数据）
-        // 我们直接返回空逻辑，让 App 拿不到真实的卫星原始状态
-        val doNothingMethods = arrayOf(
-            "reportMeasurementData",
-            "reportAntennaInfo",
-            "reportNavigationMessage",
-            "reportSvStatus" // 卫星状态（星图）
-        )
-
-        val disableHook = object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                // 如果开启模拟，就拦截这些底层硬件信息，返回空或不执行
-                param.result = null
-            }
-        }
-
-        doNothingMethods.forEach { methodName ->
-            XposedBridge.hookAllMethods(targetClass, methodName, disableHook)
+            is List<*> -> value.mapNotNull { rewriteLocationContainer(it) as? Location }
+            else -> value
         }
     }
 
-    /**
-     * 伪造 NMEA 字符串
-     * NMEA 包含了 $GPGGA, $GPRMC 等，直接决定了 App 看到的原始 GPS 数据
-     */
-    private fun injectNmea(nmea: String): String {
-        try {
-            // 如果你不想深度解析 NMEA 协议（非常复杂），
-            // 简单暴力的方法是检测到坐标行时直接根据你的模拟坐标生成新的行，
-            // 或者简单的返回一个空的/修改后的报文。
-            // 这里提供一个思路：如果是 $GPGGA 或 $GPRMC，将其替换或返回空
-            if (nmea.startsWith("\$GPGGA") || nmea.startsWith("\$GPRMC")) {
-                // 进阶：根据 mockLat/mockLng 生成符合校验和的 NMEA
-                // 简化：返回空字符串可以强迫 App 只信任 Location 对象
-                return ""
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return nmea
+    private fun Location.spoofed(): Location {
+        if (!currentConfig().enabled) return this
+        return fakeLocation(provider ?: LocationManager.GPS_PROVIDER, this)
     }
 
-    // 辅助日志
-    private fun log(msg: String) {
-        HookLog.i(HookLog.Module.LOCATION, "GNSS: $msg")
-    }
-
-    /**
-     * 统一修改坐标的方法
-     * 包含：坐标偏转、时间更新、Mock标记移除、精度增强
-     */
-    private fun modifyLocation(loc: Location): Location { // 1. Add return type
+    private fun fakeLocation(
+        provider: String? = LocationManager.GPS_PROVIDER,
+        source: Location? = null
+    ): Location {
         val now = System.currentTimeMillis()
         val elapsed = SystemClock.elapsedRealtimeNanos()
+        val config = currentConfig()
+        val location = source?.let(::Location) ?: Location(provider ?: LocationManager.GPS_PROVIDER)
 
-        // --- 1. 核心坐标修改 ---
-        loc.latitude = 39.019444
-        loc.longitude = 125.738052
-        loc.altitude = 27.0
+        location.provider = provider ?: LocationManager.GPS_PROVIDER
+        location.latitude = config.latitude
+        location.longitude = config.longitude
+        location.altitude = config.altitude
+        location.speed = config.speed
+        location.bearing = config.bearing
+        location.accuracy = config.accuracy
+        location.time = now
+        location.elapsedRealtimeNanos = elapsed
 
-        // --- 2. 状态模拟 (防止静止状态下经纬度却不停跳变引起的检测) ---
-        loc.speed = 0.0f
-        loc.bearing = 0.0f
-        loc.accuracy = 5.0f // 5米精度
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            loc.verticalAccuracyMeters = 2.0f
-            loc.speedAccuracyMetersPerSecond = 0.1f
-            loc.bearingAccuracyDegrees = 0.5f
+            location.verticalAccuracyMeters = MOCK_VERTICAL_ACCURACY
+            location.speedAccuracyMetersPerSecond = MOCK_SPEED_ACCURACY
+            location.bearingAccuracyDegrees = MOCK_BEARING_ACCURACY
         }
 
-        // --- 3. 时间同步 (最重要：系统会过滤掉时间戳过旧的数据) ---
-        loc.time = now
-        loc.elapsedRealtimeNanos = elapsed
-
-        // --- 4. 移除所有 Mock 特征 ---
-        loc.provider = LocationManager.GPS_PROVIDER
-
-        // 移除 setIsFromMockProvider 标记 (Android 12+)
-        try {
-            XposedHelpers.callMethod(loc, "setIsFromMockProvider", false)
-        } catch (ignored: Throwable) {
+        runCatching {
+            XposedHelpers.callMethod(location, "setIsFromMockProvider", false)
         }
 
-        // 移除 Bundle 中的 mock 标记
-        val extras = loc.extras ?: Bundle()
-        extras.remove("mockLocation")
+        val extras = Bundle(location.extras ?: Bundle())
+        listOf("mockLocation", "is_mock", "portal.enable").forEach(extras::remove)
         extras.putBoolean("mockLocation", false)
+        extras.putInt("satellites", config.satellites)
+        extras.putInt("visible_satellites", (config.satellites + 4).coerceAtLeast(config.satellites))
+        extras.putFloat("hdop", MOCK_HDOP)
+        location.extras = extras
 
-        // 注入伪造的卫星信息 (让定位看起来更像真实的硬件上报)
-        extras.putInt("satellites", 12)
-        extras.putInt("visible_satellites", 16)
-        extras.putFloat("hdop", 0.9f)
+        return location
+    }
 
-        loc.extras = extras
+    private fun providerFromArgs(args: Array<Any?>): String {
+        return args.firstOrNull { it == LocationManager.GPS_PROVIDER || it == LocationManager.NETWORK_PROVIDER || it == LocationManager.FUSED_PROVIDER }
+            as? String
+            ?: LocationManager.GPS_PROVIDER
+    }
 
-        return loc // 2. Return the modified object
+    private fun callerFromArgs(args: Array<Any?>): String? {
+        return args.filterIsInstance<String>()
+            .lastOrNull { it.contains('.') && it != LocationManager.GPS_PROVIDER && it != LocationManager.NETWORK_PROVIDER }
+    }
+
+    private fun Class<*>.hasLocationCallbackMethod(): Boolean {
+        return findLocationCallbackMethod() != null
+    }
+
+    private fun Any.dispatchLocation(location: Location): Boolean {
+        val method = javaClass.findLocationCallbackMethod() ?: return false
+        method.isAccessible = true
+        val args = method.parameterTypes.map { type ->
+            when {
+                type == Location::class.java -> location
+                type == Boolean::class.javaPrimitiveType -> false
+                type == Int::class.javaPrimitiveType -> 0
+                type == Long::class.javaPrimitiveType -> 0L
+                type == Float::class.javaPrimitiveType -> 0f
+                type == Double::class.javaPrimitiveType -> 0.0
+                else -> null
+            }
+        }.toTypedArray()
+
+        return runCatching {
+            method.invoke(this, *args)
+            true
+        }.onFailure {
+            HookLog.d(HookLog.Module.LOCATION, "failed to dispatch current location callback: ${it.message}")
+        }.getOrDefault(false)
+    }
+
+    private fun Class<*>.findLocationCallbackMethod(): Method? {
+        var current: Class<*>? = this
+        while (current != null && current != Any::class.java) {
+            current.declaredMethods.firstOrNull { method ->
+                method.parameterTypes.any { it == Location::class.java } &&
+                    (method.name == "onLocation" || method.name.contains("location", ignoreCase = true))
+            }?.let { return it }
+            current = current.superclass
+        }
+        return null
+    }
+
+    private fun spoofNmea(nmea: String): String {
+        val config = currentConfig()
+        if (!config.enabled) return nmea
+        val header = nmea.substringBefore(',').uppercase()
+        if (!header.endsWith("GGA") && !header.endsWith("RMC")) return nmea
+
+        val originalParts = nmea.substringBefore('*').split(',').toMutableList()
+        if (originalParts.size < 7) return nmea
+
+        val lat = latitudeToNmea(config.latitude)
+        val lon = longitudeToNmea(config.longitude)
+        originalParts[2] = lat.first
+        originalParts[3] = lat.second
+        originalParts[4] = lon.first
+        originalParts[5] = lon.second
+
+        if (header.endsWith("GGA") && originalParts.size > 9) {
+            originalParts[6] = "1"
+            originalParts[7] = config.satellites.toString().padStart(2, '0')
+            originalParts[8] = "%.1f".format(java.util.Locale.US, MOCK_HDOP)
+            originalParts[9] = "%.1f".format(java.util.Locale.US, config.altitude)
+        }
+
+        if (header.endsWith("RMC") && originalParts.size > 8) {
+            originalParts[2] = "A"
+            originalParts[7] = "0.0"
+            originalParts[8] = "0.0"
+        }
+
+        return withChecksum(originalParts.joinToString(","))
+    }
+
+    private fun latitudeToNmea(latitude: Double): Pair<String, String> {
+        val hemisphere = if (latitude >= 0) "N" else "S"
+        val abs = kotlin.math.abs(latitude)
+        val degrees = abs.toInt()
+        val minutes = (abs - degrees) * 60.0
+        return "%02d%07.4f".format(java.util.Locale.US, degrees, minutes) to hemisphere
+    }
+
+    private fun longitudeToNmea(longitude: Double): Pair<String, String> {
+        val hemisphere = if (longitude >= 0) "E" else "W"
+        val abs = kotlin.math.abs(longitude)
+        val degrees = abs.toInt()
+        val minutes = (abs - degrees) * 60.0
+        return "%03d%07.4f".format(java.util.Locale.US, degrees, minutes) to hemisphere
+    }
+
+    private fun withChecksum(sentence: String): String {
+        val body = sentence.removePrefix("$")
+        val checksum = body.fold(0) { acc, char -> acc xor char.code }
+        return "$$body*%02X".format(java.util.Locale.US, checksum)
     }
 }

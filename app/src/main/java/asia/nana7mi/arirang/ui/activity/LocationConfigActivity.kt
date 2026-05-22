@@ -1,145 +1,404 @@
 package asia.nana7mi.arirang.ui.activity
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
 import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
+import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
+import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
-class LocationConfigActivity : AppCompatActivity() {
+class LocationConfigActivity : ComponentActivity() {
 
-    // 原生 API 的两个文本框
-    private lateinit var tvNativeCache: TextView
-    private lateinit var tvNativeReal: TextView
-
-    // Fused API 的两个文本框
-    private lateinit var tvFusedCache: TextView
-    private lateinit var tvFusedReal: TextView
-
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var locationManager: LocationManager
-
-    companion object {
-        private const val REQUEST_CODE = 100
-        private val PERMISSIONS = arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-    }
-
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContentView(R.layout.activity_location_config)
+        val initialConfig = LocationConfigPrefs.loadConfig(this)
 
-        // 1. 初始化视图 (确保你的 layout 文件中有对应的 ID)
-        tvNativeCache = findViewById(R.id.tv_native_cache)
-        tvNativeReal = findViewById(R.id.tv_native_real)
-        tvFusedCache = findViewById(R.id.tv_fused_cache)
-        tvFusedReal = findViewById(R.id.tv_fused_real)
-
-        findViewById<Button>(R.id.btn_refresh).setOnClickListener {
-            clearUI()
-            checkPermissionsAndGetLocation()
-        }
-
-        // 2. 初始化定位客户端
-        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
-        checkPermissionsAndGetLocation()
-    }
-
-    private fun clearUI() {
-        val loading = "正在获取..."
-        tvNativeCache.text = "原生(缓存): $loading"
-        tvNativeReal.text = "原生(实时): $loading"
-        tvFusedCache.text = "Fused(缓存): $loading"
-        tvFusedReal.text = "Fused(实时): $loading"
-    }
-
-    private fun checkPermissionsAndGetLocation() {
-        if (PERMISSIONS.all { ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }) {
-            startFetchingLocations()
-        } else {
-            ActivityCompat.requestPermissions(this, PERMISSIONS, REQUEST_CODE)
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun startFetchingLocations() {
-        // --- 1. 原生 API 定位方式 ---
-
-        // A. 获取缓存位置 (LastKnownLocation)
-        // 尝试从 GPS 或网络获取最后一次记录
-        val lastGps = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-        val lastNetwork = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-        val bestLast = lastGps ?: lastNetwork
-        updateUI(tvNativeCache, bestLast, "原生(缓存)")
-
-        // B. 获取实时位置 (getCurrentLocation / requestSingleUpdate)
-        locationManager.getCurrentLocation(
-            LocationManager.GPS_PROVIDER,
-            null,
-            ContextCompat.getMainExecutor(this)
-        ) { location ->
-            updateUI(tvNativeReal, location, "原生(实时)")
-        }
-
-        // --- 2. Google Fused API ---
-
-        // C. 获取 Fused 缓存
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            updateUI(tvFusedCache, location, "Fused(缓存)")
-        }
-
-        // D. 获取 Fused 实时
-        val cts = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-            .addOnSuccessListener { location ->
-                updateUI(tvFusedReal, location, "Fused(实时)")
+        setContent {
+            ArirangTheme {
+                LocationConfigScreen(
+                    initialConfig = initialConfig,
+                    onBack = { finish() },
+                    onSave = { config ->
+                        LocationConfigPrefs.saveConfig(this, config)
+                        Toast.makeText(this, getString(R.string.save_success), Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
-            .addOnFailureListener {
-                tvFusedReal.text = "Fused(实时): 失败 ${it.message}"
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun LocationConfigScreen(
+        initialConfig: Config,
+        onBack: () -> Unit,
+        onSave: (Config) -> Unit
+    ) {
+        var config by remember { mutableStateOf(initialConfig) }
+        var latitudeText by remember { mutableStateOf(initialConfig.latitude.toString()) }
+        var longitudeText by remember { mutableStateOf(initialConfig.longitude.toString()) }
+        var altitudeText by remember { mutableStateOf(initialConfig.altitude.toString()) }
+        var accuracyText by remember { mutableStateOf(initialConfig.accuracy.toString()) }
+        var speedText by remember { mutableStateOf(initialConfig.speed.toString()) }
+        var bearingText by remember { mutableStateOf(initialConfig.bearing.toString()) }
+        var satellitesText by remember { mutableStateOf(initialConfig.satellites.toString()) }
+        var revision by remember { mutableLongStateOf(0L) }
+        var validationError by remember { mutableStateOf<String?>(null) }
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+        val context = LocalContext.current
+
+        fun applyConfig(updated: Config) {
+            config = updated
+            latitudeText = updated.latitude.toString()
+            longitudeText = updated.longitude.toString()
+            altitudeText = updated.altitude.toString()
+            accuracyText = updated.accuracy.toString()
+            speedText = updated.speed.toString()
+            bearingText = updated.bearing.toString()
+            satellitesText = updated.satellites.toString()
+            validationError = null
+            revision++
+        }
+
+        fun parsedConfig(): Config? {
+            val latitude = parseDouble(
+                latitudeText,
+                context.getString(R.string.location_field_latitude),
+                -90.0,
+                90.0,
+                context.getString(R.string.location_invalid_number)
+            )
+            val longitude = parseDouble(
+                longitudeText,
+                context.getString(R.string.location_field_longitude),
+                -180.0,
+                180.0,
+                context.getString(R.string.location_invalid_number)
+            )
+            val altitude = parseDouble(
+                altitudeText,
+                context.getString(R.string.location_field_altitude),
+                -500.0,
+                10000.0,
+                context.getString(R.string.location_invalid_number)
+            )
+            val accuracy = parseFloat(
+                accuracyText,
+                context.getString(R.string.location_field_accuracy),
+                0.1f,
+                10000f,
+                context.getString(R.string.location_invalid_number)
+            )
+            val speed = parseFloat(
+                speedText,
+                context.getString(R.string.location_field_speed),
+                0.0f,
+                400f,
+                context.getString(R.string.location_invalid_number)
+            )
+            val bearing = parseFloat(
+                bearingText,
+                context.getString(R.string.location_field_bearing),
+                0.0f,
+                360f,
+                context.getString(R.string.location_invalid_number)
+            )
+            val satellites = parseInt(
+                satellitesText,
+                context.getString(R.string.location_field_satellites),
+                0,
+                64,
+                context.getString(R.string.location_invalid_number)
+            )
+            val firstError = listOf(latitude, longitude, altitude, accuracy, speed, bearing, satellites)
+                .firstOrNull { it.error != null }
+                ?.error
+
+            if (firstError != null) {
+                validationError = firstError
+                return null
             }
-    }
 
-    private fun updateUI(textView: TextView, location: Location?, label: String) {
-        if (location != null) {
-            val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(location.time))
-            val info = """
-                [$label]
-                经纬度: ${String.format("%.6f", location.latitude)}, ${String.format("%.6f", location.longitude)}
-                精度: ${location.accuracy}m | 时间: $time
-            """.trimIndent()
-            textView.text = info
-        } else {
-            textView.text = "[$label]: 无数据 (请尝试开启GPS或移动位置)"
+            validationError = null
+            return Config(
+                enabled = config.enabled,
+                latitude = latitude.doubleValue ?: LocationConfigPrefs.DEFAULT_LATITUDE,
+                longitude = longitude.doubleValue ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
+                altitude = altitude.doubleValue ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
+                accuracy = accuracy.floatValue ?: LocationConfigPrefs.DEFAULT_ACCURACY,
+                speed = speed.floatValue ?: LocationConfigPrefs.DEFAULT_SPEED,
+                bearing = bearing.floatValue ?: LocationConfigPrefs.DEFAULT_BEARING,
+                satellites = satellites.intValue ?: LocationConfigPrefs.DEFAULT_SATELLITES
+            )
+        }
+
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text(stringResource(R.string.location_config_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { applyConfig(Config(enabled = true)) }) {
+                            Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_default_pyongyang))
+                        }
+                        IconButton(onClick = {
+                            parsedConfig()?.let(onSave)
+                        }) {
+                            Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
+            ) {
+                item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .toggleable(
+                                    value = config.enabled,
+                                    onValueChange = { config = config.copy(enabled = it) },
+                                    role = Role.Switch
+                                )
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.location_hook_enabled),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.location_hook_enabled_summary),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(checked = config.enabled, onCheckedChange = null)
+                        }
+                    }
+                }
+
+                item {
+                    SectionCard(title = stringResource(R.string.location_section_coordinates)) {
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_latitude),
+                            value = latitudeText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { latitudeText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_longitude),
+                            value = longitudeText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { longitudeText = it }
+                        )
+                    }
+                }
+
+                item {
+                    SectionCard(title = stringResource(R.string.location_section_motion)) {
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_altitude),
+                            value = altitudeText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { altitudeText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_accuracy),
+                            value = accuracyText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { accuracyText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_speed),
+                            value = speedText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { speedText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_bearing),
+                            value = bearingText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { bearingText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_satellites),
+                            value = satellitesText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Number,
+                            onValueChange = { satellitesText = it.filter(Char::isDigit) }
+                        )
+                    }
+                }
+
+                validationError?.let { error ->
+                    item {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            startFetchingLocations()
-        } else {
-            Toast.makeText(this, "需要定位权限才能显示数据", Toast.LENGTH_SHORT).show()
+    @Composable
+    private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                content()
+            }
         }
     }
+
+    @Composable
+    private fun LocationTextField(
+        label: String,
+        value: String,
+        revision: Long,
+        keyboardType: KeyboardType,
+        onValueChange: (String) -> Unit
+    ) {
+        var localValue by remember(revision, label) { mutableStateOf(value) }
+        OutlinedTextField(
+            value = localValue,
+            onValueChange = {
+                localValue = it
+                onValueChange(it)
+            },
+            label = { Text(label) },
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+
+    private fun parseDouble(text: String, label: String, min: Double, max: Double, errorFormat: String): ParsedValue {
+        val value = text.trim().toDoubleOrNull()
+        return if (value == null || value !in min..max) {
+            ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
+        } else {
+            ParsedValue(doubleValue = value)
+        }
+    }
+
+    private fun parseFloat(text: String, label: String, min: Float, max: Float, errorFormat: String): ParsedValue {
+        val value = text.trim().toFloatOrNull()
+        return if (value == null || value < min || value > max) {
+            ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
+        } else {
+            ParsedValue(floatValue = value)
+        }
+    }
+
+    private fun parseInt(text: String, label: String, min: Int, max: Int, errorFormat: String): ParsedValue {
+        val value = text.trim().toIntOrNull()
+        return if (value == null || value !in min..max) {
+            ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
+        } else {
+            ParsedValue(intValue = value)
+        }
+    }
+
+    private data class ParsedValue(
+        val doubleValue: Double? = null,
+        val floatValue: Float? = null,
+        val intValue: Int? = null,
+        val error: String? = null
+    )
 }

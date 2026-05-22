@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.media.MediaDrm
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -32,16 +34,23 @@ import androidx.lifecycle.lifecycleScope
 import asia.nana7mi.arirang.R
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import com.google.android.gms.appset.AppSet
-import com.google.android.material.button.MaterialButton
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.tasks.Tasks
+import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.io.BufferedWriter
 import java.io.OutputStreamWriter
 import java.net.NetworkInterface
-import java.util.concurrent.TimeUnit
+import java.text.SimpleDateFormat
 import java.util.UUID
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class SelfCheckActivity : BaseActivity() {
 
@@ -57,6 +66,7 @@ class SelfCheckActivity : BaseActivity() {
     private lateinit var telephonySection: CheckSectionView
     private lateinit var simSection: CheckSectionView
     private lateinit var appsSection: CheckSectionView
+    private lateinit var locationSection: CheckSectionView
     private lateinit var wifiSection: CheckSectionView
     private lateinit var accountsSection: CheckSectionView
     private lateinit var networkSection: CheckSectionView
@@ -108,6 +118,7 @@ class SelfCheckActivity : BaseActivity() {
         telephonySection = CheckSectionView(findViewById(R.id.telephonySection))
         simSection = CheckSectionView(findViewById(R.id.simSection))
         appsSection = CheckSectionView(findViewById(R.id.appsSection))
+        locationSection = CheckSectionView(findViewById(R.id.locationSection))
         wifiSection = CheckSectionView(findViewById(R.id.wifiSection))
         accountsSection = CheckSectionView(findViewById(R.id.accountsSection))
         networkSection = CheckSectionView(findViewById(R.id.networkSection))
@@ -118,6 +129,7 @@ class SelfCheckActivity : BaseActivity() {
         telephonySection.bindTitle(getString(R.string.self_check_telephony_title))
         simSection.bindTitle(getString(R.string.self_check_sim_title))
         appsSection.bindTitle(getString(R.string.self_check_apps_title))
+        locationSection.bindTitle(getString(R.string.self_check_location_title))
         wifiSection.bindTitle(getString(R.string.self_check_wifi_title))
         accountsSection.bindTitle(getString(R.string.self_check_accounts_title))
         networkSection.bindTitle(getString(R.string.self_check_network_title))
@@ -143,6 +155,9 @@ class SelfCheckActivity : BaseActivity() {
         }
         findViewById<View>(R.id.navAppsChip).setOnClickListener {
             scrollToSection(appsSection.root)
+        }
+        findViewById<View>(R.id.navLocationChip).setOnClickListener {
+            scrollToSection(locationSection.root)
         }
         findViewById<View>(R.id.navWifiChip).setOnClickListener {
             scrollToSection(wifiSection.root)
@@ -201,6 +216,7 @@ class SelfCheckActivity : BaseActivity() {
             val telephony = async(Dispatchers.IO) { readTelephonyInfo() }
             val sim = async(Dispatchers.IO) { readSimInfo() }
             val apps = async(Dispatchers.IO) { readInstalledApps() }
+            val location = async(Dispatchers.IO) { readLocationInfo() }
             val wifi = async(Dispatchers.IO) { readWifiInfo() }
             val accounts = async(Dispatchers.IO) { readAccounts() }
             val network = async(Dispatchers.IO) { readNetworkInterfaces() }
@@ -212,6 +228,7 @@ class SelfCheckActivity : BaseActivity() {
                 R.string.self_check_telephony_title to telephony.await(),
                 R.string.self_check_sim_title to sim.await(),
                 R.string.self_check_apps_title to apps.await(),
+                R.string.self_check_location_title to location.await(),
                 R.string.self_check_wifi_title to wifi.await(),
                 R.string.self_check_accounts_title to accounts.await(),
                 R.string.self_check_network_title to network.await(),
@@ -224,10 +241,11 @@ class SelfCheckActivity : BaseActivity() {
             telephonySection.bindResult(results[2].second)
             simSection.bindResult(results[3].second)
             appsSection.bindResult(results[4].second)
-            wifiSection.bindResult(results[5].second)
-            accountsSection.bindResult(results[6].second)
-            networkSection.bindResult(results[7].second)
-            bluetoothSection.bindResult(results[8].second)
+            locationSection.bindResult(results[5].second)
+            wifiSection.bindResult(results[6].second)
+            accountsSection.bindResult(results[7].second)
+            networkSection.bindResult(results[8].second)
+            bluetoothSection.bindResult(results[9].second)
 
             val visibleCount = results.count { it.second.state == CheckState.VISIBLE }
             val blockedCount = results.count { it.second.state == CheckState.BLOCKED }
@@ -297,6 +315,7 @@ class SelfCheckActivity : BaseActivity() {
         telephonySection.bindResult(loading)
         simSection.bindResult(loading)
         appsSection.bindResult(loading)
+        locationSection.bindResult(loading)
         wifiSection.bindResult(loading)
         accountsSection.bindResult(loading)
         networkSection.bindResult(loading)
@@ -734,6 +753,87 @@ class SelfCheckActivity : BaseActivity() {
         } catch (e: Exception) {
             CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun readLocationInfo(): CheckResult {
+        if (!hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            return CheckResult(
+                CheckState.BLOCKED,
+                getString(R.string.self_check_permission_needed),
+                getString(R.string.self_check_location_permission_hint)
+            )
+        }
+
+        return try {
+            val locationManager = getSystemService(LocationManager::class.java)
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+            val values = mutableListOf<String>()
+
+            val nativeCache = runCatching {
+                locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                    ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            }.getOrNull()
+            values.add(formatLocationProbe(getString(R.string.self_check_location_native_cache), nativeCache))
+
+            val nativeRealtime = awaitNativeCurrentLocation(locationManager)
+            values.add(formatLocationProbe(getString(R.string.self_check_location_native_realtime), nativeRealtime))
+
+            val fusedCache = runCatching {
+                Tasks.await(fusedLocationClient.lastLocation, 1500L, TimeUnit.MILLISECONDS)
+            }.getOrNull()
+            values.add(formatLocationProbe(getString(R.string.self_check_location_fused_cache), fusedCache))
+
+            val tokenSource = CancellationTokenSource()
+            val fusedRealtime = runCatching {
+                Tasks.await(
+                    fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.token),
+                    2500L,
+                    TimeUnit.MILLISECONDS
+                )
+            }.getOrNull()
+            values.add(formatLocationProbe(getString(R.string.self_check_location_fused_realtime), fusedRealtime))
+
+            val hasLocation = values.any { !it.contains(getString(R.string.self_check_location_no_data)) }
+            CheckResult(
+                if (hasLocation) CheckState.VISIBLE else CheckState.BLOCKED,
+                if (hasLocation) getString(R.string.self_check_status_visible) else getString(R.string.self_check_status_not_visible),
+                values.joinToString("\n\n")
+            )
+        } catch (e: Exception) {
+            CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun awaitNativeCurrentLocation(locationManager: LocationManager): Location? {
+        val latch = CountDownLatch(1)
+        var result: Location? = null
+        runCatching {
+            locationManager.getCurrentLocation(
+                LocationManager.GPS_PROVIDER,
+                null,
+                ContextCompat.getMainExecutor(this)
+            ) { location ->
+                result = location
+                latch.countDown()
+            }
+            latch.await(2500L, TimeUnit.MILLISECONDS)
+        }
+        return result
+    }
+
+    private fun formatLocationProbe(label: String, location: Location?): String {
+        if (location == null) {
+            return "$label\n${getString(R.string.self_check_location_no_data)}"
+        }
+        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(location.time))
+        return listOf(
+            label,
+            getString(R.string.self_check_location_coordinates, location.latitude, location.longitude),
+            getString(R.string.self_check_location_accuracy_time, location.accuracy, time),
+            "Provider: ${location.provider ?: getString(R.string.self_check_unknown_name)}"
+        ).joinToString("\n")
     }
 
     private fun readAccounts(): CheckResult {

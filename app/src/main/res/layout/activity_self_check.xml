@@ -74,6 +74,13 @@
                     android:text="@string/self_check_nav_apps" />
 
                 <com.google.android.material.chip.Chip
+                    android:id="@+id/navLocationChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_location" />
+
+                <com.google.android.material.chip.Chip
                     android:id="@+id/navWifiChip"
                     style="@style/Widget.Material3.Chip.Filter"
                     android:layout_width="wrap_content"
@@ -191,6 +198,13 @@
 
             <include
                 android:id="@+id/appsSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/locationSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

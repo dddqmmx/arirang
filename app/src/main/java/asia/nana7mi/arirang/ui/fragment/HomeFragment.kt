@@ -52,7 +52,7 @@ class HomeFragment : Fragment() {
         setupFeature(R.id.unique_identifier_setting_bottom, UniqueIdentifierConfigActivity::class.java, isReleased = true)
 
         // These are disabled in release build
-        setupFeature(R.id.location_setting_bottom, LocationConfigActivity::class.java, isReleased = false)
+        setupFeature(R.id.location_setting_bottom, LocationConfigActivity::class.java, isReleased = true)
         setupFeature(R.id.package_list_bottom, PackageListConfigActivity::class.java, isReleased = false)
         setupFeature(R.id.test_view, SelfCheckActivity::class.java, isReleased = true)
 
