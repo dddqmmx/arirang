@@ -42,6 +42,13 @@
             app:featureName="@string/title_activity_language_settings"
             app:featureIcon="@drawable/ic_language"/>
 
+        <asia.nana7mi.arirang.view.FeatureItemView
+            android:id="@+id/region_setting"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:featureName="@string/user_region_title"
+            app:featureIcon="@drawable/ic_language"/>
+
     </LinearLayout>
 
     </LinearLayout>

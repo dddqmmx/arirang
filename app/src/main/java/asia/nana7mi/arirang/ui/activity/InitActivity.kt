@@ -79,7 +79,7 @@ fun getAppColorScheme(context: Context): ColorScheme {
 fun SetupFlow() {
     var step by rememberSaveable { mutableIntStateOf(1) }
     var selectedLanguageCode by rememberSaveable { mutableStateOf(getCurrentAppLanguageCode()) }
-    var selectedRegionCode by rememberSaveable { mutableStateOf("CN") }
+    var selectedRegionCode by rememberSaveable { mutableStateOf("JP") }
 
     AnimatedContent(
         targetState = step,

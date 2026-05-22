@@ -1,29 +1,259 @@
 package asia.nana7mi.arirang.ui.fragment
 
-import asia.nana7mi.arirang.R
-import asia.nana7mi.arirang.ui.activity.LanguageSettingsActivity
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
+import asia.nana7mi.arirang.R
+import asia.nana7mi.arirang.data.datastore.AppPreferences
+import asia.nana7mi.arirang.ui.activity.LanguageSettingsActivity
+import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class SettingsFragment : Fragment() {
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(R.layout.fragment_settings, container, false)
+    ): View {
+        return ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                ArirangTheme {
+                    SettingsScreen(
+                        onOpenLanguage = {
+                            startActivity(Intent(requireContext(), LanguageSettingsActivity::class.java))
+                        }
+                    )
+                }
+            }
+        }
     }
+}
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        view.findViewById<View>(R.id.language_setting).setOnClickListener{
-            val intent = Intent(requireContext(), LanguageSettingsActivity::class.java)
-            startActivity(intent)
+@Composable
+private fun SettingsScreen(
+    onOpenLanguage: () -> Unit
+) {
+    val context = LocalContext.current
+    val languageNames = stringArrayResource(R.array.language_names)
+    val languageCodes = stringArrayResource(R.array.language_codes)
+    val regionNames = stringArrayResource(R.array.region_names)
+    val regionCodes = stringArrayResource(R.array.region_codes)
+
+    val savedLanguage = AppPreferences.getLanguage(context) ?: "system"
+    val currentLanguage = languageNames.getOrElse(languageCodes.indexOf(savedLanguage)) { savedLanguage }
+
+    var currentRegionCode by remember {
+        mutableStateOf(AppPreferences.getRegion(context) ?: DEFAULT_REGION)
+    }
+    var showRegionDialog by remember { mutableStateOf(false) }
+    val currentRegion = regionNames.getOrElse(regionCodes.indexOf(currentRegionCode)) { currentRegionCode }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        item {
+            Text(
+                text = stringResource(R.string.nav_settings),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.ui_settings_title)) {
+                SettingCard(
+                    title = stringResource(R.string.title_activity_language_settings),
+                    summary = currentLanguage,
+                    icon = Icons.Default.Language,
+                    onClick = onOpenLanguage
+                )
+            }
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.init_select_region)) {
+                SettingCard(
+                    title = stringResource(R.string.user_region_title),
+                    summary = currentRegion,
+                    icon = Icons.Default.Public,
+                    onClick = { showRegionDialog = true }
+                )
+            }
         }
     }
 
+    if (showRegionDialog) {
+        RegionDialog(
+            regionNames = regionNames,
+            regionCodes = regionCodes,
+            selectedCode = currentRegionCode,
+            onDismiss = { showRegionDialog = false },
+            onSelect = { code ->
+                AppPreferences.setRegion(context, code)
+                currentRegionCode = code
+                showRegionDialog = false
+                Toast.makeText(context, R.string.save_success, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
 }
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    }
+}
+
+@Composable
+private fun SettingCard(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun RegionDialog(
+    regionNames: Array<String>,
+    regionCodes: Array<String>,
+    selectedCode: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.init_select_region)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                regionNames.zip(regionCodes).forEach { (name, code) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(code) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        RadioButton(
+                            selected = code == selectedCode,
+                            onClick = { onSelect(code) }
+                        )
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(android.R.string.cancel))
+            }
+        }
+    )
+}
+
+private const val DEFAULT_REGION = "JP"
