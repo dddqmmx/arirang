@@ -103,7 +103,7 @@ Use at your own risk.
 - **LSPosed** or compatible Xposed framework
 - Magisk, KernelSU / KernelSU Next, or APatch (required for advanced submodule features)
 - Zygisk
-- Android 15+ (recommended)
+- Android 16 (recommended)
 
 ## 📦 Installation
 
