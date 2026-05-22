@@ -79,9 +79,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 }
             )
 
-            XposedBridge.log("FuckPackageList: Hooked successfully")
+            HookLog.i(HookLog.Module.PACKAGE_LIST, "hooked successfully")
         }.onFailure {
-            XposedBridge.log("FuckPackageList: Error: ${it.message}")
+            HookLog.e(HookLog.Module.PACKAGE_LIST, "hook failed", it)
         }
     }
 

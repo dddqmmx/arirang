@@ -19,6 +19,8 @@ class HookManager : IXposedHookLoadPackage {
             .forEach { module ->
                 runCatching {
                     module.onHook(lpparam)
+                }.onFailure {
+                    HookLog.e(HookLog.Module.CORE, "module ${module.javaClass.simpleName} failed for ${lpparam.packageName}", it)
                 }
             }
     }

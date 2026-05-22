@@ -3,7 +3,6 @@ package asia.nana7mi.arirang.hook
 import android.os.Binder
 import android.os.Process
 import android.os.SystemClock
-import android.util.Log
 import android.util.Xml
 import asia.nana7mi.arirang.BuildConfig
 import de.robv.android.xposed.XC_MethodHook
@@ -187,15 +186,15 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             when (lpparam.packageName) {
                 "android" -> {
                     hookSystemServerSurfaces(lpparam.classLoader)
-                    XposedBridge.log("Arirang: SIM proof system_server hook installed enabled=${config.enabled}")
+                    HookLog.i(HookLog.Module.SIM, "system_server hook installed enabled=${config.enabled}")
                 }
                 "com.android.phone" -> {
                     hookPhoneProcessSurfaces(lpparam.classLoader)
-                    XposedBridge.log("Arirang: SIM proof phone process hook installed enabled=${config.enabled}")
+                    HookLog.i(HookLog.Module.SIM, "phone process hook installed enabled=${config.enabled}")
                 }
             }
         }.onFailure {
-            XposedBridge.log("Arirang: SIM country proof hook failed: ${Log.getStackTraceString(it)}")
+            HookLog.e(HookLog.Module.SIM, "SIM country proof hook failed", it)
         }
     }
 
@@ -294,7 +293,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "com.android.phone.PhoneInterfaceManager",
             classLoader
         ) ?: run {
-            XposedBridge.log("Arirang: PhoneInterfaceManager not found for SIM country proof")
+            HookLog.w(HookLog.Module.SIM, "PhoneInterfaceManager not found for SIM country proof")
             return
         }
 
@@ -350,7 +349,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         mapOf<String, (SimProfile) -> Any?>(
             "getForbiddenPlmns" to { emptyArray<String>() },
             "getEquivalentHomePlmns" to { emptyList<String>() },
-            "getTypeAllocationCode" to { it.typeAllocationCode },
             "getImei" to { it.imei },
             "getImeiForSlot" to { it.imei },
             "getMeid" to { null },
@@ -369,16 +367,27 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                         profileForSlot(param.args.firstIntOrNull(), allowFallback = false)
                     else -> profileForSlot(null, allowFallback = true)
                 }
-                if (methodName == "getTypeAllocationCode") {
-                    val slot = param.args.firstIntOrNull() ?: profile?.slotIndex
-                    hookConfig.uniqueIdentifiers.typeAllocationCodeForSlot(slot, profile?.typeAllocationCode)
-                } else if (methodName.contains("Imei", ignoreCase = true) || methodName.contains("DeviceId", ignoreCase = true)) {
+                if (methodName.contains("Imei", ignoreCase = true) || methodName.contains("DeviceId", ignoreCase = true)) {
                     val slot = param.args.firstIntOrNull() ?: profile?.slotIndex
                     hookConfig.uniqueIdentifiers.imeiForSlot(slot, profile?.imei)
                 } else {
                     valueProvider(profile ?: return@hookProfileMethod null)
                 }
             }
+        }
+
+        hookAllExistingStringMethods(
+            targetClass = phoneInterfaceManagerClass,
+            methodNames = listOf(
+                "getTypeAllocationCode",
+                "getTypeAllocationCodeForSlot",
+                "getTypeAllocationCodeForPhone",
+                "getTypeAllocationCodeForSubscriber"
+            ),
+            beforeOriginal = true,
+            shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
+        ) { param, method ->
+            typeAllocationCodeForCall(param, method)
         }
 
         hookPhoneInterfaceManagerObjectReaders(phoneInterfaceManagerClass)
@@ -441,6 +450,21 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         ) { param, method ->
             imeiForCall(param, method)
         }
+
+        hookAllExistingStringMethods(
+            classLoader = classLoader,
+            className = "com.android.internal.telephony.PhoneSubInfoController",
+            methodNames = listOf(
+                "getTypeAllocationCode",
+                "getTypeAllocationCodeForSlot",
+                "getTypeAllocationCodeForPhone",
+                "getTypeAllocationCodeForSubscriber"
+            ),
+            beforeOriginal = true,
+            shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
+        ) { param, method ->
+            typeAllocationCodeForCall(param, method)
+        }
     }
 
     private fun hookTelephonyManagerUniqueIdentifierReaders(classLoader: ClassLoader) {
@@ -451,7 +475,12 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
         hookAllExistingStringMethods(
             targetClass = telephonyManagerClass,
-            methodNames = listOf("getTypeAllocationCode"),
+            methodNames = listOf(
+                "getTypeAllocationCode",
+                "getTypeAllocationCodeForSlot",
+                "getTypeAllocationCodeForPhone",
+                "getTypeAllocationCodeForSubscriber"
+            ),
             beforeOriginal = true,
             shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
@@ -618,7 +647,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         ).mapNotNull { XposedHelpers.findClassIfExists(it, classLoader) }
 
         if (serviceClasses.isEmpty()) {
-            XposedBridge.log("Arirang: Subscription service not found for SIM proof")
+            HookLog.w(HookLog.Module.SIM, "Subscription service not found for SIM proof")
             return
         }
 
@@ -627,9 +656,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             hookSubscriptionPhoneNumberReaders(serviceClass, externalClientsOnly)
             hookSubscriptionCounts(serviceClass, externalClientsOnly)
             hookSubscriptionIdReaders(serviceClass, externalClientsOnly)
-            XposedBridge.log(
-                "Arirang: hooked SIM subscription service ${serviceClass.name} externalOnly=$externalClientsOnly"
-            )
+            HookLog.i(HookLog.Module.SIM, "hooked subscription service ${serviceClass.name} externalOnly=$externalClientsOnly")
         }
     }
 
@@ -755,7 +782,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "android.sysprop.TelephonyProperties",
             classLoader
         ) ?: run {
-            XposedBridge.log("Arirang: android.sysprop.TelephonyProperties not found")
+            HookLog.w(HookLog.Module.SIM, "android.sysprop.TelephonyProperties not found")
             return
         }
 
@@ -844,7 +871,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 XposedHelpers.callStaticMethod(systemPropertiesClass, "set", key, value)
             }
         }.onFailure {
-            XposedBridge.log("Arirang: failed to write proof telephony properties: ${it.message}")
+            HookLog.w(HookLog.Module.SIM, "failed to write proof telephony properties: ${it.message}")
         }
     }
 
@@ -955,7 +982,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             applySubscriptionBuilderProfile(builder, profile)
             builderClass.getDeclaredMethod("build").invoke(builder)
         }.onFailure {
-            XposedBridge.log("Arirang: failed to create virtual SubscriptionInfo: ${it.message}")
+            HookLog.w(HookLog.Module.SIM, "failed to create virtual SubscriptionInfo: ${it.message}")
         }.getOrNull()
     }
 
@@ -1407,27 +1434,39 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
         methodNames.forEach { methodName ->
-            targetClass.declaredMethods
+            val methods = targetClass.declaredMethods
                 .filter { it.name == methodName }
-                .forEach { method ->
-                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            if (!beforeOriginal) return
-                            val config = hookConfig
-                            if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
+            if (methods.isEmpty() && methodName.contains("TypeAllocationCode", ignoreCase = true)) {
+                HookLog.d(
+                    HookLog.Module.UNIQUE_ID,
+                    "method not found for TAC hook: ${targetClass.name}.$methodName"
+                )
+            }
+            methods.forEach { method ->
+                if (methodName.contains("TypeAllocationCode", ignoreCase = true)) {
+                    HookLog.i(
+                        HookLog.Module.UNIQUE_ID,
+                        "install TAC hook ${targetClass.name}.${method.name}(${method.parameterTypes.joinToString { it.simpleName }}) beforeOriginal=$beforeOriginal"
+                    )
+                }
+                XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        if (!beforeOriginal) return
+                        val config = hookConfig
+                        if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
+                        param.result = resultProvider(param, method)
+                    }
+
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (beforeOriginal) return
+                        val config = hookConfig
+                        if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
+                        if (param.result == null || param.result is String) {
                             param.result = resultProvider(param, method)
                         }
-
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            if (beforeOriginal) return
-                            val config = hookConfig
-                            if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
-                            if (param.result == null || param.result is String) {
-                                param.result = resultProvider(param, method)
-                            }
-                        }
-                    })
-                }
+                    }
+                })
+            }
         }
     }
 
@@ -1482,7 +1521,14 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType -> firstInt
             else -> profile?.slotIndex
         }
-        return hookConfig.uniqueIdentifiers.typeAllocationCodeForSlot(slotIndex, profile?.typeAllocationCode)
+        val config = hookConfig
+        val result = config.uniqueIdentifiers.typeAllocationCodeForSlot(slotIndex, profile?.typeAllocationCode)
+        HookLog.i(
+            HookLog.Module.UNIQUE_ID,
+            "TAC call ${method.declaringClass.simpleName}.${method.name} firstInt=$firstInt slot=$slotIndex " +
+                "uniqueEnabled=${config.uniqueIdentifiers.enabled} profileSlot=${profile?.slotIndex} fallback=${profile?.typeAllocationCode} result=$result"
+        )
+        return result
     }
 
     private fun profileForTelephonyManager(param: XC_MethodHook.MethodHookParam): SimProfile? {
@@ -1626,6 +1672,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         }
     }
 
+    private fun String.maskIdentifier(): String {
+        if (length <= 6) return "***"
+        return take(3) + "***" + takeLast(3)
+    }
+
     private fun currentHookConfig(force: Boolean = false): HookConfig {
         val now = SystemClock.uptimeMillis()
         cachedHookConfig?.let { cached ->
@@ -1698,9 +1749,16 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun logHookConfig(config: HookConfig) {
-        XposedBridge.log(
-            "Arirang: SIM proof config loaded enabled=${config.enabled} hideSim=${config.hideSim} " +
+        HookLog.i(
+            HookLog.Module.SIM,
+            "config loaded enabled=${config.enabled} hideSim=${config.hideSim} " +
                 "uniqueIds=${config.uniqueIdentifiers.enabled} slots=${config.visibleProfiles.joinToString { "${it.slotIndex}:${it.countryIso}/${it.operatorNumeric}/${it.alphaLong}" }}"
+        )
+        HookLog.i(
+            HookLog.Module.UNIQUE_ID,
+            "unique config enabled=${config.uniqueIdentifiers.enabled} " +
+                "imeiSlots=${config.uniqueIdentifiers.imeiBySlot.mapValues { it.value.maskIdentifier() }} " +
+                "tacSlots=${config.uniqueIdentifiers.tacBySlot}"
         )
     }
 
@@ -1724,7 +1782,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
             }
         }.onFailure {
-            XposedBridge.log("Arirang: failed to parse SIM config snapshot: ${it.message}")
+            HookLog.w(HookLog.Module.SIM, "failed to parse SIM config snapshot: ${it.message}")
         }.getOrDefault(emptyMap())
     }
 
@@ -1770,7 +1828,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
             }.toSortedMap()
         }.onFailure {
-            XposedBridge.log("Arirang: failed to parse IMEI map: ${it.message}")
+            HookLog.w(HookLog.Module.UNIQUE_ID, "failed to parse slot string map: ${it.message}")
         }.getOrDefault(emptyMap())
     }
 
@@ -1805,7 +1863,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             }
             values
         }.onFailure {
-            XposedBridge.log("Arirang: failed to read $prefsName config: ${it.message}")
+            HookLog.w(HookLog.Module.SIM, "failed to read $prefsName config: ${it.message}")
         }.getOrNull()
     }
 
@@ -1823,7 +1881,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             }
             result
         }.onFailure {
-            XposedBridge.log("Arirang: failed to parse SIM profile map: ${it.message}")
+            HookLog.w(HookLog.Module.SIM, "failed to parse SIM profile map: ${it.message}")
         }.getOrDefault(emptyMap())
     }
 
@@ -1838,7 +1896,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
             }
         }.onFailure {
-            XposedBridge.log("Arirang: failed to parse legacy SIM profile list: ${it.message}")
+            HookLog.w(HookLog.Module.SIM, "failed to parse legacy SIM profile list: ${it.message}")
         }.getOrDefault(emptyMap())
     }
 

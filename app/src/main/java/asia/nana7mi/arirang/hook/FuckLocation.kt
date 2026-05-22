@@ -30,7 +30,7 @@ class FuckLocation : BaseHookModule(matchSystem = true) {
             hookProviderManager(classLoader)
 
         } catch (t: Throwable) {
-            XposedBridge.log("FuckLocation: Hook 过程出错 - ${t.message}")
+            HookLog.e(HookLog.Module.LOCATION, "hook failed", t)
         }
     }
 
@@ -47,7 +47,7 @@ class FuckLocation : BaseHookModule(matchSystem = true) {
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val pkg = param.args[2] as? String
-                    XposedBridge.log("FuckLocation: [拦截缓存定位] App: $pkg")
+                    HookLog.i(HookLog.Module.LOCATION, "intercept last location for app=$pkg")
 
                     // 统一调用 modifyLocation
                     param.result = modifyLocation(Location(LocationManager.GPS_PROVIDER))
@@ -73,7 +73,7 @@ class FuckLocation : BaseHookModule(matchSystem = true) {
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val pkg = param.args[3] as? String
-                    XposedBridge.log("FuckLocation: [拦截实时定位] App: $pkg")
+                    HookLog.i(HookLog.Module.LOCATION, "intercept current location for app=$pkg")
 
                     // 统一调用 modifyLocation
                     param.result = modifyLocation(Location(LocationManager.GPS_PROVIDER))
@@ -122,7 +122,7 @@ class FuckLocation : BaseHookModule(matchSystem = true) {
                 }
             )
         } catch (e: Throwable) {
-            XposedBridge.log("FuckLocation: ProviderManager Hook 失败: ${e.message}")
+            HookLog.e(HookLog.Module.LOCATION, "ProviderManager hook failed", e)
         }
     }
 
@@ -238,7 +238,7 @@ class FuckLocation : BaseHookModule(matchSystem = true) {
 
     // 辅助日志
     private fun log(msg: String) {
-        XposedBridge.log("GNSS_HOOK: $msg")
+        HookLog.i(HookLog.Module.LOCATION, "GNSS: $msg")
     }
 
     /**

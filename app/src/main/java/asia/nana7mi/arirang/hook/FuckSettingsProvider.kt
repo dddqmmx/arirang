@@ -30,7 +30,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
             hookCall(lmsClass, classLoader)
 
         } catch (t: Throwable) {
-            XposedBridge.log("FuckSetting: Hook 过程出错 - ${t.message}")
+            HookLog.e(HookLog.Module.SETTINGS, "hook failed", t)
         }
     }
 
@@ -71,7 +71,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
             if (!root.optString(KEY_ENABLED).toBooleanStrictOrNull().orFalse()) return@runCatching null
             root.optString(KEY_ANDROID_ID).takeIf { it.isNotBlank() }
         }.onFailure {
-            XposedBridge.log("FuckSetting: failed to parse unique identifier config - ${it.message}")
+            HookLog.w(HookLog.Module.SETTINGS, "failed to parse unique identifier config: ${it.message}")
         }.getOrNull()
     }
 

@@ -35,7 +35,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
                 val allowed = HookNotifyClient.requestClipboardReadAccess(callingPackage, uid, userId)
                 if (!allowed) {
-                    XposedBridge.log("FuckClipboard: denied read for $callingPackage uid=$uid")
+                    HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
                     param.result = null
                 }
             }
@@ -58,9 +58,9 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
                 lpparam.classLoader
             )
             hookClipboard(clipboardImpl ?: clipboardService)
-            XposedBridge.log("FuckClipboard: hooked")
+            HookLog.i(HookLog.Module.CLIPBOARD, "hooked")
         }.onFailure {
-            XposedBridge.log("FuckClipboard: hook failed: $it")
+            HookLog.e(HookLog.Module.CLIPBOARD, "hook failed", it)
         }
     }
 }

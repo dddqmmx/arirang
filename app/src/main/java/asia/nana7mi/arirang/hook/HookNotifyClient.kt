@@ -136,7 +136,7 @@ object HookNotifyClient {
     private val reconnectRunnable = Runnable {
         val ctx = getSystemContext()
         if (ctx != null && sService == null) {
-            XposedBridge.log("$TAG Triggering auto-reconnect...")
+            HookLog.i(HookLog.Module.NOTIFY, "Triggering auto-reconnect...")
             ensureBound(ctx)
         }
     }
@@ -152,14 +152,14 @@ object HookNotifyClient {
          * 成功建立 Binder 连接时回调
          */
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            XposedBridge.log("$TAG onServiceConnected $name")
+            HookLog.i(HookLog.Module.NOTIFY, "onServiceConnected $name")
             try {
                 // 将 IBinder 转换为 AIDL 接口
                 sService = IHookNotify.Stub.asInterface(service)
                 // 连接成功，移除潜在的重连任务
                 handler.removeCallbacks(reconnectRunnable)
             } catch (t: Throwable) {
-                XposedBridge.log("$TAG asInterface failed: ${t.stackTraceToString()}")
+                HookLog.i(HookLog.Module.NOTIFY, "asInterface failed: ${t.stackTraceToString()}")
                 sService = null
             } finally {
                 // 标记不再处于 binding 状态
@@ -173,17 +173,17 @@ object HookNotifyClient {
          * 远程服务异常断开（进程死亡等）
          */
         override fun onServiceDisconnected(name: ComponentName) {
-            XposedBridge.log("$TAG onServiceDisconnected $name")
+            HookLog.i(HookLog.Module.NOTIFY, "onServiceDisconnected $name")
             handleDisconnect()
         }
 
         override fun onBindingDied(name: ComponentName) {
-            XposedBridge.log("$TAG onBindingDied $name, connection is permanently dead for system auto-restart")
+            HookLog.i(HookLog.Module.NOTIFY, "onBindingDied $name, connection is permanently dead for system auto-restart")
             handleDisconnect()
         }
 
         override fun onNullBinding(name: ComponentName) {
-            XposedBridge.log("$TAG onNullBinding $name")
+            HookLog.i(HookLog.Module.NOTIFY, "onNullBinding $name")
             handleDisconnect()
         }
 
@@ -228,7 +228,7 @@ object HookNotifyClient {
                 service.onPermissionUsed(pkgName, uid, userId, opName)
             }
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG notify failed: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "notify failed: ${t.stackTraceToString()}")
             // Binder 死亡，清空引用，下次自动重连
             sService = null
         }
@@ -254,13 +254,13 @@ object HookNotifyClient {
 
         val ctx = getSystemContext()
         if (ctx == null) {
-            XposedBridge.log("$TAG requestClipboardReadAccess: no system context")
+            HookLog.i(HookLog.Module.NOTIFY, "requestClipboardReadAccess: no system context")
             return FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         }
 
         val service = getOrBindService(ctx)
         if (service == null) {
-            XposedBridge.log("$TAG requestClipboardReadAccess: service unavailable, fail-open=$FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE")
+            HookLog.i(HookLog.Module.NOTIFY, "requestClipboardReadAccess: service unavailable, fail-open=$FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE")
             return FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         }
 
@@ -280,7 +280,7 @@ object HookNotifyClient {
             sService = null
             FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG requestClipboardReadAccess failed: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "requestClipboardReadAccess failed: ${t.stackTraceToString()}")
             sService = null
             FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         }
@@ -296,7 +296,7 @@ object HookNotifyClient {
         val service = if (allowBind) {
             val ctx = getSystemContext()
             if (ctx == null) {
-                XposedBridge.log("$TAG readSimConfigSnapshot: no system context")
+                HookLog.i(HookLog.Module.NOTIFY, "readSimConfigSnapshot: no system context")
                 return cachedSnapshot
             }
             getOrBindService(ctx)
@@ -321,7 +321,7 @@ object HookNotifyClient {
             sService = null
             cachedSnapshot
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG readSimConfigSnapshot failed: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "readSimConfigSnapshot failed: ${t.stackTraceToString()}")
             sService = null
             cachedSnapshot
         }
@@ -342,7 +342,7 @@ object HookNotifyClient {
         val service = if (allowBind) {
             val ctx = bindContext ?: getSystemContext()
             if (ctx == null) {
-                XposedBridge.log("$TAG readUniqueIdentifierConfigSnapshot: no system context")
+                HookLog.i(HookLog.Module.NOTIFY, "readUniqueIdentifierConfigSnapshot: no system context")
                 return cachedSnapshot
             }
             if (bindCurrentUser) {
@@ -371,7 +371,7 @@ object HookNotifyClient {
             sService = null
             cachedSnapshot
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG readUniqueIdentifierConfigSnapshot failed: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "readUniqueIdentifierConfigSnapshot failed: ${t.stackTraceToString()}")
             sService = null
             cachedSnapshot
         }
@@ -412,7 +412,7 @@ object HookNotifyClient {
                 "SYSTEM"
             ) as UserHandle
 
-            XposedBridge.log("$TAG Binding to service $TARGET_PKG as user $systemUser")
+            HookLog.i(HookLog.Module.NOTIFY, "Binding to service $TARGET_PKG as user $systemUser")
 
             // 以 SYSTEM 用户身份绑定服务
             val success = withCleanCallingIdentity {
@@ -425,7 +425,7 @@ object HookNotifyClient {
             }
 
             if (!success) {
-                XposedBridge.log("$TAG bindServiceAsUser returned false")
+                HookLog.i(HookLog.Module.NOTIFY, "bindServiceAsUser returned false")
                 sBinding = false
                 connectLatch?.countDown()
             }
@@ -435,14 +435,14 @@ object HookNotifyClient {
              */
             handler.postDelayed({
                 if (sService == null && sBinding) {
-                    XposedBridge.log("$TAG bind timeout, reset binding")
+                    HookLog.i(HookLog.Module.NOTIFY, "bind timeout, reset binding")
                     sBinding = false
                     connectLatch?.countDown()
                 }
             }, BIND_TIMEOUT_MS)
 
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG bind exception: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "bind exception: ${t.stackTraceToString()}")
             sBinding = false
             connectLatch?.countDown()
         }
@@ -465,7 +465,7 @@ object HookNotifyClient {
         }
 
         try {
-            XposedBridge.log("$TAG Binding to service $TARGET_PKG as current user")
+            HookLog.i(HookLog.Module.NOTIFY, "Binding to service $TARGET_PKG as current user")
             val success = withCleanCallingIdentity {
                 ctx.bindService(
                     intent,
@@ -475,20 +475,20 @@ object HookNotifyClient {
             }
 
             if (!success) {
-                XposedBridge.log("$TAG current-user bindService returned false")
+                HookLog.i(HookLog.Module.NOTIFY, "current-user bindService returned false")
                 sBinding = false
                 connectLatch?.countDown()
             }
 
             handler.postDelayed({
                 if (sService == null && sBinding) {
-                    XposedBridge.log("$TAG current-user bind timeout, reset binding")
+                    HookLog.i(HookLog.Module.NOTIFY, "current-user bind timeout, reset binding")
                     sBinding = false
                     connectLatch?.countDown()
                 }
             }, BIND_TIMEOUT_MS)
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG current-user bind exception: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "current-user bind exception: ${t.stackTraceToString()}")
             sBinding = false
             connectLatch?.countDown()
         }
@@ -516,9 +516,9 @@ object HookNotifyClient {
                 // UserId 0 是主用户
                 XposedHelpers.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
             }
-            XposedBridge.log("$TAG Success to unstop package $TARGET_PKG")
+            HookLog.i(HookLog.Module.NOTIFY, "Success to unstop package $TARGET_PKG")
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG Failed to unstop package: ${t.message}")
+            HookLog.i(HookLog.Module.NOTIFY, "Failed to unstop package: ${t.message}")
         }
     }
 

@@ -21,13 +21,13 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                 it.name == "systemReady" && it.parameterTypes.isNotEmpty() && it.parameterTypes[0] == Runnable::class.java
             } ?: throw NoSuchMethodError("systemReady(Runnable, ...) not found in ActivityManagerService")
 
-            XposedBridge.log("Arirang: Found systemReady with parameters: ${systemReady.parameterTypes.joinToString { it.name }}")
+            HookLog.i(HookLog.Module.CORE, "found systemReady with parameters: ${systemReady.parameterTypes.joinToString { it.name }}")
 
             XposedBridge.hookMethod(
                 systemReady,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        XposedBridge.log("Arirang: AMS systemReady, starting auto-bind to HookNotifyService")
+                        HookLog.i(HookLog.Module.CORE, "AMS systemReady, starting auto-bind to HookNotifyService")
 
                         val ctx = HookNotifyClient.getSystemContext()
                         if (ctx != null) {
@@ -45,7 +45,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                                 override fun onReceive(context: Context, intent: Intent) {
                                     val pkgName = intent.data?.schemeSpecificPart
                                     if (pkgName == BuildConfig.APPLICATION_ID) {
-                                        XposedBridge.log("Arirang: Package $pkgName updated/restarted, trying to bind service...")
+                                        HookLog.i(HookLog.Module.CORE, "package $pkgName updated/restarted, trying to bind service")
                                         HookNotifyClient.autoBind(context)
                                     }
                                 }
@@ -55,7 +55,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                 }
             )
         } catch (t: Throwable) {
-            XposedBridge.log("Arirang: Hook systemReady failed: ${t.stackTraceToString()}")
+            HookLog.e(HookLog.Module.CORE, "systemReady hook failed", t)
         }
     }
 }

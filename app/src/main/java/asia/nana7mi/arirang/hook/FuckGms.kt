@@ -52,7 +52,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         hookApplicationContext(lpparam.classLoader)
         hookAdvertisingIdService()
         hookAppSetCallback(lpparam.classLoader)
-        XposedBridge.log("Arirang: GMS identifier hook installed")
+        HookLog.i(HookLog.Module.GMS, "GMS identifier hook installed")
     }
 
     private fun hookApplicationContext(classLoader: ClassLoader) {
@@ -97,7 +97,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                 spoofAdvertisingIdIfMatched(param)
             }
         })
-        XposedBridge.log("Arirang: hooked GMS Advertising ID service ${ownerClass.name}/${transactClass.name}")
+        HookLog.i(HookLog.Module.GMS, "hooked GMS Advertising ID service ${ownerClass.name}/${transactClass.name}")
     }
 
     private fun hookAdvertisingIdGetters(ownerClass: Class<*>) {
@@ -106,7 +106,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         }
 
         if (methods.isEmpty()) {
-            XposedBridge.log("Arirang: Advertising ID String getter not found on ${ownerClass.name}")
+            HookLog.i(HookLog.Module.GMS, "Advertising ID String getter not found on ${ownerClass.name}")
             return
         }
 
@@ -116,10 +116,10 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val gaid = currentConfig().gaid.takeIf { it.isNotBlank() } ?: return
                     param.result = gaid
-                    XposedBridge.log("Arirang: GAID spoofed from ${ownerClass.name}.${method.name}()")
+                    HookLog.i(HookLog.Module.GMS, "GAID spoofed from ${ownerClass.name}.${method.name}()")
                 }
             })
-            XposedBridge.log("Arirang: hooked GMS Advertising ID getter ${ownerClass.name}.${method.name}()")
+            HookLog.i(HookLog.Module.GMS, "hooked GMS Advertising ID getter ${ownerClass.name}.${method.name}()")
         }
     }
 
@@ -131,7 +131,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         val transactClass = ownerClass.findOnTransactClass()
         logClassHierarchyMethods("App Set service", ownerClass)
         hookAppSetRequestMethod(ownerClass)
-        XposedBridge.log("Arirang: found GMS App Set service ${ownerClass.name}/${transactClass?.name}")
+        HookLog.i(HookLog.Module.GMS, "found GMS App Set service ${ownerClass.name}/${transactClass?.name}")
     }
 
     private fun hookAppSetRequestMethod(ownerClass: Class<*>) {
@@ -140,7 +140,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         val method = ownerClass.declaredMethods.firstOrNull { it.isAppSetRequestMethod() }
 
         if (method == null) {
-            XposedBridge.log("Arirang: App Set request method not found on ${ownerClass.name}")
+            HookLog.i(HookLog.Module.GMS, "App Set request method not found on ${ownerClass.name}")
             return
         }
 
@@ -154,16 +154,16 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                     param.result = null
                     return
                 }
-                XposedBridge.log(
-                    "Arirang: App Set request entered request=${request?.javaClass?.name} " +
-                        "callback=${callback?.javaClass?.name}"
+                HookLog.i(
+                    HookLog.Module.GMS,
+                    "App Set request entered request=${request?.javaClass?.name} callback=${callback?.javaClass?.name}"
                 )
                 request?.javaClass?.let { logClassHierarchyMethods("App Set request object", it) }
                 callback?.javaClass?.let { logClassHierarchyMethods("App Set callback object", it) }
                 method.parameterTypes.getOrNull(1)?.let { logClassHierarchyMethods("App Set callback type", it) }
             }
         })
-        XposedBridge.log("Arirang: hooked GMS App Set request method ${ownerClass.name}.${method.name}()")
+        HookLog.i(HookLog.Module.GMS, "hooked GMS App Set request method ${ownerClass.name}.${method.name}()")
     }
 
     private fun spoofAppSetRequest(classLoader: ClassLoader, callback: Any?): Boolean {
@@ -186,13 +186,13 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                 callbackMethod.isAccessible = true
                 runCatching {
                     callbackMethod.invoke(callback, status, info)
-                    XposedBridge.log(
-                        "Arirang: App Set ID spoofed from GMS service callback " +
-                            "${callback.javaClass.name}.${callbackMethod.name}()"
+                    HookLog.i(
+                        HookLog.Module.GMS,
+                        "App Set ID spoofed from GMS service callback ${callback.javaClass.name}.${callbackMethod.name}()"
                     )
                     return true
                 }.onFailure {
-                    XposedBridge.log("Arirang: failed to invoke App Set callback method: ${it.message}")
+                    HookLog.i(HookLog.Module.GMS, "failed to invoke App Set callback method: ${it.message}")
                     if (spoofAppSetCallbackBinder(callback, status, info)) return true
                 }
             } else {
@@ -202,7 +202,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
             val statusClass = XposedHelpers.findClass("com.google.android.gms.common.api.Status", classLoader)
             spoofAppSetCallbackBinder(callback, statusClass.successStatus(), info)
         }.onFailure {
-            XposedBridge.log("Arirang: failed to spoof App Set ID from GMS service callback: ${it.message}")
+            HookLog.i(HookLog.Module.GMS, "failed to spoof App Set ID from GMS service callback: ${it.message}")
         }.getOrDefault(false)
     }
 
@@ -215,13 +215,13 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
             data.writeParcelableCompat(info as Parcelable, 0)
             val handled = binder.transact(APP_SET_CALLBACK_TRANSACTION, data, null, IBinder.FLAG_ONEWAY)
             if (handled) {
-                XposedBridge.log("Arirang: App Set ID spoofed from GMS callback binder")
+                HookLog.i(HookLog.Module.GMS, "App Set ID spoofed from GMS callback binder")
             } else {
-                XposedBridge.log("Arirang: App Set callback binder transact returned false")
+                HookLog.i(HookLog.Module.GMS, "App Set callback binder transact returned false")
             }
             handled
         }.onFailure {
-            XposedBridge.log("Arirang: failed to spoof App Set ID from callback binder: ${it.message}")
+            HookLog.i(HookLog.Module.GMS, "failed to spoof App Set ID from callback binder: ${it.message}")
         }.getOrDefault(false).also {
             data.recycle()
         }
@@ -238,7 +238,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         val reply = param.args.getOrNull(2) as? Parcel ?: return
         reply.replaceWithStringResult(gaid)
         param.result = true
-        XposedBridge.log("Arirang: GAID spoofed from GMS binder")
+        HookLog.i(HookLog.Module.GMS, "GAID spoofed from GMS binder")
     }
 
     private fun hookAppSetCallback(classLoader: ClassLoader) {
@@ -262,7 +262,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                     if (data.interfaceTokenOrNull() != APP_SET_CALLBACK_DESCRIPTOR) return
 
                     val appSetId = currentConfig().appSetId.takeIf { it.isNotBlank() } ?: return
-                    XposedBridge.log("Arirang: App Set ID callback matched in GMS")
+                    HookLog.i(HookLog.Module.GMS, "App Set ID callback matched in GMS")
                     val replacement = Parcel.obtain()
                     try {
                         val status = data.readParcelableAfterInterfaceToken(Status.CREATOR) ?: Status.RESULT_SUCCESS
@@ -270,10 +270,10 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                         replacement.writeParcelableCompat(status, 0)
                         replacement.writeParcelableCompat(AppSetIdResult(appSetId, 1), 0)
                         param.args[1] = replacement
-                        XposedBridge.log("Arirang: App Set ID spoofed from GMS callback")
+                        HookLog.i(HookLog.Module.GMS, "App Set ID spoofed from GMS callback")
                     } catch (t: Throwable) {
                         replacement.recycle()
-                        XposedBridge.log("Arirang: failed to rewrite App Set ID callback: ${t.message}")
+                        HookLog.i(HookLog.Module.GMS, "failed to rewrite App Set ID callback: ${t.message}")
                     }
                 }
             }
@@ -309,7 +309,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                 appSetId = root.optString(KEY_APP_SET_ID)
             )
         }.onFailure {
-            XposedBridge.log("Arirang: failed to read GMS identifier config through IHookNotify: ${it.message}")
+            HookLog.i(HookLog.Module.GMS, "failed to read GMS identifier config through IHookNotify: ${it.message}")
         }.getOrNull()
     }
 
@@ -421,7 +421,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                     val params = method.parameterTypes.joinToString(",") { it.name }
                     "${method.returnType.name} ${method.name}($params)"
                 }
-            XposedBridge.log("Arirang: $label class ${current.name} methods=[$signatures]")
+            HookLog.i(HookLog.Module.GMS, "$label class ${current.name} methods=[$signatures]")
             current = current.superclass
         }
     }
@@ -431,7 +431,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
             val params = constructor.parameterTypes.joinToString(",") { it.name }
             "${ownerClass.name}($params)"
         }
-        XposedBridge.log("Arirang: $label class ${ownerClass.name} constructors=[$signatures]")
+        HookLog.i(HookLog.Module.GMS, "$label class ${ownerClass.name} constructors=[$signatures]")
     }
 
     private data class IdentifierConfig(
