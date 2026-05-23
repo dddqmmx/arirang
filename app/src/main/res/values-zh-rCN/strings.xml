@@ -66,6 +66,9 @@
     <string name="fused_cache_waiting">Fused(缓存): 等待中...</string>
     <string name="fused_realtime_waiting">Fused(实时): 等待中...</string>
     <string name="save">保存</string>
+    <string name="unsaved_changes_title">设置未保存</string>
+    <string name="unsaved_changes_message">设置已修改，离开前是否保存？</string>
+    <string name="discard_changes">放弃</string>
     <string name="add_new_slot">添加新插槽</string>
     <string name="hide_sim">隐藏全部 SIM 信息</string>
     <string name="sim_hook_enabled">启用 Hook</string>
@@ -104,6 +107,8 @@
     <string name="unique_import_imei">导入当前 IMEI</string>
     <string name="unique_import_imei_empty">没有读取到可用的 IMEI。</string>
     <string name="unique_imei_slot_title">卡槽 %1$d</string>
+    <string name="sim_slot_limit_reached">只能配置 %1$d 个 SIM 卡槽。请先在唯一标识中调整 IMEI 槽位。</string>
+    <string name="sim_slot_limit_title">已达到卡槽上限</string>
     <string name="test_clipboard_receiver">测试 ClipboardRequestReceiver</string>
     <string name="location_hook_enabled">启用虚拟定位</string>
     <string name="location_hook_enabled_summary">将配置的坐标应用到已 Hook 的原生和 Fused 定位读取。</string>
@@ -304,6 +309,7 @@
     <string name="sim_preset_carrier_placeholder_select">选择运营商...</string>
     <string name="sim_summary_fallback">SIM</string>
     <string name="save_success">保存成功</string>
+    <string name="save_success_reboot_required">保存成功。请重启手机后生效。</string>
     <string name="sim_import_no_active">未发现活跃的系统 SIM 卡</string>
     <string name="sim_import_desc">从系统导入 SIM 卡信息</string>
     <string name="sim_mcc_prefix">MCC:</string>

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.telephony.TelephonyManager
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,7 +31,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -68,6 +68,8 @@ import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
+import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 import kotlin.math.roundToInt
 
@@ -87,7 +89,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     onImportImeis = { importCurrentImeis() },
                     onSave = { config ->
                         UniqueIdentifierPrefs.saveConfig(this, config)
-                        Toast.makeText(this, getString(R.string.save_success), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.save_success_reboot_required), Toast.LENGTH_LONG).show()
                     }
                 )
             }
@@ -103,6 +105,8 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         onSave: (UniqueIdentifierPrefs.Config) -> Unit
     ) {
         var config by remember { mutableStateOf(initialConfig) }
+        var savedConfig by remember { mutableStateOf(initialConfig) }
+        var showUnsavedDialog by remember { mutableStateOf(false) }
         var revision by remember { mutableLongStateOf(0L) }
         val imeiRows = remember {
             mutableStateListOf<ImeiRowState>().apply {
@@ -124,12 +128,35 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         var draggedItemIndex by remember { mutableStateOf<Int?>(null) }
         var draggingOffset by remember { mutableFloatStateOf(0f) }
 
-        fun updateImeis() {
-            config = config.copy(
+        fun currentConfig(): UniqueIdentifierPrefs.Config {
+            return config.copy(
                 imeiBySlot = imeiRows.mapIndexed { index, row -> index to row.imei }.toMap().toSortedMap(),
                 tacBySlot = imeiRows.mapIndexed { index, row -> index to row.tac }.toMap().toSortedMap()
             )
         }
+
+        fun updateImeis() {
+            config = currentConfig()
+        }
+
+        fun saveCurrent() {
+            val current = currentConfig()
+            config = current
+            onSave(current)
+            savedConfig = current
+        }
+
+        val hasChanges = currentConfig() != savedConfig
+
+        fun requestBack() {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onBack()
+            }
+        }
+
+        BackHandler { requestBack() }
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -137,7 +164,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                 CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.unique_identifier_config_title)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = { requestBack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     },
@@ -157,12 +184,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         }) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_import_imei))
                         }
-                        IconButton(onClick = {
-                            updateImeis()
-                            onSave(config)
-                        }) {
-                            Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
-                        }
+                        SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
                     scrollBehavior = scrollBehavior
                 )
@@ -412,6 +434,21 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+
+        if (showUnsavedDialog) {
+            UnsavedChangesDialog(
+                onDismiss = { showUnsavedDialog = false },
+                onDiscard = {
+                    showUnsavedDialog = false
+                    onBack()
+                },
+                onSave = {
+                    showUnsavedDialog = false
+                    saveCurrent()
+                    onBack()
+                }
+            )
         }
     }
 

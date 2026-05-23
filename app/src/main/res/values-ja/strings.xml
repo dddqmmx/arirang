@@ -64,6 +64,9 @@
     <string name="fused_cache_waiting">Fused(キャッシュ): 待機中...</string>
     <string name="fused_realtime_waiting">Fused(リアルタイム): 待機中...</string>
     <string name="save">保存</string>
+    <string name="unsaved_changes_title">未保存の変更</string>
+    <string name="unsaved_changes_message">設定が変更されています。移動する前に保存しますか？</string>
+    <string name="discard_changes">破棄</string>
     <string name="add_new_slot">新しいスロットを追加</string>
     <string name="hide_sim">SIM 情報をすべて非表示</string>
     <string name="sim_hook_enabled">Hook を有効化</string>
@@ -102,6 +105,8 @@
     <string name="unique_add_imei_slot">IMEI スロットを追加</string>
     <string name="unique_import_imei">現在の IMEI をインポート</string>
     <string name="unique_import_imei_empty">読み取り可能な IMEI は返されませんでした。</string>
+    <string name="sim_slot_limit_reached">%1$d 件の SIM スロットのみ設定できます。先に一意識別子で IMEI スロットを調整してください。</string>
+    <string name="sim_slot_limit_title">スロット上限に達しました</string>
     <string name="test_clipboard_receiver">ClipboardRequestReceiver をテスト</string>
     <string name="location_hook_enabled">仮想位置情報を有効化</string>
     <string name="location_hook_enabled_summary">設定した座標を、Hook 済みのネイティブおよび Fused 位置情報の読み取りに適用します。</string>
@@ -301,6 +306,7 @@
     <string name="sim_preset_carrier_placeholder_select">キャリアを選択...</string>
     <string name="sim_summary_fallback">SIM</string>
     <string name="save_success">保存しました</string>
+    <string name="save_success_reboot_required">保存しました。変更を反映するには端末を再起動してください。</string>
     <string name="sim_import_no_active">有効なシステムSIMが見つかりません</string>
     <string name="sim_import_desc">システムからSIM情報をインポート</string>
     <string name="sim_mcc_prefix">MCC:</string>

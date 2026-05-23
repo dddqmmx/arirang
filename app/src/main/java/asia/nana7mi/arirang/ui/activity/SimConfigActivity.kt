@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,17 +32,24 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
+import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.model.SimInfo
+import asia.nana7mi.arirang.ui.component.InfoDialog
+import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
 import asia.nana7mi.arirang.ui.component.SimSlotItem
+import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import java.security.SecureRandom
 
 class SimConfigActivity : ComponentActivity() {
+    private val iccidRandom = SecureRandom()
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val initialConfig = SimConfigPrefs.loadConfig(this)
+        val slotLimit = UniqueIdentifierPrefs.configuredSlotCount(this)
 
         setContent {
             ArirangTheme {
@@ -52,7 +60,8 @@ class SimConfigActivity : ComponentActivity() {
                     },
                     initialEnabled = initialConfig.enabled,
                     initialHideSim = initialConfig.hideSim,
-                    initialSimList = initialConfig.simInfoList
+                    initialSimList = initialConfig.simInfoList,
+                    slotLimit = slotLimit
                 )
             }
         }
@@ -67,7 +76,7 @@ class SimConfigActivity : ComponentActivity() {
                 simInfoList = simInfoList
             )
         )
-        Toast.makeText(this, getString(R.string.save_success), Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.save_success_reboot_required), Toast.LENGTH_LONG).show()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -77,13 +86,39 @@ class SimConfigActivity : ComponentActivity() {
         onSave: (Boolean, Boolean, List<SimInfo>) -> Unit,
         initialEnabled: Boolean,
         initialHideSim: Boolean,
-        initialSimList: List<SimInfo>
+        initialSimList: List<SimInfo>,
+        slotLimit: Int
     ) {
         var enabled by remember { mutableStateOf(initialEnabled) }
         var hideSim by remember { mutableStateOf(initialHideSim) }
-        val simList = remember { mutableStateListOf<SimInfo>().apply { addAll(initialSimList) } }
+        val maxSlots = slotLimit.coerceAtLeast(1)
+        val simList = remember { mutableStateListOf<SimInfo>().apply { addAll(initialSimList.take(maxSlots)) } }
+        var savedEnabled by remember { mutableStateOf(initialEnabled) }
+        var savedHideSim by remember { mutableStateOf(initialHideSim) }
+        var savedSimList by remember { mutableStateOf(initialSimList.take(maxSlots)) }
+        var showUnsavedDialog by remember { mutableStateOf(false) }
+        var showSlotLimitDialog by remember { mutableStateOf(false) }
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
         val context = LocalContext.current
+        val hasChanges = enabled != savedEnabled || hideSim != savedHideSim || simList.toList() != savedSimList
+
+        fun saveCurrent() {
+            val currentList = simList.toList()
+            onSave(enabled, hideSim, currentList)
+            savedEnabled = enabled
+            savedHideSim = hideSim
+            savedSimList = currentList
+        }
+
+        fun requestBack() {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onBack()
+            }
+        }
+
+        BackHandler { requestBack() }
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -91,7 +126,7 @@ class SimConfigActivity : ComponentActivity() {
                 CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.sim_config_title)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = { requestBack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     },
@@ -102,7 +137,7 @@ class SimConfigActivity : ComponentActivity() {
                                     val systemSims = getSystemSimInfoList()
                                     if (systemSims.isNotEmpty()) {
                                         simList.clear()
-                                        simList.addAll(systemSims)
+                                        simList.addAll(systemSims.take(maxSlots))
                                     } else {
                                         Toast.makeText(context, context.getString(R.string.sim_import_no_active), Toast.LENGTH_SHORT).show()
                                     }
@@ -113,9 +148,7 @@ class SimConfigActivity : ComponentActivity() {
                                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.sim_import_desc))
                             }
                         }
-                        IconButton(onClick = { onSave(enabled, hideSim, simList.toList()) }) {
-                            Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
-                        }
+                        SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
                     scrollBehavior = scrollBehavior
                 )
@@ -124,9 +157,14 @@ class SimConfigActivity : ComponentActivity() {
                 if (!hideSim) {
                     ExtendedFloatingActionButton(
                         onClick = {
+                            if (simList.size >= maxSlots) {
+                                showSlotLimitDialog = true
+                                return@ExtendedFloatingActionButton
+                            }
                             val newSlotIndex = simList.size
                             simList.add(createDefaultSimInfo(newSlotIndex))
                         },
+                        expanded = simList.size < maxSlots,
                         icon = { Icon(Icons.Default.Add, contentDescription = null) },
                         text = { Text(stringResource(R.string.add_new_slot)) },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -179,6 +217,29 @@ class SimConfigActivity : ComponentActivity() {
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
             }
+        }
+
+        if (showUnsavedDialog) {
+            UnsavedChangesDialog(
+                onDismiss = { showUnsavedDialog = false },
+                onDiscard = {
+                    showUnsavedDialog = false
+                    onBack()
+                },
+                onSave = {
+                    showUnsavedDialog = false
+                    saveCurrent()
+                    onBack()
+                }
+            )
+        }
+
+        if (showSlotLimitDialog) {
+            InfoDialog(
+                title = stringResource(R.string.sim_slot_limit_title),
+                message = stringResource(R.string.sim_slot_limit_reached, maxSlots),
+                onDismiss = { showSlotLimitDialog = false }
+            )
         }
     }
 
@@ -268,7 +329,7 @@ class SimConfigActivity : ComponentActivity() {
     private fun createDefaultSimInfo(index: Int): SimInfo {
         return SimInfo(
             id = index + 1,
-            iccId = "",
+            iccId = randomIccidForDefault(),
             simSlotIndex = index,
             displayName = getString(R.string.sim_carrier_default),
             carrierName = getString(R.string.sim_carrier_default),
@@ -297,6 +358,29 @@ class SimConfigActivity : ComponentActivity() {
             usageSetting = 0,
             isExpanded = true
         )
+    }
+
+    private fun randomIccidForDefault(): String {
+        val body = buildString(18) {
+            append("89860")
+            while (length < 18) {
+                append(iccidRandom.nextInt(10))
+            }
+        }
+        return body + luhnCheckDigit(body)
+    }
+
+    private fun luhnCheckDigit(body: String): Int {
+        val sum = body.reversed().mapIndexed { index, char ->
+            val digit = char.digitToIntOrNull() ?: 0
+            if (index % 2 == 0) {
+                val doubled = digit * 2
+                if (doubled > 9) doubled - 9 else doubled
+            } else {
+                digit
+            }
+        }.sum()
+        return (10 - (sum % 10)) % 10
     }
 
     private fun getSystemSimInfoList(): List<SimInfo> {

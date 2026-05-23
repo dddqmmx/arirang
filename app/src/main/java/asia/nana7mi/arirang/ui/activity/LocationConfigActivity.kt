@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.ui.activity
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,7 +21,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
+import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class LocationConfigActivity : ComponentActivity() {
@@ -84,6 +86,7 @@ class LocationConfigActivity : ComponentActivity() {
         onSave: (Config) -> Unit
     ) {
         var config by remember { mutableStateOf(initialConfig) }
+        var savedConfig by remember { mutableStateOf(initialConfig) }
         var latitudeText by remember { mutableStateOf(initialConfig.latitude.toString()) }
         var longitudeText by remember { mutableStateOf(initialConfig.longitude.toString()) }
         var altitudeText by remember { mutableStateOf(initialConfig.altitude.toString()) }
@@ -91,8 +94,16 @@ class LocationConfigActivity : ComponentActivity() {
         var speedText by remember { mutableStateOf(initialConfig.speed.toString()) }
         var bearingText by remember { mutableStateOf(initialConfig.bearing.toString()) }
         var satellitesText by remember { mutableStateOf(initialConfig.satellites.toString()) }
+        var savedLatitudeText by remember { mutableStateOf(latitudeText) }
+        var savedLongitudeText by remember { mutableStateOf(longitudeText) }
+        var savedAltitudeText by remember { mutableStateOf(altitudeText) }
+        var savedAccuracyText by remember { mutableStateOf(accuracyText) }
+        var savedSpeedText by remember { mutableStateOf(speedText) }
+        var savedBearingText by remember { mutableStateOf(bearingText) }
+        var savedSatellitesText by remember { mutableStateOf(satellitesText) }
         var revision by remember { mutableLongStateOf(0L) }
         var validationError by remember { mutableStateOf<String?>(null) }
+        var showUnsavedDialog by remember { mutableStateOf(false) }
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
         val context = LocalContext.current
 
@@ -181,13 +192,47 @@ class LocationConfigActivity : ComponentActivity() {
             )
         }
 
+        fun saveCurrent(): Boolean {
+            val current = parsedConfig() ?: return false
+            onSave(current)
+            config = current
+            savedConfig = current
+            savedLatitudeText = latitudeText
+            savedLongitudeText = longitudeText
+            savedAltitudeText = altitudeText
+            savedAccuracyText = accuracyText
+            savedSpeedText = speedText
+            savedBearingText = bearingText
+            savedSatellitesText = satellitesText
+            return true
+        }
+
+        val hasChanges = config.enabled != savedConfig.enabled ||
+            latitudeText != savedLatitudeText ||
+            longitudeText != savedLongitudeText ||
+            altitudeText != savedAltitudeText ||
+            accuracyText != savedAccuracyText ||
+            speedText != savedSpeedText ||
+            bearingText != savedBearingText ||
+            satellitesText != savedSatellitesText
+
+        fun requestBack() {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onBack()
+            }
+        }
+
+        BackHandler { requestBack() }
+
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.location_config_title)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = { requestBack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     },
@@ -195,11 +240,7 @@ class LocationConfigActivity : ComponentActivity() {
                         IconButton(onClick = { applyConfig(Config(enabled = true)) }) {
                             Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_default_pyongyang))
                         }
-                        IconButton(onClick = {
-                            parsedConfig()?.let(onSave)
-                        }) {
-                            Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
-                        }
+                        SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
                     scrollBehavior = scrollBehavior
                 )
@@ -321,6 +362,22 @@ class LocationConfigActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+
+        if (showUnsavedDialog) {
+            UnsavedChangesDialog(
+                onDismiss = { showUnsavedDialog = false },
+                onDiscard = {
+                    showUnsavedDialog = false
+                    onBack()
+                },
+                onSave = {
+                    if (saveCurrent()) {
+                        showUnsavedDialog = false
+                        onBack()
+                    }
+                }
+            )
         }
     }
 

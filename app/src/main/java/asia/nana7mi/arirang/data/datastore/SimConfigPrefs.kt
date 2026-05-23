@@ -45,22 +45,26 @@ object SimConfigPrefs {
 
     fun loadConfig(context: Context): Config {
         val prefs = prefs(context)
-        return Config(
-            enabled = prefs.getBoolean(KEY_ENABLED, false),
-            hideSim = prefs.getBoolean(KEY_HIDE_SIM, false),
-            simInfoBySlot = loadSimInfoMap(prefs)
+        return limitToConfiguredSlots(
+            context,
+            Config(
+                enabled = prefs.getBoolean(KEY_ENABLED, false),
+                hideSim = prefs.getBoolean(KEY_HIDE_SIM, false),
+                simInfoBySlot = loadSimInfoMap(prefs)
+            )
         )
     }
 
     fun saveConfig(context: Context, config: Config) {
+        val boundedConfig = limitToConfiguredSlots(context, config)
         prefs(context).edit(commit = true) {
-            putBoolean(KEY_ENABLED, config.enabled)
-            putBoolean(KEY_HIDE_SIM, config.hideSim)
+            putBoolean(KEY_ENABLED, boundedConfig.enabled)
+            putBoolean(KEY_HIDE_SIM, boundedConfig.hideSim)
             putLong(KEY_LAST_MODIFIED, Date().time)
             remove(KEY_SIM_INFO_LIST)
-            putString(KEY_SIM_INFO_MAP, gson.toJson(config.simInfoBySlot.toSortedMap()))
+            putString(KEY_SIM_INFO_MAP, gson.toJson(boundedConfig.simInfoBySlot.toSortedMap()))
         }
-        SubmoduleConfigFiles.write(context, config)
+        SubmoduleConfigFiles.write(context, boundedConfig)
     }
 
     fun lastModified(context: Context): Long {
@@ -97,6 +101,25 @@ object SimConfigPrefs {
 
     private fun prefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    private fun limitToConfiguredSlots(context: Context, config: Config): Config {
+        val slotLimit = UniqueIdentifierPrefs.configuredSlotCount(context)
+        return config.copy(
+            simInfoBySlot = config.simInfoBySlot.toSortedMap()
+                .entries
+                .take(slotLimit)
+                .mapIndexed { index, (_, simInfo) ->
+                    val normalizedSlot = index.coerceAtLeast(0)
+                    normalizedSlot to simInfo.copy(
+                        simSlotIndex = normalizedSlot,
+                        id = simInfo.id?.takeIf { it > 0 } ?: normalizedSlot + 1,
+                        cardId = simInfo.cardId?.takeIf { it >= 0 } ?: normalizedSlot
+                    )
+                }
+                .toMap()
+                .toSortedMap()
+        )
     }
 
     private fun List<SimInfo>.toSlotMap(): Map<Int, SimInfo> {

@@ -65,6 +65,9 @@
     <string name="fused_cache_waiting">Fused (Cache): Waiting...</string>
     <string name="fused_realtime_waiting">Fused (Real-time): Waiting...</string>
     <string name="save">Save</string>
+    <string name="unsaved_changes_title">Unsaved changes</string>
+    <string name="unsaved_changes_message">Settings have changed. Save before leaving?</string>
+    <string name="discard_changes">Discard</string>
     <string name="add_new_slot">Add New Slot</string>
     <string name="hide_sim">Hide all SIM info</string>
     <string name="sim_hook_enabled">Enable hook</string>
@@ -103,6 +106,8 @@
     <string name="unique_import_imei">Import current IMEI</string>
     <string name="unique_import_imei_empty">No readable IMEI was returned.</string>
     <string name="unique_imei_slot_title">Slot %1$d</string>
+    <string name="sim_slot_limit_reached">Only %1$d SIM slot(s) can be configured. Adjust IMEI slots in Unique identifiers first.</string>
+    <string name="sim_slot_limit_title">Slot limit reached</string>
     <string name="test_clipboard_receiver">Test ClipboardRequestReceiver</string>
     <string name="location_hook_enabled">Enable virtual location</string>
     <string name="location_hook_enabled_summary">Applies the configured coordinates to hooked native and fused location reads.</string>
@@ -307,6 +312,7 @@
     <string name="sim_preset_carrier_placeholder_select">Select Carrier...</string>
     <string name="sim_summary_fallback">SIM</string>
     <string name="save_success">Saved successfully</string>
+    <string name="save_success_reboot_required">Saved successfully. Reboot the phone for changes to take effect.</string>
     <string name="sim_import_no_active">No active system SIMs found</string>
     <string name="sim_import_desc">Import System SIMs</string>
     <string name="sim_mcc_prefix">MCC:</string>

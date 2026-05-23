@@ -89,6 +89,11 @@ object UniqueIdentifierPrefs {
             .getLong(KEY_LAST_MODIFIED, 0L)
     }
 
+    fun configuredSlotCount(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return loadSlotStringMap(prefs.getString(KEY_IMEI_BY_SLOT, null)).size.coerceAtLeast(1)
+    }
+
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
         return JSONObject()

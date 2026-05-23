@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.ui.activity
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.DeviceInfoPrefs
 import asia.nana7mi.arirang.model.DevicePresetCatalog
+import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class DeviceInfoConfigActivity : ComponentActivity() {
@@ -72,7 +74,7 @@ class DeviceInfoConfigActivity : ComponentActivity() {
                     onBack = { finish() },
                     onSave = { config ->
                         DeviceInfoPrefs.saveConfig(this, config)
-                        Toast.makeText(this, getString(R.string.save_success), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.save_success_reboot_required), Toast.LENGTH_LONG).show()
                     }
                 )
             }
@@ -87,8 +89,10 @@ class DeviceInfoConfigActivity : ComponentActivity() {
         onSave: (DeviceInfoPrefs.Config) -> Unit
     ) {
         var config by remember { mutableStateOf(initialConfig) }
+        var savedConfig by remember { mutableStateOf(initialConfig) }
         var expanded by remember { mutableStateOf(false) }
         var buildTimeText by remember { mutableStateOf(initialConfig.time.toString()) }
+        var showUnsavedDialog by remember { mutableStateOf(false) }
         var revision by remember { mutableLongStateOf(0L) }
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
         val selectedPreset = DevicePresetCatalog.ALL.firstOrNull { it.id == config.presetId }?.label
@@ -100,13 +104,36 @@ class DeviceInfoConfigActivity : ComponentActivity() {
             revision++
         }
 
+        fun currentConfig(): DeviceInfoPrefs.Config {
+            return config.copy(time = buildTimeText.toLongOrNull() ?: config.time)
+        }
+
+        fun saveCurrent() {
+            val current = currentConfig()
+            config = current
+            onSave(current)
+            savedConfig = current
+        }
+
+        val hasChanges = currentConfig() != savedConfig
+
+        fun requestBack() {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onBack()
+            }
+        }
+
+        BackHandler { requestBack() }
+
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.device_info_config_title)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = { requestBack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     },
@@ -114,11 +141,7 @@ class DeviceInfoConfigActivity : ComponentActivity() {
                         IconButton(onClick = { updateConfig(DeviceInfoPrefs.currentDeviceConfig()) }) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.device_import_current))
                         }
-                        IconButton(onClick = {
-                            onSave(config.copy(time = buildTimeText.toLongOrNull() ?: config.time))
-                        }) {
-                            Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
-                        }
+                        SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
                     scrollBehavior = scrollBehavior
                 )
@@ -294,6 +317,21 @@ class DeviceInfoConfigActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+
+        if (showUnsavedDialog) {
+            UnsavedChangesDialog(
+                onDismiss = { showUnsavedDialog = false },
+                onDiscard = {
+                    showUnsavedDialog = false
+                    onBack()
+                },
+                onSave = {
+                    showUnsavedDialog = false
+                    saveCurrent()
+                    onBack()
+                }
+            )
         }
     }
 

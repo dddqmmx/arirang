@@ -144,6 +144,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         val imeiBySlot: Map<Int, String> = DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.imei },
         val tacBySlot: Map<Int, String> = DEFAULT_PROFILES_BY_SLOT.mapValues { it.value.typeAllocationCode }
     ) {
+        val slotLimit: Int = imeiBySlot.size.coerceAtLeast(1)
+
         fun imeiForSlot(slotIndex: Int?, fallback: String?): String? {
             if (!enabled) return fallback
             if (slotIndex != null) {
@@ -1333,6 +1335,14 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             if (targetClass.declaredMethods.none { it.name == methodName }) return@forEach
 
             XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val config = hookConfig
+                    if (!config.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
+                    if (shouldShortCircuitInternalSubscriptionIdRead()) {
+                        param.result = config.visibleProfiles.map { it.subId }.toIntArray()
+                    }
+                }
+
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = hookConfig
                     if (!config.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
@@ -1410,6 +1420,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
         val callingUid = Binder.getCallingUid()
         return callingUid >= Process.FIRST_APPLICATION_UID && callingUid != Process.myUid()
+    }
+
+    private fun shouldShortCircuitInternalSubscriptionIdRead(): Boolean {
+        val callingUid = Binder.getCallingUid()
+        return callingUid == Process.SYSTEM_UID ||
+            callingUid == Process.PHONE_UID ||
+            callingUid == Process.myUid()
     }
 
     private fun hookAllExistingStringMethods(
@@ -1715,8 +1732,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 ?.let(::parseProfileList)
                 ?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_PROFILES_BY_SLOT
-        val normalized = normalizeProfiles(profilesBySlot)
         val uniqueIdentifiers = readUniqueIdentifierConfig(force)
+        val normalized = normalizeProfiles(profilesBySlot, uniqueIdentifiers.slotLimit)
         return HookConfig(
             enabled = enabled,
             hideSim = hideSim,
@@ -1945,15 +1962,21 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         )
     }
 
-    private fun normalizeProfiles(profilesBySlot: Map<Int, SimProfile>): Map<Int, SimProfile> {
-        return profilesBySlot.toSortedMap().mapValues { (slot, profile) ->
-            profile.copy(
-                slotIndex = slot,
-                subId = profile.subId.takeIf { it > 0 } ?: slot + 1,
-                cardId = profile.cardId.takeIf { it >= 0 } ?: slot,
-                portIndex = profile.portIndex.takeIf { it >= 0 } ?: slot
-            )
-        }
+    private fun normalizeProfiles(profilesBySlot: Map<Int, SimProfile>, slotLimit: Int): Map<Int, SimProfile> {
+        return profilesBySlot.toSortedMap()
+            .entries
+            .take(slotLimit.coerceAtLeast(1))
+            .mapIndexed { index, (_, profile) ->
+                val normalizedSlot = index.coerceAtLeast(0)
+                normalizedSlot to profile.copy(
+                    slotIndex = normalizedSlot,
+                    subId = profile.subId.takeIf { it > 0 } ?: normalizedSlot + 1,
+                    cardId = profile.cardId.takeIf { it >= 0 } ?: normalizedSlot,
+                    portIndex = profile.portIndex.takeIf { it >= 0 } ?: normalizedSlot
+                )
+            }
+            .toMap()
+            .toSortedMap()
     }
 
     private fun JSONObject.optCleanString(name: String): String? {
