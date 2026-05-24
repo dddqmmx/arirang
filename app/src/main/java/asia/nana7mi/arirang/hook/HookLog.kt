@@ -14,6 +14,7 @@ object HookLog {
         PACKAGE_LIST("package_list"),
         SETTINGS("settings"),
         SIM("sim"),
+        WIFI("wifi"),
         UNIQUE_ID("unique_id"),
         NOTIFY("notify")
     }

@@ -123,6 +123,21 @@
     <string name="location_field_satellites">卫星数</string>
     <string name="location_default_pyongyang">使用平壤默认值</string>
     <string name="location_invalid_number">%1$s 必须在 %2$s 到 %3$s 之间。</string>
+    <string name="wifi_config_title">Wi-Fi 信息</string>
+    <string name="wifi_hook_enabled">启用 Hook</string>
+    <string name="wifi_hook_enabled_summary">改写应用读取到的当前 Wi-Fi 标识和周边扫描结果。</string>
+    <string name="wifi_section_current">当前 Wi-Fi</string>
+    <string name="wifi_section_scan_result">周边 Wi-Fi</string>
+    <string name="wifi_field_current_ssid">当前 SSID</string>
+    <string name="wifi_field_current_bssid">当前 BSSID</string>
+    <string name="wifi_field_scan_ssid">扫描结果 SSID</string>
+    <string name="wifi_field_scan_bssid">扫描结果 BSSID</string>
+    <string name="wifi_hide_all_scan_results">隐藏所有周边 Wi-Fi</string>
+    <string name="wifi_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表。</string>
+    <string name="wifi_add_scan_result">新增周边 Wi-Fi</string>
+    <string name="wifi_remove_scan_result">删除周边 Wi-Fi</string>
+    <string name="wifi_scan_result_title">周边 Wi-Fi %1$d</string>
+    <string name="wifi_apply_defaults">应用默认值</string>
 
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">选择语言</string>

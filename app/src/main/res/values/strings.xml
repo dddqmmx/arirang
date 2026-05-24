@@ -122,6 +122,21 @@
     <string name="location_field_satellites">Satellites</string>
     <string name="location_default_pyongyang">Use Pyongyang default</string>
     <string name="location_invalid_number">%1$s must be between %2$s and %3$s.</string>
+    <string name="wifi_config_title">Wi-Fi Information</string>
+    <string name="wifi_hook_enabled">Enable hook</string>
+    <string name="wifi_hook_enabled_summary">Rewrites the current Wi-Fi identity and nearby scan result returned to apps.</string>
+    <string name="wifi_section_current">Current Wi-Fi</string>
+    <string name="wifi_section_scan_result">Nearby Wi-Fi</string>
+    <string name="wifi_field_current_ssid">Current SSID</string>
+    <string name="wifi_field_current_bssid">Current BSSID</string>
+    <string name="wifi_field_scan_ssid">Scan result SSID</string>
+    <string name="wifi_field_scan_bssid">Scan result BSSID</string>
+    <string name="wifi_hide_all_scan_results">Hide all nearby Wi-Fi</string>
+    <string name="wifi_hide_all_scan_results_summary">Return an empty scan list to hooked apps.</string>
+    <string name="wifi_add_scan_result">Add nearby Wi-Fi</string>
+    <string name="wifi_remove_scan_result">Remove nearby Wi-Fi</string>
+    <string name="wifi_scan_result_title">Nearby Wi-Fi %1$d</string>
+    <string name="wifi_apply_defaults">Apply defaults</string>
 
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">Select Language</string>

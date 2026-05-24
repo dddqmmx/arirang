@@ -60,6 +60,7 @@ import asia.nana7mi.arirang.ui.activity.PackageListConfigActivity
 import asia.nana7mi.arirang.ui.activity.SelfCheckActivity
 import asia.nana7mi.arirang.ui.activity.SimConfigActivity
 import asia.nana7mi.arirang.ui.activity.UniqueIdentifierConfigActivity
+import asia.nana7mi.arirang.ui.activity.WifiConfigActivity
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class HomeFragment : Fragment() {
@@ -131,7 +132,7 @@ private fun HomeScreen(
                     FeatureItem(R.string.feature_clipboard, Icons.Default.ContentPaste, ClipboardConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_sensor_info, Icons.Default.Sensors, null, false),
                     FeatureItem(R.string.feature_bluetooth_list, Icons.Default.Bluetooth, null, false),
-                    FeatureItem(R.string.feature_wifi_list, Icons.Default.Wifi, null, false)
+                    FeatureItem(R.string.feature_wifi_list, Icons.Default.Wifi, WifiConfigActivity::class.java, true)
                 ),
                 onUnavailable = { showUnavailableDialog = true },
                 onFeatureClick = onFeatureClick

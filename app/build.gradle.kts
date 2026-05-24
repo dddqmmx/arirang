@@ -108,3 +108,10 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+android {
+    compileSdk {
+        version = release(37)
+    }
+    ndkVersion = "23.1.7779620"
+    buildToolsVersion = "37.0.0"
+}
