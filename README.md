@@ -2,7 +2,7 @@
 
 Arirang is named after a smartphone brand from North Korea.
 
-This is a powerful Xposed module for Android designed to enhance user privacy through fine-grained control over sensitive system information and runtime hooks. It allows spoofing of device identifiers, location, SIM information, and app visibility.
+This is a powerful Xposed module for Android designed to enhance user privacy through fine-grained control over sensitive system information and runtime hooks. It allows spoofing of device identifiers, location, SIM information, Wi-Fi information, and app visibility.
 
 ## Philosophy
 
@@ -68,22 +68,30 @@ Use at your own risk.
   bootloader, fingerprint, and related Android build fields.
 
 - **Unique Identifier Spoofing (Experimental)**
-  Configure Android ID, advertising ID, SSAID-style identifiers, IMEI/MEID, serial
-  number, subscriber ID, phone number, and SIM ICCID values.
+  Configure Android ID, Google Advertising ID, App Set ID, SSAID-style identifiers,
+  IMEI/MEID, TAC, serial number, subscriber ID, phone number, and SIM ICCID values.
 
 - **Virtual Location (Experimental)**
   Configure a virtual latitude, longitude, altitude, accuracy, speed, bearing, and
   satellite count. The implementation covers Android framework location APIs,
   fused location paths, Google Fused Location APIs, GNSS status, and NMEA reports.
 
+- **Wi-Fi Info Masking (Experimental)**  
+  Configure the current Wi-Fi SSID, BSSID, MAC address, RSSI, frequency, and network ID
+  returned to apps. The hook covers framework Wi-Fi service paths on modern Android.
+
+- **Nearby Wi-Fi List Masking (Experimental)**  
+  Configure one or more nearby Wi-Fi scan results, or return an empty scan list. The
+  implementation rewrites both `WifiServiceImpl.getScanResults(...)` and the underlying
+  `ScanRequestProxy.getScanResults()` path used by Android's Wi-Fi service.
+
 - **Package List Management (In Development)**  
   Hide installed applications (Invisible / Whitelist modes).
 
-- **Wi-Fi Info Masking (Planned)**  
-  Hide or modify Wi-Fi information such as SSID, BSSID, MAC address, and network details.
-
-- **Nearby Devices List Masking (Planned)**  
-  Hide or modify nearby Wi-Fi, Bluetooth, and other discoverable device lists.
+- **Hook Log Controls (Available)**  
+  Enable or disable LSPosed log output per hook module, including core, clipboard,
+  Google services, location, package list, settings provider, SIM, Wi-Fi, unique
+  identifiers, and hook service bridge logs.
 
 - **Privacy Self-Check (Available)**  
   Inspect what device information is visible to applications and verify whether
@@ -126,6 +134,7 @@ Use at your own risk.
 4. Select scope:
    - System / Android framework (required)
    - `com.android.phone` (required for SIM information rewriting)
+   - `com.android.wifi` (required on ROMs that load Wi-Fi service code from the Wi-Fi module process)
    - `com.google.android.gms` (required for Google Fused Location API rewriting)
 5. Reboot your device or restart target apps  
 
@@ -139,12 +148,6 @@ Some advanced process-level features require the optional native Zygisk helper m
   - KernelSU / KernelSU Next
   - APatch
 3. Reboot the device
-
-## 🛡 Disclaimer
-
-This project is for **testing and educational purposes only**.
-
-The developers are not responsible for any damage, data loss, or misuse caused by this software.
 
 ## 🤝 Contributing
 
