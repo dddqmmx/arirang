@@ -47,8 +47,6 @@ information, sensors, and installed packages.
 
 This software is in an early development stage and may cause system instability, crashes, or unexpected behavior.
 
-To achieve certain features, it uses highly aggressive system-level techniques. As a result, it may never become fully stable or suitable for daily use.
-
 This project does **not** prohibit the use of AI-generated code.
 
 During early prototyping and experimental development, a considerable amount of code was generated or assisted by large language models (LLMs).  
