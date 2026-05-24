@@ -106,7 +106,6 @@
     <string name="unique_section_imei_summary">卡槽相关的标识符可以在这里配置。即使没有安装 SIM 卡，某些标识符（如 IMEI）也可以被读取。长按可以拖动排序。</string>
     <string name="unique_field_android_id">Android ID</string>
     <string name="unique_field_gaid">GAID</string>
-    <string name="unique_field_gsf_id">GSF ID</string>
     <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
     <string name="unique_field_app_set_id">App Set ID</string>
     <string name="unique_field_serial">Serial</string>

@@ -333,7 +333,6 @@ class SelfCheckActivity : AppCompatActivity() {
             ?.let { values.add("Android ID: ${it.maskMiddle()}") }
 
         readAdvertisingId()?.let { values.add("GAID: ${it.maskMiddle()}") }
-        readGsfId()?.let { values.add("GSF ID: ${it.maskMiddle()}") }
         readAppSetId()?.let { values.add("App Set ID: ${it.maskMiddle()}") }
         readWidevineId()?.let { values.add("Widevine DRM ID: ${it.maskMiddle()}") }
 
@@ -465,25 +464,6 @@ class SelfCheckActivity : AppCompatActivity() {
             AdvertisingIdClient.getAdvertisingIdInfo(this).id
         }.onFailure {
             Log.e(PHONE_DIAG_TAG, "readAdvertisingId failed", it)
-        }.getOrNull()?.takeUnless { it.isBlank() }
-    }
-
-    private fun readGsfId(): String? {
-        return runCatching {
-            contentResolver.query(
-                Uri.parse("content://com.google.android.gsf.gservices"),
-                null,
-                null,
-                arrayOf("android_id"),
-                null
-            )?.use { cursor ->
-                if (!cursor.moveToFirst() || cursor.columnCount < 2) {
-                    null
-                } else {
-                    val raw = cursor.getString(1)?.takeUnless { it.isBlank() }
-                    raw?.toLongOrNull()?.toString(16) ?: raw
-                }
-            }
         }.getOrNull()?.takeUnless { it.isBlank() }
     }
 

@@ -282,16 +282,6 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                             onValueChange = { config = config.copy(gaid = it) }
                         )
                         IdentifierTextField(
-                            label = stringResource(R.string.unique_field_gsf_id),
-                            value = config.gsfId,
-                            revision = revision,
-                            onRandom = {
-                                config = config.copy(gsfId = UniqueIdentifierPrefs.randomGsfId())
-                                revision++
-                            },
-                            onValueChange = { config = config.copy(gsfId = it) }
-                        )
-                        IdentifierTextField(
                             label = stringResource(R.string.unique_field_widevine_drm_id),
                             value = config.widevineDrmId,
                             revision = revision,

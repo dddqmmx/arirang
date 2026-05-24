@@ -106,7 +106,6 @@
     <string name="unique_section_imei_summary">Slot-related identifiers can be configured here. Some identifiers, like IMEI, can be read even when no SIM card is installed. Long press to drag and reorder.</string>
     <string name="unique_field_android_id">Android ID</string>
     <string name="unique_field_gaid">GAID</string>
-    <string name="unique_field_gsf_id">GSF ID</string>
     <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
     <string name="unique_field_app_set_id">App Set ID</string>
     <string name="unique_field_serial">Serial</string>

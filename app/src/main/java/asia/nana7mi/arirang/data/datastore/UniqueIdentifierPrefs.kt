@@ -18,7 +18,6 @@ object UniqueIdentifierPrefs {
     private const val KEY_LAST_MODIFIED = "last_modified"
     private const val KEY_ANDROID_ID = "android_id"
     private const val KEY_GAID = "gaid"
-    private const val KEY_GSF_ID = "gsf_id"
     private const val KEY_WIDEVINE_DRM_ID = "widevine_drm_id"
     private const val KEY_APP_SET_ID = "app_set_id"
     private const val KEY_SERIAL = "serial"
@@ -32,7 +31,6 @@ object UniqueIdentifierPrefs {
         val enabled: Boolean = true,
         val androidId: String = "",
         val gaid: String = "",
-        val gsfId: String = "",
         val widevineDrmId: String = "",
         val appSetId: String = "",
         val serial: String = "",
@@ -57,7 +55,6 @@ object UniqueIdentifierPrefs {
             enabled = prefs.getBoolean(KEY_ENABLED, true),
             androidId = prefs.getString(KEY_ANDROID_ID, null) ?: defaultAndroidId(context),
             gaid = prefs.getString(KEY_GAID, null) ?: randomGaid(),
-            gsfId = prefs.getString(KEY_GSF_ID, null) ?: randomGsfId(),
             widevineDrmId = prefs.getString(KEY_WIDEVINE_DRM_ID, null) ?: randomWidevineDrmId(),
             appSetId = prefs.getString(KEY_APP_SET_ID, null) ?: randomAppSetId(),
             serial = prefs.getString(KEY_SERIAL, null) ?: defaultSerial(),
@@ -74,7 +71,6 @@ object UniqueIdentifierPrefs {
             putLong(KEY_LAST_MODIFIED, Date().time)
             putString(KEY_ANDROID_ID, config.androidId)
             putString(KEY_GAID, config.gaid)
-            putString(KEY_GSF_ID, config.gsfId)
             putString(KEY_WIDEVINE_DRM_ID, config.widevineDrmId)
             putString(KEY_APP_SET_ID, config.appSetId)
             putString(KEY_SERIAL, config.serial)
@@ -101,7 +97,6 @@ object UniqueIdentifierPrefs {
             .put(KEY_LAST_MODIFIED, lastModified(context).toString())
             .put(KEY_ANDROID_ID, config.androidId)
             .put(KEY_GAID, config.gaid)
-            .put(KEY_GSF_ID, config.gsfId)
             .put(KEY_WIDEVINE_DRM_ID, config.widevineDrmId)
             .put(KEY_APP_SET_ID, config.appSetId)
             .put(KEY_SERIAL, config.serial)
@@ -120,10 +115,6 @@ object UniqueIdentifierPrefs {
 
     fun randomGaid(): String {
         return randomUuidLike()
-    }
-
-    fun randomGsfId(): String {
-        return randomHex(16)
     }
 
     fun randomWidevineDrmId(): String {

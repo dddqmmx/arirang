@@ -106,7 +106,6 @@
     <string name="unique_section_device_ids">端末識別子</string>
     <string name="unique_field_android_id">Android ID</string>
     <string name="unique_field_gaid">GAID</string>
-    <string name="unique_field_gsf_id">GSF ID</string>
     <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
     <string name="unique_field_app_set_id">App Set ID</string>
     <string name="unique_field_serial">Serial</string>

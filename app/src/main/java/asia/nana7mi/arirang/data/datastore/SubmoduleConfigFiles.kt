@@ -46,7 +46,6 @@ object SubmoduleConfigFiles {
             .put("uniqueIdentifierEnabled", uniqueIdentifierConfig.enabled)
             .put("androidId", uniqueIdentifierConfig.androidId)
             .put("gaid", uniqueIdentifierConfig.gaid)
-            .put("gsfId", uniqueIdentifierConfig.gsfId)
             .put("widevineDrmId", uniqueIdentifierConfig.widevineDrmId)
             .put("appSetId", uniqueIdentifierConfig.appSetId)
             .put("serial", uniqueIdentifierConfig.serial)
