@@ -2,8 +2,11 @@ package asia.nana7mi.arirang.hook
 
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.data.datastore.HookLogSettings
+import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import org.json.JSONObject
 
 object HookLog {
     enum class Module(val key: String, val defaultEnabled: Boolean = true) {
@@ -28,6 +31,8 @@ object HookLog {
     @Volatile
     private var cachedSwitches: Map<String, Boolean> = emptyMap()
 
+    private val resolvingConfig = ThreadLocal.withInitial { false }
+
     fun i(module: Module, message: String) {
         write(module, "I", message)
     }
@@ -38,7 +43,7 @@ object HookLog {
 
     fun e(module: Module, message: String, throwable: Throwable? = null) {
         val suffix = throwable?.let { "\n${it.stackTraceToString()}" }.orEmpty()
-        write(module, "E", message + suffix, force = true)
+        write(module, "E", message + suffix)
     }
 
     fun d(module: Module, message: String) {
@@ -61,8 +66,8 @@ object HookLog {
             ?: BuildConfig.DEBUG
     }
 
-    private fun write(module: Module, level: String, message: String, force: Boolean = false) {
-        if (!force && !isEnabled(module)) return
+    private fun write(module: Module, level: String, message: String) {
+        if (resolvingConfig.get() == true || !isEnabled(module)) return
         XposedBridge.log("Arirang/${module.key}/$level: $message")
     }
 
@@ -76,18 +81,48 @@ object HookLog {
             if (checkedAt - cachedAt < CACHE_TTL_MS) {
                 return@synchronized cachedSwitches
             }
-            val updated = buildMap {
-                readSwitch("all")?.let { put("all", it) }
-                readSwitch("debug")?.let { put("debug", it) }
-                Module.entries.forEach { module ->
-                    readSwitch(module.key)?.let { put(module.key, it) }
-                    readSwitch("${module.key}.debug")?.let { put("${module.key}.debug", it) }
+            resolvingConfig.set(true)
+            try {
+                val updated = buildMap {
+                    val json = hookLogSnapshotJson()
+                    readSwitch("all")?.let { put("all", it) }
+                    readSwitch("debug")?.let { put("debug", it) }
+                    Module.entries.forEach { module ->
+                        val configured = json?.optBoolean(module.key, module.defaultEnabled)
+                        if (configured != null) {
+                            put(module.key, configured)
+                        }
+                        readSwitch(module.key)?.let { put(module.key, it) }
+                        readSwitch("${module.key}.debug")?.let { put("${module.key}.debug", it) }
+                    }
+                }
+                cachedSwitches = updated
+                cachedAt = checkedAt
+                return@synchronized updated
+            } finally {
+                resolvingConfig.set(false)
+            }
+        }
+    }
+
+    private fun hookLogSnapshotJson(): JSONObject? {
+        HookNotifyClient.readHookLogConfigSnapshot(allowBind = true)?.let { snapshot ->
+            runCatching { JSONObject(snapshot) }.getOrNull()?.let { return it }
+        }
+
+        return runCatching {
+            XSharedPreferences(BuildConfig.APPLICATION_ID, HookLogSettings.PREFS_NAME).takeIf {
+                it.file.canRead()
+            }?.apply {
+                reload()
+            }?.let { prefs ->
+                JSONObject().apply {
+                    Module.entries.forEach { module ->
+                        put(module.key, prefs.getBoolean(HookLogSettings.prefKey(module.key), module.defaultEnabled))
+                    }
                 }
             }
-            cachedSwitches = updated
-            cachedAt = checkedAt
-            updated
-        }
+        }.getOrNull()
     }
 
     private fun readSwitch(key: String): Boolean? {

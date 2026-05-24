@@ -48,6 +48,19 @@
     <string name="hint_package_or_app_name">Package or App Name</string>
 
     <string name="ui_settings_title">UI Settings</string>
+    <string name="log_settings_title">Hook Logs</string>
+    <string name="log_settings_summary">Choose which hook modules can write logs.</string>
+    <string name="log_settings_save_failed">Failed to update log setting.</string>
+    <string name="log_module_core">Core</string>
+    <string name="log_module_clipboard">Clipboard</string>
+    <string name="log_module_gms">Google services</string>
+    <string name="log_module_location">Location</string>
+    <string name="log_module_package_list">App list</string>
+    <string name="log_module_settings">Settings provider</string>
+    <string name="log_module_sim">SIM</string>
+    <string name="log_module_wifi">Wi-Fi</string>
+    <string name="log_module_unique_id">Unique identifiers</string>
+    <string name="log_module_notify">Hook service bridge</string>
 
     <string name="slot_title_text">%1$d. SIM Slot</string>
 

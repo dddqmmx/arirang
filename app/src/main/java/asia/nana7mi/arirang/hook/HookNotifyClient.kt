@@ -107,6 +107,24 @@ object HookNotifyClient {
     @Volatile
     private var sLastUniqueIdentifierConfigCheckAt = 0L
 
+    @Volatile
+    private var sHookLogConfigSnapshot: String? = null
+
+    @Volatile
+    private var sHookLogConfigVersion = Long.MIN_VALUE
+
+    @Volatile
+    private var sLastHookLogConfigCheckAt = 0L
+
+    @Volatile
+    private var sWifiConfigSnapshot: String? = null
+
+    @Volatile
+    private var sWifiConfigVersion = Long.MIN_VALUE
+
+    @Volatile
+    private var sLastWifiConfigCheckAt = 0L
+
     /**
      * 同步锁对象
      *
@@ -372,6 +390,96 @@ object HookNotifyClient {
             cachedSnapshot
         } catch (t: Throwable) {
             HookLog.i(HookLog.Module.NOTIFY, "readUniqueIdentifierConfigSnapshot failed: ${t.stackTraceToString()}")
+            sService = null
+            cachedSnapshot
+        }
+    }
+
+    fun readHookLogConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
+        val now = SystemClock.uptimeMillis()
+        val cachedSnapshot = sHookLogConfigSnapshot
+        if (!force && cachedSnapshot != null && now - sLastHookLogConfigCheckAt < CONFIG_CACHE_TTL_MS) {
+            return cachedSnapshot
+        }
+
+        val service = if (allowBind) {
+            val ctx = getSystemContext()
+            if (ctx == null) {
+                return cachedSnapshot
+            }
+            getOrBindService(ctx)
+        } else {
+            sService
+        } ?: return cachedSnapshot
+
+        return try {
+            withCleanCallingIdentity {
+                val version = service.readHookLogConfigVersion()
+                if (force || cachedSnapshot == null || version != sHookLogConfigVersion) {
+                    val snapshot = service.readHookLogConfigSnapshot()?.takeIf { it.isNotBlank() }
+                    if (snapshot != null) {
+                        sHookLogConfigSnapshot = snapshot
+                        sHookLogConfigVersion = version
+                    }
+                }
+                sLastHookLogConfigCheckAt = now
+                sHookLogConfigSnapshot
+            }
+        } catch (_: DeadObjectException) {
+            sService = null
+            cachedSnapshot
+        } catch (t: Throwable) {
+            HookLog.i(HookLog.Module.NOTIFY, "readHookLogConfigSnapshot failed: ${t.stackTraceToString()}")
+            sService = null
+            cachedSnapshot
+        }
+    }
+
+    fun readWifiConfigSnapshot(
+        force: Boolean = false,
+        allowBind: Boolean = false,
+        bindContext: Context? = null,
+        bindCurrentUser: Boolean = false
+    ): String? {
+        val now = SystemClock.uptimeMillis()
+        val cachedSnapshot = sWifiConfigSnapshot
+        if (!force && cachedSnapshot != null && now - sLastWifiConfigCheckAt < CONFIG_CACHE_TTL_MS) {
+            return cachedSnapshot
+        }
+
+        val service = if (allowBind) {
+            val ctx = bindContext ?: getSystemContext()
+            if (ctx == null) {
+                HookLog.i(HookLog.Module.NOTIFY, "readWifiConfigSnapshot: no context")
+                return cachedSnapshot
+            }
+            if (bindCurrentUser) {
+                getOrBindServiceCurrentUser(ctx)
+            } else {
+                getOrBindService(ctx)
+            }
+        } else {
+            sService
+        } ?: return cachedSnapshot
+
+        return try {
+            withCleanCallingIdentity {
+                val version = service.readWifiConfigVersion()
+                if (force || cachedSnapshot == null || version != sWifiConfigVersion) {
+                    val snapshot = service.readWifiConfigSnapshot()?.takeIf { it.isNotBlank() }
+                    if (snapshot != null) {
+                        sWifiConfigSnapshot = snapshot
+                        sWifiConfigVersion = version
+                    }
+                }
+                sLastWifiConfigCheckAt = now
+                sWifiConfigSnapshot
+            }
+        } catch (_: DeadObjectException) {
+            sService = null
+            cachedSnapshot
+        } catch (t: Throwable) {
+            HookLog.i(HookLog.Module.NOTIFY, "readWifiConfigSnapshot failed: ${t.stackTraceToString()}")
             sService = null
             cachedSnapshot
         }

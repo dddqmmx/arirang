@@ -22,12 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.AppPreferences
+import asia.nana7mi.arirang.data.datastore.HookLogSettings
 import asia.nana7mi.arirang.ui.activity.LanguageSettingsActivity
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
@@ -82,6 +85,11 @@ private fun SettingsScreen(
     val languageCodes = stringArrayResource(R.array.language_codes)
     val regionNames = stringArrayResource(R.array.region_names)
     val regionCodes = stringArrayResource(R.array.region_codes)
+    val logModules = remember {
+        HookLogSettings.MODULE_KEYS.map { key ->
+            HookLogSettings.Module(key, logModuleLabelRes(key))
+        }
+    }
 
     val savedLanguage = AppPreferences.getLanguage(context) ?: "system"
     val currentLanguage = languageNames.getOrElse(languageCodes.indexOf(savedLanguage)) { savedLanguage }
@@ -90,6 +98,7 @@ private fun SettingsScreen(
         mutableStateOf(AppPreferences.getRegion(context) ?: DEFAULT_REGION)
     }
     var showRegionDialog by remember { mutableStateOf(false) }
+    var showLogDialog by remember { mutableStateOf(false) }
     val currentRegion = regionNames.getOrElse(regionCodes.indexOf(currentRegionCode)) { currentRegionCode }
 
     LazyColumn(
@@ -129,6 +138,17 @@ private fun SettingsScreen(
                 )
             }
         }
+
+        item {
+            SettingsSection(title = stringResource(R.string.log_settings_title)) {
+                SettingCard(
+                    title = stringResource(R.string.log_settings_title),
+                    summary = stringResource(R.string.log_settings_summary),
+                    icon = Icons.Default.Terminal,
+                    onClick = { showLogDialog = true }
+                )
+            }
+        }
     }
 
     if (showRegionDialog) {
@@ -145,6 +165,80 @@ private fun SettingsScreen(
             }
         )
     }
+
+    if (showLogDialog) {
+        HookLogDialog(
+            modules = logModules,
+            onDismiss = { showLogDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun HookLogDialog(
+    modules: List<HookLogSettings.Module>,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.log_settings_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                modules.forEach { module ->
+                    var enabled by remember(module.key) {
+                        mutableStateOf(HookLogSettings.isEnabled(context, module.key))
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val next = !enabled
+                                if (HookLogSettings.setEnabled(context, module.key, next)) {
+                                    enabled = next
+                                } else {
+                                    Toast.makeText(context, R.string.log_settings_save_failed, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = stringResource(module.labelRes),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = module.key,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enabled,
+                            onCheckedChange = { checked ->
+                                if (HookLogSettings.setEnabled(context, module.key, checked)) {
+                                    enabled = checked
+                                } else {
+                                    Toast.makeText(context, R.string.log_settings_save_failed, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(android.R.string.ok))
+            }
+        }
+    )
 }
 
 @Composable
@@ -257,3 +351,19 @@ private fun RegionDialog(
 }
 
 private const val DEFAULT_REGION = "JP"
+
+private fun logModuleLabelRes(key: String): Int {
+    return when (key) {
+        "core" -> R.string.log_module_core
+        "clipboard" -> R.string.log_module_clipboard
+        "gms" -> R.string.log_module_gms
+        "location" -> R.string.log_module_location
+        "package_list" -> R.string.log_module_package_list
+        "settings" -> R.string.log_module_settings
+        "sim" -> R.string.log_module_sim
+        "wifi" -> R.string.log_module_wifi
+        "unique_id" -> R.string.log_module_unique_id
+        "notify" -> R.string.log_module_notify
+        else -> R.string.log_settings_title
+    }
+}

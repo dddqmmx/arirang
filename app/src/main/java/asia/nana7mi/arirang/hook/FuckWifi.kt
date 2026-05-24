@@ -1,10 +1,7 @@
 package asia.nana7mi.arirang.hook
 
-import android.net.NetworkCapabilities
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
-import android.os.Binder
-import android.os.Process
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
@@ -15,6 +12,8 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import org.json.JSONArray
 import java.lang.reflect.Method
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
  * Feasibility hook for rewriting the current Wi-Fi identity and nearby Wi-Fi scan results.
@@ -24,17 +23,11 @@ import java.lang.reflect.Method
  * - WifiManager.getScanResults() -> IWifiManager.getScanResults(callingPackage, featureId)
  * - WifiServiceImpl.getConnectionInfo(String, String)
  * - WifiServiceImpl.getScanResults(String, String)
+ * - WifiServiceImpl.mScanRequestProxy.getScanResults()
  */
 class FuckWifi : BaseHookModule(
-    targetPackages = setOf("android", "com.android.wifi"),
-    matchClient = true
+    targetPackages = setOf("android", "com.android.wifi")
 ) {
-    @Volatile
-    private var cachedConfig = WifiConfig()
-
-    @Volatile
-    private var cachedConfigAt = 0L
-
     private data class WifiConfig(
         val enabled: Boolean = true,
         val currentSsid: String = WifiConfigPrefs.DEFAULT_CURRENT_SSID,
@@ -48,110 +41,257 @@ class FuckWifi : BaseHookModule(
         val bssid: String = WifiConfigPrefs.DEFAULT_SCAN_BSSID
     )
 
+    private val hardcodedConfig = WifiConfig(
+        currentSsid = "1919810",
+        currentBssid = "02:00:00:19:19:81",
+        scanResults = listOf(
+            ScanNetwork(ssid = "114514", bssid = "02:00:00:11:45:14"),
+            ScanNetwork(ssid = "114", bssid = "02:00:00:00:01:14")
+        )
+    )
+    @Volatile
+    private var cachedConfig = WifiConfig()
+    @Volatile
+    private var cachedConfigAt = 0L
+    private val hookedServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
+    private val hookedScanRequestProxyClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
+    private val hookedWifiSystemServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
+    @Volatile
+    private var systemServiceManagerHookInstalled = false
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
-            if (lpparam.packageName == BuildConfig.APPLICATION_ID) {
-                hookClientWifiApis(lpparam.classLoader)
-            } else {
-                hookWifiService(lpparam.classLoader)
-            }
+            HookLog.i(
+                HookLog.Module.WIFI,
+                "installing Wi-Fi hooks for ${lpparam.packageName} classLoader=${lpparam.classLoader}"
+            )
+            hookWifiService(lpparam.classLoader)
+            hookWifiSystemServiceManager(lpparam.classLoader)
             HookLog.i(HookLog.Module.WIFI, "Wi-Fi privacy hook installed for ${lpparam.packageName}")
         }.onFailure {
             HookLog.e(HookLog.Module.WIFI, "Wi-Fi privacy hook failed for ${lpparam.packageName}", it)
         }
     }
 
-    private fun hookClientWifiApis(classLoader: ClassLoader) {
-        val wifiManagerClass = XposedHelpers.findClassIfExists("android.net.wifi.WifiManager", classLoader)
-            ?: XposedHelpers.findClassIfExists("android.net.wifi.WifiManager", null)
-            ?: return
-
-        XposedBridge.hookAllMethods(wifiManagerClass, "getConnectionInfo", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val config = currentConfig()
-                if (!config.enabled) return
-                param.result = spoofedWifiInfo(config)
-            }
-        })
-
-        XposedBridge.hookAllMethods(wifiManagerClass, "getScanResults", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val config = currentConfig()
-                if (!config.enabled) return
-                param.result = spoofedScanResults(config)
-            }
-        })
-
-        hookNetworkCapabilitiesTransportInfo(classLoader)
-        hookWifiInfoGetters(classLoader)
-    }
-
     private fun hookWifiService(classLoader: ClassLoader) {
-        val serviceClass = XposedHelpers.findClassIfExists("com.android.server.wifi.WifiServiceImpl", classLoader)
-            ?: return
-
-        serviceClass.declaredMethods
-            .filter { it.name == "getConnectionInfo" && it.returnsWifiInfo() }
-            .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = currentConfig()
-                        if (!config.enabled || !shouldHideForServiceCaller()) return
-                        param.result = spoofedWifiInfo(config)
-                    }
-                })
+        val serviceClasses = WIFI_SERVICE_CLASS_NAMES.mapNotNull { className ->
+            XposedHelpers.findClassIfExists(className, classLoader).also { foundClass ->
+                HookLog.d(
+                    HookLog.Module.WIFI,
+                    "lookup $className in $classLoader -> ${foundClass?.name ?: "null"}"
+                )
             }
+        }.distinct()
 
-        serviceClass.declaredMethods
-            .filter { it.name == "getScanResults" }
-            .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = currentConfig()
-                        if (!config.enabled || !shouldHideForServiceCaller()) return
-                        param.result = parceledListSlice(classLoader, spoofedScanResults(config))
-                    }
-                })
-            }
+        if (serviceClasses.isEmpty()) {
+            HookLog.w(
+                HookLog.Module.WIFI,
+                "Wi-Fi service class not found in $classLoader; waiting for SystemServiceManager.startServiceFromJar"
+            )
+            return
+        }
+
+        serviceClasses.forEach { hookWifiServiceClass(classLoader, it) }
     }
 
-    private fun hookNetworkCapabilitiesTransportInfo(classLoader: ClassLoader) {
-        val networkCapabilitiesClass = XposedHelpers.findClassIfExists(
-            "android.net.NetworkCapabilities",
-            classLoader
-        ) ?: NetworkCapabilities::class.java
+    private fun hookWifiSystemServiceManager(classLoader: ClassLoader) {
+        synchronized(this) {
+            if (systemServiceManagerHookInstalled) return
+            systemServiceManagerHookInstalled = true
+        }
 
-        XposedBridge.hookAllMethods(networkCapabilitiesClass, "getTransportInfo", object : XC_MethodHook() {
+        val managerClass = XposedHelpers.findClassIfExists(
+            "com.android.server.SystemServiceManager",
+            classLoader
+        )
+        if (managerClass == null) {
+            HookLog.w(HookLog.Module.WIFI, "SystemServiceManager class not found in $classLoader")
+            return
+        }
+
+        XposedBridge.hookAllMethods(managerClass, "startServiceFromJar", object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
-                val config = currentConfig()
-                if (!config.enabled) return
-                if (param.result is WifiInfo) {
-                    param.result = spoofedWifiInfo(config)
+                val className = param.args.firstOrNull() as? String ?: return
+                val jarPath = param.args.getOrNull(1) as? String
+                if (className != WIFI_SYSTEM_SERVICE_CLASS) return
+
+                val wifiService = param.result ?: run {
+                    HookLog.w(HookLog.Module.WIFI, "WifiService startServiceFromJar returned null")
+                    return
                 }
+                HookLog.i(
+                    HookLog.Module.WIFI,
+                    "WifiService started from jar serviceClass=$className jarPath=$jarPath class=${wifiService.javaClass.name} classLoader=${wifiService.javaClass.classLoader}"
+                )
+                hookWifiSystemServiceClass(wifiService.javaClass)
+                hookWifiServiceInstance(wifiService)
             }
         })
+        HookLog.i(HookLog.Module.WIFI, "installed SystemServiceManager.startServiceFromJar watcher for Wi-Fi service")
     }
 
-    private fun hookWifiInfoGetters(classLoader: ClassLoader) {
-        val wifiInfoClass = XposedHelpers.findClassIfExists("android.net.wifi.WifiInfo", classLoader)
-            ?: WifiInfo::class.java
+    private fun hookWifiSystemServiceClass(wifiServiceClass: Class<*>) {
+        synchronized(hookedWifiSystemServiceClasses) {
+            if (!hookedWifiSystemServiceClasses.add(wifiServiceClass)) return
+        }
 
-        mapOf<String, (WifiConfig) -> String?>(
-            "getSSID" to { "\"${it.currentSsid}\"" },
-            "getBSSID" to { it.currentBssid },
-            "getMacAddress" to { DEFAULT_MAC_ADDRESS }
-        ).forEach { (methodName, valueProvider) ->
-            XposedBridge.hookAllMethods(wifiInfoClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val config = currentConfig()
-                    if (!config.enabled) return
-                    param.result = valueProvider(config)
+        wifiServiceClass.declaredMethods
+            .filter { it.name == "onStart" && it.parameterTypes.isEmpty() }
+            .forEach { method ->
+                XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        HookLog.i(HookLog.Module.WIFI, "WifiService.onStart observed; resolving WifiServiceImpl")
+                        hookWifiServiceInstance(param.thisObject)
+                    }
+                })
+            }
+    }
+
+    private fun hookWifiServiceInstance(wifiService: Any) {
+        val impl = runCatching {
+            XposedHelpers.getObjectField(wifiService, "mImpl")
+        }.getOrNull() ?: wifiService.javaClass.declaredFields
+            .firstNotNullOfOrNull { field ->
+                runCatching {
+                    field.isAccessible = true
+                    field.get(wifiService)?.takeIf { it.javaClass.name == WIFI_SERVICE_IMPL_CLASS }
+                }.getOrNull()
+            }
+
+        if (impl == null) {
+            HookLog.w(
+                HookLog.Module.WIFI,
+                "WifiService mImpl not found fields=${wifiService.javaClass.declaredFields.joinToString { "${it.type.name} ${it.name}" }}"
+            )
+            return
+        }
+
+        HookLog.i(
+            HookLog.Module.WIFI,
+            "found WifiServiceImpl instance class=${impl.javaClass.name} classLoader=${impl.javaClass.classLoader}"
+        )
+        hookWifiServiceClass(impl.javaClass.classLoader ?: wifiService.javaClass.classLoader, impl.javaClass)
+        hookScanRequestProxyFromWifiServiceImpl(impl)
+    }
+
+    private fun hookScanRequestProxyFromWifiServiceImpl(wifiServiceImpl: Any) {
+        val scanRequestProxy = runCatching {
+            XposedHelpers.getObjectField(wifiServiceImpl, "mScanRequestProxy")
+        }.getOrNull()
+
+        if (scanRequestProxy == null) {
+            HookLog.w(
+                HookLog.Module.WIFI,
+                "WifiServiceImpl mScanRequestProxy not found fields=${wifiServiceImpl.javaClass.declaredFields.joinToString { "${it.type.name} ${it.name}" }}"
+            )
+            return
+        }
+
+        HookLog.i(
+            HookLog.Module.WIFI,
+            "found ScanRequestProxy instance class=${scanRequestProxy.javaClass.name} classLoader=${scanRequestProxy.javaClass.classLoader}"
+        )
+        hookScanRequestProxyClass(scanRequestProxy.javaClass)
+    }
+
+    private fun hookScanRequestProxyClass(scanRequestProxyClass: Class<*>) {
+        synchronized(hookedScanRequestProxyClasses) {
+            if (!hookedScanRequestProxyClasses.add(scanRequestProxyClass)) {
+                HookLog.d(HookLog.Module.WIFI, "ScanRequestProxy class already hooked: ${scanRequestProxyClass.name}")
+                return
+            }
+        }
+
+        val candidateMethods = scanRequestProxyClass.declaredMethods
+            .filter { it.name == "getScanResults" }
+        HookLog.i(
+            HookLog.Module.WIFI,
+            "ScanRequestProxy ${scanRequestProxyClass.name} candidates=${candidateMethods.joinToString { it.signature() }}"
+        )
+
+        var hookedScanResults = 0
+        candidateMethods
+            .filter { it.returnsList() }
+            .forEach { method ->
+                XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = currentConfig()
+                        if (!config.enabled) return
+                        HookLog.i(HookLog.Module.WIFI, "spoof ScanRequestProxy.getScanResults via ${method.signature()}")
+                        param.result = spoofedScanResults(config)
+                    }
+                })
+                hookedScanResults++
+            }
+
+        HookLog.i(
+            HookLog.Module.WIFI,
+            "hooked ScanRequestProxy ${scanRequestProxyClass.name} scanResults=$hookedScanResults"
+        )
+    }
+
+    private fun hookWifiServiceClass(classLoader: ClassLoader, serviceClass: Class<*>) {
+        synchronized(hookedServiceClasses) {
+            if (!hookedServiceClasses.add(serviceClass)) {
+                HookLog.d(HookLog.Module.WIFI, "Wi-Fi service class already hooked: ${serviceClass.name}")
+                return
+            }
+        }
+
+        var hookedConnectionInfo = 0
+        var hookedScanResults = 0
+        val candidateMethods = serviceClass.declaredMethods
+            .filter { it.name == "getConnectionInfo" || it.name == "getScanResults" }
+        HookLog.i(
+            HookLog.Module.WIFI,
+            "Wi-Fi service ${serviceClass.name} candidates=${candidateMethods.joinToString { it.signature() }}"
+        )
+
+        candidateMethods.forEach { method ->
+            when {
+                method.name == "getConnectionInfo" && method.returnsWifiInfo() -> {
+                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val config = currentConfig()
+                            if (!config.enabled) return
+                            HookLog.i(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
+                            param.result = spoofedWifiInfo(config)
+                        }
+                    })
+                    hookedConnectionInfo++
                 }
-            })
+
+                method.name == "getScanResults" && method.returnsScanResults() -> {
+                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val config = currentConfig()
+                            if (!config.enabled) return
+                            HookLog.i(HookLog.Module.WIFI, "spoof getScanResults via ${method.signature()}")
+                            param.result = method.wrapScanResults(classLoader, spoofedScanResults(config))
+                        }
+                    })
+                    hookedScanResults++
+                }
+            }
+        }
+
+        HookLog.i(
+            HookLog.Module.WIFI,
+            "hooked Wi-Fi service ${serviceClass.name} connectionInfo=$hookedConnectionInfo scanResults=$hookedScanResults"
+        )
+    }
+
+    private fun Method.wrapScanResults(classLoader: ClassLoader, results: List<ScanResult>): Any? {
+        return when {
+            returnsParceledListSlice() -> parceledListSlice(classLoader, results)
+            returnsList() -> results
+            else -> null
         }
     }
 
     private fun currentConfig(): WifiConfig {
+        if (DEBUG_HARDCODED_CONFIG) return hardcodedConfig
+
         val now = SystemClock.uptimeMillis()
         if (now - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) return cachedConfig
 
@@ -160,26 +300,31 @@ class FuckWifi : BaseHookModule(
             if (checkedAt - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) {
                 return@synchronized cachedConfig
             }
-            val prefs = XSharedPreferences(BuildConfig.APPLICATION_ID, WifiConfigPrefs.PREFS_NAME).apply {
-                makeWorldReadable()
-                reload()
-            }
-            cachedConfig = WifiConfig(
-                enabled = prefs.getBoolean(WifiConfigPrefs.KEY_ENABLED, true),
-                currentSsid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_SSID, null)
-                    ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
-                currentBssid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_BSSID, null)
-                    ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
-                hideScanResults = prefs.getBoolean(WifiConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),
-                scanResults = parseScanResults(
-                    prefs.getString(WifiConfigPrefs.KEY_SCAN_RESULTS, null),
-                    prefs.getString(WifiConfigPrefs.KEY_SCAN_SSID, null),
-                    prefs.getString(WifiConfigPrefs.KEY_SCAN_BSSID, null)
-                )
-            )
+
+            cachedConfig = readConfigFromPrefs()
             cachedConfigAt = checkedAt
             cachedConfig
         }
+    }
+
+    private fun readConfigFromPrefs(): WifiConfig {
+        val prefs = XSharedPreferences(BuildConfig.APPLICATION_ID, WifiConfigPrefs.PREFS_NAME).apply {
+            makeWorldReadable()
+            reload()
+        }
+        return WifiConfig(
+            enabled = prefs.getBoolean(WifiConfigPrefs.KEY_ENABLED, true),
+            currentSsid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_SSID, null)
+                ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
+            currentBssid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_BSSID, null)
+                ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
+            hideScanResults = prefs.getBoolean(WifiConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),
+            scanResults = parseScanResults(
+                prefs.getString(WifiConfigPrefs.KEY_SCAN_RESULTS, null),
+                prefs.getString(WifiConfigPrefs.KEY_SCAN_SSID, null),
+                prefs.getString(WifiConfigPrefs.KEY_SCAN_BSSID, null)
+            )
+        )
     }
 
     private fun spoofedWifiInfo(config: WifiConfig): Any {
@@ -191,6 +336,12 @@ class FuckWifi : BaseHookModule(
             runCatching { XposedHelpers.callMethod(wifiInfo, "setRssi", -42) }
             runCatching { XposedHelpers.callMethod(wifiInfo, "setFrequency", 2412) }
             runCatching { XposedHelpers.callMethod(wifiInfo, "setNetworkId", 0) }
+            runCatching { XposedHelpers.setObjectField(wifiInfo, "mWifiSsid", wifiSsid) }
+            runCatching { XposedHelpers.setObjectField(wifiInfo, "mBSSID", config.currentBssid) }
+            runCatching { XposedHelpers.setObjectField(wifiInfo, "mMacAddress", DEFAULT_MAC_ADDRESS) }
+            runCatching { XposedHelpers.setIntField(wifiInfo, "mRssi", -42) }
+            runCatching { XposedHelpers.setIntField(wifiInfo, "mFrequency", 2412) }
+            runCatching { XposedHelpers.setIntField(wifiInfo, "mNetworkId", 0) }
         }
     }
 
@@ -212,7 +363,9 @@ class FuckWifi : BaseHookModule(
     }
 
     private fun parceledListSlice(classLoader: ClassLoader, list: List<ScanResult>): Any? {
-        val sliceClass = XposedHelpers.findClassIfExists("android.content.pm.ParceledListSlice", classLoader)
+        val sliceClass = XposedHelpers.findClassIfExists("com.android.modules.utils.ParceledListSlice", classLoader)
+            ?: XposedHelpers.findClassIfExists("com.android.modules.utils.ParceledListSlice", null)
+            ?: XposedHelpers.findClassIfExists("android.content.pm.ParceledListSlice", classLoader)
             ?: XposedHelpers.findClassIfExists("android.content.pm.ParceledListSlice", null)
             ?: return null
         return XposedHelpers.newInstance(sliceClass, list)
@@ -223,6 +376,10 @@ class FuckWifi : BaseHookModule(
             ?: return null
         return runCatching {
             XposedHelpers.callStaticMethod(wifiSsidClass, "fromBytes", ssid.toByteArray(Charsets.UTF_8))
+        }.getOrNull() ?: runCatching {
+            XposedHelpers.callStaticMethod(wifiSsidClass, "fromUtf8Text", ssid)
+        }.getOrNull() ?: runCatching {
+            XposedHelpers.callStaticMethod(wifiSsidClass, "createFromByteArray", ssid.toByteArray(Charsets.UTF_8))
         }.getOrNull()
     }
 
@@ -248,17 +405,35 @@ class FuckWifi : BaseHookModule(
         )
     }
 
-    private fun shouldHideForServiceCaller(): Boolean {
-        val callingUid = Binder.getCallingUid()
-        return callingUid >= Process.FIRST_APPLICATION_UID && callingUid != Process.myUid()
-    }
-
     private fun Method.returnsWifiInfo(): Boolean {
         return returnType.name == "android.net.wifi.WifiInfo"
     }
 
+    private fun Method.returnsScanResults(): Boolean {
+        return returnsParceledListSlice() || returnsList()
+    }
+
+    private fun Method.returnsParceledListSlice(): Boolean {
+        return returnType.name == "com.android.modules.utils.ParceledListSlice" ||
+            returnType.name == "android.content.pm.ParceledListSlice"
+    }
+
+    private fun Method.returnsList(): Boolean {
+        return java.util.List::class.java.isAssignableFrom(returnType)
+    }
+
+    private fun Method.signature(): String {
+        return "${returnType.name} ${declaringClass.name}.$name(${parameterTypes.joinToString { it.name }})"
+    }
+
     private companion object {
+        private const val DEBUG_HARDCODED_CONFIG = false
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
         private const val DEFAULT_MAC_ADDRESS = "02:00:00:00:00:00"
+        private const val WIFI_SYSTEM_SERVICE_CLASS = "com.android.server.wifi.WifiService"
+        private const val WIFI_SERVICE_IMPL_CLASS = "com.android.server.wifi.WifiServiceImpl"
+        private val WIFI_SERVICE_CLASS_NAMES = listOf(
+            WIFI_SERVICE_IMPL_CLASS
+        )
     }
 }

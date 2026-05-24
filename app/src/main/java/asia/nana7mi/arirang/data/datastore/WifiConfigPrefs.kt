@@ -1,10 +1,12 @@
 package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Date
 
 object WifiConfigPrefs {
@@ -40,7 +42,9 @@ object WifiConfigPrefs {
     )
 
     fun loadConfig(context: Context): Config {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = prefs(context).also {
+            migratePrivatePrefsIfNeeded(context, it)
+        }
         val scanResults = parseScanResults(prefs.getString(KEY_SCAN_RESULTS, null)).ifEmpty {
             listOf(
                 ScanNetwork(
@@ -63,7 +67,7 @@ object WifiConfigPrefs {
     }
 
     fun saveConfig(context: Context, config: Config) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
+        prefs(context).edit(commit = true) {
             putBoolean(KEY_ENABLED, config.enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
             putString(KEY_CURRENT_SSID, config.currentSsid)
@@ -71,7 +75,31 @@ object WifiConfigPrefs {
             putBoolean(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
             putString(KEY_SCAN_RESULTS, gson.toJson(config.scanResults))
         }
-        makeReadableForHooks(context)
+    }
+
+    fun lastModified(context: Context): Long {
+        return prefs(context).getLong(KEY_LAST_MODIFIED, 0L)
+    }
+
+    fun buildHookSnapshot(context: Context): String {
+        val config = loadConfig(context)
+        val scanResults = JSONArray().apply {
+            config.scanResults.forEach { network ->
+                put(
+                    JSONObject()
+                        .put("ssid", network.ssid)
+                        .put("bssid", network.bssid)
+                )
+            }
+        }
+        return JSONObject()
+            .put(KEY_ENABLED, config.enabled)
+            .put(KEY_LAST_MODIFIED, lastModified(context))
+            .put(KEY_CURRENT_SSID, config.currentSsid)
+            .put(KEY_CURRENT_BSSID, config.currentBssid)
+            .put(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
+            .put(KEY_SCAN_RESULTS, scanResults)
+            .toString()
     }
 
     fun defaultScanNetwork(index: Int = 0): ScanNetwork {
@@ -92,11 +120,25 @@ object WifiConfigPrefs {
             .filter { it.ssid.isNotBlank() || it.bssid.isNotBlank() }
     }
 
-    private fun makeReadableForHooks(context: Context) {
-        val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
-        val prefsFile = File(sharedPrefsDir, "$PREFS_NAME.xml")
-        sharedPrefsDir.setExecutable(true, false)
-        sharedPrefsDir.setReadable(true, false)
-        prefsFile.setReadable(true, false)
+    @Suppress("DEPRECATION")
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_WORLD_READABLE)
+
+    private fun migratePrivatePrefsIfNeeded(context: Context, sharedPrefs: SharedPreferences) {
+        if (sharedPrefs.contains(KEY_LAST_MODIFIED)) return
+
+        val privatePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!privatePrefs.contains(KEY_LAST_MODIFIED)) return
+
+        sharedPrefs.edit(commit = true) {
+            putBoolean(KEY_ENABLED, privatePrefs.getBoolean(KEY_ENABLED, true))
+            putLong(KEY_LAST_MODIFIED, privatePrefs.getLong(KEY_LAST_MODIFIED, Date().time))
+            privatePrefs.getString(KEY_CURRENT_SSID, null)?.let { putString(KEY_CURRENT_SSID, it) }
+            privatePrefs.getString(KEY_CURRENT_BSSID, null)?.let { putString(KEY_CURRENT_BSSID, it) }
+            putBoolean(KEY_HIDE_SCAN_RESULTS, privatePrefs.getBoolean(KEY_HIDE_SCAN_RESULTS, false))
+            privatePrefs.getString(KEY_SCAN_RESULTS, null)?.let { putString(KEY_SCAN_RESULTS, it) }
+            privatePrefs.getString(KEY_SCAN_SSID, null)?.let { putString(KEY_SCAN_SSID, it) }
+            privatePrefs.getString(KEY_SCAN_BSSID, null)?.let { putString(KEY_SCAN_BSSID, it) }
+        }
     }
 }

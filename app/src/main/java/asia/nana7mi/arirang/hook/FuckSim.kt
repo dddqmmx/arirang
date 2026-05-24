@@ -178,6 +178,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     @Volatile
     private var phoneConfigBindHookInstalled = false
 
+    private val resolvingHookConfig = ThreadLocal.withInitial { false }
+
     private val hookConfig: HookConfig
         get() = currentHookConfig()
 
@@ -1695,6 +1697,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun currentHookConfig(force: Boolean = false): HookConfig {
+        if (resolvingHookConfig.get() == true) {
+            return cachedHookConfig ?: defaultDisabledHookConfig()
+        }
+
         val now = SystemClock.uptimeMillis()
         cachedHookConfig?.let { cached ->
             if (!force && now - lastHookConfigRefreshAt < CONFIG_REFRESH_INTERVAL_MS) {
@@ -1710,15 +1716,29 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
             }
 
-            val previous = cachedHookConfig
-            val updated = loadHookConfig(force)
-            if (previous != updated) {
-                logHookConfig(updated)
+            resolvingHookConfig.set(true)
+            try {
+                val previous = cachedHookConfig
+                val updated = loadHookConfig(force)
+                if (previous != updated) {
+                    logHookConfig(updated)
+                }
+                cachedHookConfig = updated
+                lastHookConfigRefreshAt = checkedAt
+                updated
+            } finally {
+                resolvingHookConfig.set(false)
             }
-            cachedHookConfig = updated
-            lastHookConfigRefreshAt = checkedAt
-            updated
         }
+    }
+
+    private fun defaultDisabledHookConfig(): HookConfig {
+        return HookConfig(
+            enabled = false,
+            hideSim = false,
+            profilesBySlot = DEFAULT_PROFILES_BY_SLOT,
+            uniqueIdentifiers = UniqueIdentifierConfig()
+        )
     }
 
     private fun loadHookConfig(force: Boolean = false): HookConfig {

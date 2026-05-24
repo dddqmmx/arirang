@@ -95,6 +95,9 @@
             android:name="xposedminversion"
             android:value="93" />
         <meta-data
+            android:name="xposedsharedprefs"
+            android:value="true" />
+        <meta-data
             android:name="xposedscope"
             android:resource="@array/xposedscope" />
         <!-- 1. 设置 SplashActivity 为启动页 (Launcher) -->

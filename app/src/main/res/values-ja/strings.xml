@@ -47,6 +47,19 @@
     <string name="hint_package_or_app_name">アプリ名で検索</string>
 
     <string name="ui_settings_title">UI設定</string>
+    <string name="log_settings_title">Hook ログ</string>
+    <string name="log_settings_summary">ログ出力を許可する Hook モジュールを選択します。</string>
+    <string name="log_settings_save_failed">ログ設定を更新できませんでした。</string>
+    <string name="log_module_core">コア</string>
+    <string name="log_module_clipboard">クリップボード</string>
+    <string name="log_module_gms">Google サービス</string>
+    <string name="log_module_location">位置情報</string>
+    <string name="log_module_package_list">アプリリスト</string>
+    <string name="log_module_settings">設定プロバイダー</string>
+    <string name="log_module_sim">SIM</string>
+    <string name="log_module_wifi">Wi-Fi</string>
+    <string name="log_module_unique_id">一意識別子</string>
+    <string name="log_module_notify">Hook サービスブリッジ</string>
 
     <string name="slot_title_text">%1$d. SIMストック</string>
 

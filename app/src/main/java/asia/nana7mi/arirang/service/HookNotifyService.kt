@@ -14,8 +14,10 @@ import android.os.ResultReceiver
 import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
+import asia.nana7mi.arirang.data.datastore.HookLogSettings
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
+import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
 import asia.nana7mi.arirang.hook.IHookNotify
 import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 import kotlinx.coroutines.CoroutineScope
@@ -62,6 +64,9 @@ class HookNotifyService : Service() {
             "android",
             "com.android.phone",
             "com.google.android.gms",
+            "com.android.networkstack",
+            "com.android.networkstack.inprocess",
+            "com.android.wifi",
             BuildConfig.APPLICATION_ID
         )
     }
@@ -249,6 +254,42 @@ class HookNotifyService : Service() {
                 return ""
             }
             return UniqueIdentifierPrefs.buildHookSnapshot(this@HookNotifyService)
+        }
+
+        override fun readHookLogConfigVersion(): Long {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected hook log config version request from uid=$callingUid")
+                return 0L
+            }
+            return HookLogSettings.lastModified(this@HookNotifyService)
+        }
+
+        override fun readHookLogConfigSnapshot(): String {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected hook log config snapshot request from uid=$callingUid")
+                return ""
+            }
+            return HookLogSettings.buildHookSnapshot(this@HookNotifyService)
+        }
+
+        override fun readWifiConfigVersion(): Long {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected Wi-Fi config version request from uid=$callingUid")
+                return 0L
+            }
+            return WifiConfigPrefs.lastModified(this@HookNotifyService)
+        }
+
+        override fun readWifiConfigSnapshot(): String {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected Wi-Fi config snapshot request from uid=$callingUid")
+                return ""
+            }
+            return WifiConfigPrefs.buildHookSnapshot(this@HookNotifyService)
         }
     }
 

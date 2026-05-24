@@ -7,4 +7,8 @@ interface IHookNotify {
     String readSimConfigSnapshot();
     long readUniqueIdentifierConfigVersion();
     String readUniqueIdentifierConfigSnapshot();
+    long readHookLogConfigVersion();
+    String readHookLogConfigSnapshot();
+    long readWifiConfigVersion();
+    String readWifiConfigSnapshot();
 }

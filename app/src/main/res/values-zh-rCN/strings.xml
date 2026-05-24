@@ -48,6 +48,19 @@
     <string name="hint_package_or_app_name">包名或应用名</string>
 
     <string name="ui_settings_title">UI设置</string>
+    <string name="log_settings_title">Hook 日志</string>
+    <string name="log_settings_summary">选择允许输出日志的 Hook 模块。</string>
+    <string name="log_settings_save_failed">更新日志设置失败。</string>
+    <string name="log_module_core">核心</string>
+    <string name="log_module_clipboard">剪贴板</string>
+    <string name="log_module_gms">Google 服务</string>
+    <string name="log_module_location">定位</string>
+    <string name="log_module_package_list">应用列表</string>
+    <string name="log_module_settings">设置提供器</string>
+    <string name="log_module_sim">SIM</string>
+    <string name="log_module_wifi">Wi-Fi</string>
+    <string name="log_module_unique_id">唯一标识</string>
+    <string name="log_module_notify">Hook 服务桥接</string>
 
     <string name="slot_title_text">%1$d. SIM插槽</string>
 
