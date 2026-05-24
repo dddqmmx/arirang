@@ -140,10 +140,9 @@ Use at your own risk.
 3. Enable the **Arirang** module  
 4. Select scope:
    - System / Android framework (required)
-   - `com.android.phone` (required for SIM information rewriting)
-   - `com.android.wifi` (required on ROMs that load Wi-Fi service code from the Wi-Fi module process)
-   - `com.google.android.gms` (required for Google Fused Location API rewriting)
-5. Reboot your device or restart target apps  
+   - `com.android.phone`
+   - `com.android.wifi`
+   - `com.google.android.gms`
 
 #### Install `arirang-submodule` (Required for Native Features)
 
