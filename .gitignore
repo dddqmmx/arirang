@@ -19,3 +19,4 @@ local.properties
 *.keystore
 /app/release/
 /android-source
+/selfcheck/build

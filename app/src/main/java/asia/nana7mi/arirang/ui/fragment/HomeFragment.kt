@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Smartphone
@@ -45,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -57,14 +55,12 @@ import asia.nana7mi.arirang.ui.activity.ClipboardConfigActivity
 import asia.nana7mi.arirang.ui.activity.DeviceInfoConfigActivity
 import asia.nana7mi.arirang.ui.activity.LocationConfigActivity
 import asia.nana7mi.arirang.ui.activity.PackageListConfigActivity
-import asia.nana7mi.arirang.ui.activity.SelfCheckActivity
 import asia.nana7mi.arirang.ui.activity.SimConfigActivity
 import asia.nana7mi.arirang.ui.activity.UniqueIdentifierConfigActivity
 import asia.nana7mi.arirang.ui.activity.WifiConfigActivity
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class HomeFragment : Fragment() {
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -154,16 +150,6 @@ private fun HomeScreen(
             )
         }
 
-        item {
-            FeatureSection(
-                title = stringResource(R.string.category_audit),
-                items = listOf(
-                    FeatureItem(R.string.feature_permission_stats, Icons.Default.Security, SelfCheckActivity::class.java, true)
-                ),
-                onUnavailable = { showUnavailableDialog = true },
-                onFeatureClick = onFeatureClick
-            )
-        }
     }
 
     if (showUnavailableDialog) {
@@ -253,7 +239,6 @@ private fun FeatureCard(
     onUnavailable: () -> Unit,
     onFeatureClick: (Class<*>?) -> Unit
 ) {
-    val context = LocalContext.current
     val available = BuildConfig.DEBUG || item.isReleased
 
     Card(

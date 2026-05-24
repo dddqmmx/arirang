@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.activity
+package asia.nana7mi.arirang.selfcheck.ui.activity
 
 import android.Manifest
 import android.accounts.AccountManager
@@ -29,9 +29,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import asia.nana7mi.arirang.R
+import asia.nana7mi.arirang.selfcheck.R
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import com.google.android.gms.appset.AppSet
 import com.google.android.gms.location.LocationServices
@@ -52,7 +53,7 @@ import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-class SelfCheckActivity : BaseActivity() {
+class SelfCheckActivity : AppCompatActivity() {
 
     private companion object {
         private const val PHONE_DIAG_TAG = "Arirang/SelfCheckPhoneDiag"

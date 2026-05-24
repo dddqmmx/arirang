@@ -1,0 +1,94 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Arirang</string>
+    <string name="status_title">Status</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="action_export">Export</string>
+    <string name="export_select_sections">Select sections to export</string>
+    <string name="export_filename">arirang_self_check.txt</string>
+    <string name="export_success">Exported successfully</string>
+    <string name="export_failed">Export failed</string>
+
+    
+    <string name="self_check_title">Privacy Self Check</string>
+    <string name="self_check_summary_title">Current Visibility</string>
+    <string name="self_check_summary_idle">Run a check to see what regular apps can currently read from this device.</string>
+    <string name="self_check_summary_running">Checking visible device information...</string>
+    <string name="self_check_summary_result">%1$d items are visible, %2$d items appear blocked or unavailable.</string>
+    <string name="self_check_run">Run Self Check</string>
+    <string name="self_check_run_again">Check Again</string>
+    <string name="self_check_nav_unique">Unique IDs</string>
+    <string name="self_check_nav_build">Build</string>
+    <string name="self_check_nav_telephony">Phone</string>
+    <string name="self_check_nav_sim">SIM</string>
+    <string name="self_check_nav_apps">Apps</string>
+    <string name="self_check_nav_location">Location</string>
+    <string name="self_check_nav_wifi">Wi-Fi</string>
+    <string name="self_check_nav_accounts">Accounts</string>
+    <string name="self_check_nav_network">Network</string>
+    <string name="self_check_nav_bluetooth">Bluetooth</string>
+    <string name="self_check_waiting">Waiting for result</string>
+    <string name="self_check_status_checking">Checking</string>
+    <string name="self_check_status_visible">Visible to this app</string>
+    <string name="self_check_status_not_visible">Not visible</string>
+    <string name="self_check_status_not_supported">Not supported</string>
+    <string name="self_check_permission_needed">Permission needed</string>
+    <string name="self_check_unique_title">Unique Identifiers</string>
+    <string name="self_check_build_title">Build Information</string>
+    <string name="self_check_telephony_title">Phone Identifiers</string>
+    <string name="self_check_sim_title">SIM Card Information</string>
+    <string name="self_check_apps_title">Installed Apps</string>
+    <string name="self_check_location_title">Location</string>
+    <string name="self_check_wifi_title">Wi-Fi Information</string>
+    <string name="self_check_accounts_title">Device Accounts</string>
+    <string name="self_check_network_title">Network Interfaces</string>
+    <string name="self_check_bluetooth_title">Bluetooth Devices</string>
+    <string name="self_check_unique_hidden">No readable unique identifier was returned.</string>
+    <string name="self_check_build_hidden">No readable build information was returned.</string>
+    <string name="self_check_telephony_hidden">No phone identifier was returned.</string>
+    <string name="self_check_sim_hidden">No active SIM card information was returned.</string>
+    <string name="self_check_apps_hidden">No other installed apps were returned.</string>
+    <string name="self_check_location_hidden">No location was returned.</string>
+    <string name="self_check_wifi_hidden">No Wi-Fi network or scan result was returned.</string>
+    <string name="self_check_accounts_hidden">No device account was returned.</string>
+    <string name="self_check_network_hidden">No network interface identifier was returned.</string>
+    <string name="self_check_bluetooth_hidden">No paired Bluetooth device was returned.</string>
+    <string name="self_check_phone_permission_hint">Grant phone permission to check SIM, IMEI, subscriber and phone number visibility.</string>
+    <string name="self_check_accounts_permission_hint">Grant account permission to check whether device accounts are visible.</string>
+    <string name="self_check_wifi_permission_hint">Grant location permission to check whether Wi-Fi information is hidden.</string>
+    <string name="self_check_location_permission_hint">Grant location permission to check native and fused location results.</string>
+    <string name="self_check_bluetooth_permission_hint">Grant nearby device permission to check whether paired Bluetooth devices are hidden.</string>
+    <string name="self_check_bluetooth_not_supported">This device does not report a Bluetooth adapter.</string>
+    <string name="self_check_unknown_name">Unknown</string>
+    <string name="self_check_wifi_current">Current network: %1$s</string>
+    <string name="self_check_location_native_cache">Native Android API (cache)</string>
+    <string name="self_check_location_native_realtime">Native Android API (real-time)</string>
+    <string name="self_check_location_fused_cache">Google Fused Location API (cache)</string>
+    <string name="self_check_location_fused_realtime">Google Fused Location API (real-time)</string>
+    <string name="self_check_location_no_data">No data returned</string>
+    <string name="self_check_location_coordinates">Coordinates: %1$.6f, %2$.6f</string>
+    <string name="self_check_location_accuracy_time">Accuracy: %1$.1fm | Time: %2$s</string>
+
+    <plurals name="self_check_apps_status">
+        <item quantity="one">%1$d app returned</item>
+        <item quantity="other">%1$d apps returned</item>
+    </plurals>
+    <plurals name="self_check_wifi_status">
+        <item quantity="one">%1$d Wi-Fi network returned</item>
+        <item quantity="other">%1$d Wi-Fi networks returned</item>
+    </plurals>
+    <plurals name="self_check_sim_status">
+        <item quantity="one">%1$d SIM returned</item>
+        <item quantity="other">%1$d SIMs returned</item>
+    </plurals>
+    <plurals name="self_check_accounts_status">
+        <item quantity="one">%1$d account returned</item>
+        <item quantity="other">%1$d accounts returned</item>
+    </plurals>
+    <plurals name="self_check_bluetooth_status">
+        <item quantity="one">%1$d paired device returned</item>
+        <item quantity="other">%1$d paired devices returned</item>
+    </plurals>
+</resources>

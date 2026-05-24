@@ -207,22 +207,6 @@
 
         </LinearLayout>
 
-
-        <!-- 审计 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/category_audit"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="8dp"/>
-
-        <asia.nana7mi.arirang.view.FeatureItemView
-            android:id="@+id/test_view"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:featureName="@string/feature_permission_stats" />
-
     </LinearLayout>
 
 </ScrollView>

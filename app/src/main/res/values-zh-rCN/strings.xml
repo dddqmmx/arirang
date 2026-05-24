@@ -15,7 +15,6 @@
     <string name="category_permission">权限</string>
     <string name="category_anonymization">匿名化</string>
     <string name="category_control">控制</string>
-    <string name="category_audit">审计</string>
 
     <string name="feature_clipboard">剪切板读取</string>
     <string name="feature_sensor">传感器</string>
@@ -32,9 +31,6 @@
 
     <string name="feature_background_network">后台联网</string>
     <string name="feature_force_proxy">强制代理</string>
-
-    <string name="feature_permission_stats">隐私自检</string>
-
 
     <string name="clipboard_permission_title">剪切板读取权限</string>
     <string name="clipboard_overlay_permission_title">需要悬浮窗权限</string>
@@ -223,94 +219,13 @@
     <string name="exception">异常: </string>
     <string name="service_not_connected">服务未连接，请重试</string>
 
-    <!-- Self Check -->
-    <string name="self_check_title">隐私自检</string>
-    <string name="self_check_summary_title">当前可见性</string>
-    <string name="self_check_summary_idle">运行自检，查看普通应用当前能从这台设备读取到哪些信息。</string>
-    <string name="self_check_summary_running">正在检查设备信息可见性...</string>
-    <string name="self_check_summary_result">%1$d 项仍可读取，%2$d 项看起来已被隐藏或不可用。</string>
-    <string name="self_check_run">开始自检</string>
-    <string name="self_check_run_again">重新自检</string>
-    <string name="self_check_nav_unique">唯一标识</string>
-    <string name="self_check_nav_build">构建</string>
-    <string name="self_check_nav_telephony">电话</string>
-    <string name="self_check_nav_sim">SIM</string>
-    <string name="self_check_nav_apps">应用</string>
-    <string name="self_check_nav_location">定位</string>
-    <string name="self_check_nav_wifi">Wi-Fi</string>
-    <string name="self_check_nav_accounts">账号</string>
-    <string name="self_check_nav_network">网络</string>
-    <string name="self_check_nav_bluetooth">蓝牙</string>
-    <string name="self_check_waiting">等待结果</string>
-    <string name="self_check_status_checking">检查中</string>
-    <string name="self_check_status_visible">当前应用可读取</string>
-    <string name="self_check_status_not_visible">未读取到</string>
-    <string name="self_check_status_not_supported">设备不支持</string>
-    <string name="self_check_permission_needed">需要权限</string>
-    <string name="self_check_unique_title">唯一标识</string>
-    <string name="self_check_build_title">构建信息</string>
-    <string name="self_check_telephony_title">电话身份标识</string>
-    <string name="self_check_sim_title">SIM 卡信息</string>
-    <string name="self_check_apps_title">已安装应用</string>
-    <string name="self_check_location_title">定位</string>
-    <string name="self_check_wifi_title">Wi-Fi 信息</string>
-    <string name="self_check_accounts_title">设备账号</string>
-    <string name="self_check_network_title">网络接口</string>
-    <string name="self_check_bluetooth_title">蓝牙设备</string>
-    <string name="self_check_unique_hidden">没有返回可读取的唯一标识。</string>
-    <string name="self_check_build_hidden">没有返回可读取的构建信息。</string>
-    <string name="self_check_telephony_hidden">没有返回电话身份标识。</string>
-    <string name="self_check_sim_hidden">没有返回活跃 SIM 卡信息。</string>
-    <string name="self_check_apps_hidden">没有返回其他已安装应用。</string>
-    <string name="self_check_location_hidden">没有返回定位信息。</string>
-    <string name="self_check_wifi_hidden">没有返回 Wi-Fi 网络或扫描结果。</string>
-    <string name="self_check_accounts_hidden">没有返回设备账号。</string>
-    <string name="self_check_network_hidden">没有返回网络接口标识。</string>
-    <string name="self_check_bluetooth_hidden">没有返回已配对蓝牙设备。</string>
-    <string name="self_check_phone_permission_hint">授予电话权限后，可检查 SIM、IMEI、订阅号和手机号是否可见。</string>
-    <string name="self_check_accounts_permission_hint">授予账号权限后，可检查设备账号是否可见。</string>
-    <string name="self_check_wifi_permission_hint">授予定位权限后，可检查 Wi-Fi 信息是否已被隐藏。</string>
-    <string name="self_check_location_permission_hint">授予定位权限后，可检查原生和 Fused 定位结果。</string>
-    <string name="self_check_bluetooth_permission_hint">授予附近设备权限后，可检查已配对蓝牙设备是否已被隐藏。</string>
-    <string name="self_check_bluetooth_not_supported">这台设备没有报告蓝牙适配器。</string>
-    <string name="self_check_unknown_name">未知</string>
-    <string name="self_check_wifi_current">当前网络：%1$s</string>
-    <string name="self_check_location_native_cache">原生 Android API（缓存）</string>
-    <string name="self_check_location_native_realtime">原生 Android API（实时）</string>
-    <string name="self_check_location_fused_cache">Google Fused Location API（缓存）</string>
-    <string name="self_check_location_fused_realtime">Google Fused Location API（实时）</string>
-    <string name="self_check_location_no_data">没有返回数据</string>
-    <string name="self_check_location_coordinates">经纬度：%1$.6f, %2$.6f</string>
-    <string name="self_check_location_accuracy_time">精度：%1$.1fm | 时间：%2$s</string>
-
-    <plurals name="self_check_apps_status">
-        <item quantity="other">返回 %1$d 个应用</item>
-    </plurals>
-    <plurals name="self_check_wifi_status">
-        <item quantity="other">返回 %1$d 个 Wi-Fi 网络</item>
-    </plurals>
-    <plurals name="self_check_sim_status">
-        <item quantity="other">返回 %1$d 张 SIM</item>
-    </plurals>
     <plurals name="sim_config_profile_count">
         <item quantity="other">已配置 %1$d 张 SIM 档案</item>
-    </plurals>
-    <plurals name="self_check_accounts_status">
-        <item quantity="other">返回 %1$d 个账号</item>
-    </plurals>
-    <plurals name="self_check_bluetooth_status">
-        <item quantity="other">返回 %1$d 个已配对设备</item>
     </plurals>
 
     <string name="feature_not_available">暂未开放</string>
     <string name="reset_all">重置所有设定</string>
     <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为。</string>
-
-    <string name="action_export">导出</string>
-    <string name="export_select_sections">选择要导出的部分</string>
-    <string name="export_filename">arirang_self_check.txt</string>
-    <string name="export_success">导出成功</string>
-    <string name="export_failed">导出失败</string>
 
     <string name="sim_preset_title">选择运营商预设</string>
     <string name="sim_preset_button">选择国家/运营商预设</string>
