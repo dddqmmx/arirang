@@ -33,6 +33,16 @@ The goal of this design is to keep most functionality inside the system
 framework whenever possible, while still allowing deeper native integration
 where necessary.
 
+## 🔎 Privacy Self-Check App
+
+Arirang includes an independent companion application for inspecting what device
+information is visible to ordinary apps and verifying whether privacy protection
+features are working correctly.
+
+Current checks include device info, unique identifiers, SIM information, Android
+location APIs, Google Fused Location APIs, accounts, Bluetooth devices, Wi-Fi
+information, sensors, and installed packages.
+
 ## ⚠️ Warning
 
 This software is in an early development stage and may cause system instability, crashes, or unexpected behavior.
@@ -92,13 +102,6 @@ Use at your own risk.
   Enable or disable LSPosed log output per hook module, including core, clipboard,
   Google services, location, package list, settings provider, SIM, Wi-Fi, unique
   identifiers, and hook service bridge logs.
-
-- **Privacy Self-Check (Available)**  
-  Inspect what device information is visible to applications and verify whether
-  privacy protection features are working correctly. Current checks include
-  device info, unique identifiers, SIM information, Android location APIs, Google
-  Fused Location APIs, accounts, Bluetooth devices, Wi-Fi information, sensors,
-  and installed packages.
 
 - **Modern UI**  
   Built with Material Design 3, Dynamic Colors support, and native configuration
