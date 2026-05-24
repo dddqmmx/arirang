@@ -2,5 +2,5 @@ id=arirang-submodule
 name=arirang-submodule
 version=0.1.0
 versionCode=1
-author=Arirang
+author=PaulPerkenstein
 description=Native process-side fallbacks for Arirang surfaces that cannot be rewritten from system Java hooks.
