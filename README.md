@@ -15,23 +15,29 @@ The goal of this design is to:
 - Avoid unnecessary impact on application performance
 - Minimize interference with normal application runtime behavior
 
-## 🔌 Optional Native Submodule
+## 🔌 Native Submodule (Beta)
 
-Arirang provides an optional native Zygisk extension module named
+Arirang provides a native Zygisk extension module named
 `arirang-submodule`.
 
-This submodule is designed as a capability extension layer for functionality
-that cannot be reliably implemented through LSPosed or framework-level Java
-hooks alone.
+This submodule is a required beta-stage capability extension layer for
+functionality that cannot be reliably implemented through LSPosed or
+framework-level Java hooks alone.
+
+The current implementation avoids per-application specialization hooks. Native
+fallback hooks are installed at the Zygote/framework boundary so child processes
+inherit the rewritten framework behavior instead of receiving app-specific hook
+installation whenever possible.
 
 Depending on the feature, the submodule may be:
 - Required to implement certain low-level behaviors
 - Used to strengthen spoofing consistency and anti-detection capabilities
-- Used to extend privacy protection into native or process-local environments
+- Used to extend privacy protection into native framework surfaces such as
+  `SystemProperties` and `MediaDrm`
 
-The goal of this design is to keep most functionality inside the system
-framework whenever possible, while still allowing deeper native integration
-where necessary.
+The long-term goal remains to move functionality into system framework services
+where possible and keep this submodule as the deeper native fallback layer for
+surfaces that do not expose a suitable system service hook point.
 
 ## 🔎 Privacy Self-Check App
 
@@ -124,8 +130,8 @@ Use at your own risk.
 - **LSPosed** or compatible Xposed framework
 - Android 14 or later
 - Android 16 is the current recommended target for testing
-- Magisk, KernelSU / KernelSU Next, or APatch (required only for optional native submodule features)
-- Zygisk (required only for optional native submodule features)
+- Magisk, KernelSU / KernelSU Next, or APatch (required for native submodule features)
+- Zygisk (required for native submodule features)
 
 ## 📦 Installation
 
@@ -139,9 +145,9 @@ Use at your own risk.
    - `com.google.android.gms` (required for Google Fused Location API rewriting)
 5. Reboot your device or restart target apps  
 
-#### Install `arirang-submodule` (Optional but Recommended)
+#### Install `arirang-submodule` (Required for Native Features)
 
-Some advanced process-level features require the optional native Zygisk helper module.
+Some native framework fallback features require the Zygisk helper module.
 
 1. Download `arirang-submodule.zip`
 2. Flash the ZIP through:

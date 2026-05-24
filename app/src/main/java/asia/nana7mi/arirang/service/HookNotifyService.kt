@@ -15,6 +15,7 @@ import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
+import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
@@ -290,6 +291,24 @@ class HookNotifyService : Service() {
                 return ""
             }
             return WifiConfigPrefs.buildHookSnapshot(this@HookNotifyService)
+        }
+
+        override fun readLocationConfigVersion(): Long {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected location config version request from uid=$callingUid")
+                return 0L
+            }
+            return LocationConfigPrefs.lastModified(this@HookNotifyService)
+        }
+
+        override fun readLocationConfigSnapshot(): String {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected location config snapshot request from uid=$callingUid")
+                return ""
+            }
+            return LocationConfigPrefs.buildHookSnapshot(this@HookNotifyService)
         }
     }
 

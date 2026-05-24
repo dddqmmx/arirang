@@ -125,6 +125,15 @@ object HookNotifyClient {
     @Volatile
     private var sLastWifiConfigCheckAt = 0L
 
+    @Volatile
+    private var sLocationConfigSnapshot: String? = null
+
+    @Volatile
+    private var sLocationConfigVersion = Long.MIN_VALUE
+
+    @Volatile
+    private var sLastLocationConfigCheckAt = 0L
+
     /**
      * 同步锁对象
      *
@@ -480,6 +489,56 @@ object HookNotifyClient {
             cachedSnapshot
         } catch (t: Throwable) {
             HookLog.i(HookLog.Module.NOTIFY, "readWifiConfigSnapshot failed: ${t.stackTraceToString()}")
+            sService = null
+            cachedSnapshot
+        }
+    }
+
+    fun readLocationConfigSnapshot(
+        force: Boolean = false,
+        allowBind: Boolean = false,
+        bindContext: Context? = null,
+        bindCurrentUser: Boolean = false
+    ): String? {
+        val now = SystemClock.uptimeMillis()
+        val cachedSnapshot = sLocationConfigSnapshot
+        if (!force && cachedSnapshot != null && now - sLastLocationConfigCheckAt < CONFIG_CACHE_TTL_MS) {
+            return cachedSnapshot
+        }
+
+        val service = if (allowBind) {
+            val ctx = bindContext ?: getSystemContext()
+            if (ctx == null) {
+                HookLog.i(HookLog.Module.NOTIFY, "readLocationConfigSnapshot: no context")
+                return cachedSnapshot
+            }
+            if (bindCurrentUser) {
+                getOrBindServiceCurrentUser(ctx)
+            } else {
+                getOrBindService(ctx)
+            }
+        } else {
+            sService
+        } ?: return cachedSnapshot
+
+        return try {
+            withCleanCallingIdentity {
+                val version = service.readLocationConfigVersion()
+                if (force || cachedSnapshot == null || version != sLocationConfigVersion) {
+                    val snapshot = service.readLocationConfigSnapshot()?.takeIf { it.isNotBlank() }
+                    if (snapshot != null) {
+                        sLocationConfigSnapshot = snapshot
+                        sLocationConfigVersion = version
+                    }
+                }
+                sLastLocationConfigCheckAt = now
+                sLocationConfigSnapshot
+            }
+        } catch (_: DeadObjectException) {
+            sService = null
+            cachedSnapshot
+        } catch (t: Throwable) {
+            HookLog.i(HookLog.Module.NOTIFY, "readLocationConfigSnapshot failed: ${t.stackTraceToString()}")
             sService = null
             cachedSnapshot
         }

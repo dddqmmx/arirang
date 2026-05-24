@@ -11,4 +11,6 @@ interface IHookNotify {
     String readHookLogConfigSnapshot();
     long readWifiConfigVersion();
     String readWifiConfigSnapshot();
+    long readLocationConfigVersion();
+    String readLocationConfigSnapshot();
 }

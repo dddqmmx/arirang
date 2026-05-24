@@ -12,26 +12,25 @@ public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
         api_ = api;
         env_ = env;
+        if (!arirang::load_config_from_disk(config_)) {
+            arirang::load_config_from_companion(api_, config_);
+        }
+        arirang::install_system_property_spoofer(api_, env_, config_, true);
+        arirang::install_id_spoofer(api_, env_, config_, true);
+        arirang::spoof_build_fields(env_, config_);
+        arirang::log_info("installed zygote-level framework hooks");
     }
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *) override {
-        arirang::load_config_from_companion(api_, config_);
-        active_process_ = true;
-        arirang::install_system_property_spoofer(api_, env_, config_, active_process_);
-        arirang::install_id_spoofer(api_, env_, config_, active_process_);
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
-        if (!active_process_) return;
-        arirang::spoof_build_fields(env_, config_);
-        arirang::log_info("spoofed Build fields");
     }
 
 private:
     zygisk::Api *api_ = nullptr;
     JNIEnv *env_ = nullptr;
     arirang::SubmoduleConfig config_;
-    bool active_process_ = false;
 };
 
 REGISTER_ZYGISK_MODULE(ArirangZygisk)

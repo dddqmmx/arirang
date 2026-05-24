@@ -1,8 +1,9 @@
 package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
-import java.io.File
+import org.json.JSONObject
 import java.util.Date
 
 object LocationConfigPrefs {
@@ -38,7 +39,9 @@ object LocationConfigPrefs {
     )
 
     fun loadConfig(context: Context): Config {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val prefs = prefs(context).also {
+            migratePrivatePrefsIfNeeded(context, it)
+        }
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             latitude = prefs.getString(KEY_LATITUDE, null)?.toDoubleOrNull() ?: DEFAULT_LATITUDE,
@@ -52,7 +55,7 @@ object LocationConfigPrefs {
     }
 
     fun saveConfig(context: Context, config: Config) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
+        prefs(context).edit(commit = true) {
             putBoolean(KEY_ENABLED, config.enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
             putString(KEY_LATITUDE, config.latitude.toString())
@@ -63,14 +66,58 @@ object LocationConfigPrefs {
             putString(KEY_BEARING, config.bearing.toString())
             putInt(KEY_SATELLITES, config.satellites.coerceAtLeast(0))
         }
-        makeReadableForHooks(context)
     }
 
-    private fun makeReadableForHooks(context: Context) {
-        val sharedPrefsDir = File(context.applicationInfo.dataDir, "shared_prefs")
-        val prefsFile = File(sharedPrefsDir, "$PREFS_NAME.xml")
-        sharedPrefsDir.setExecutable(true, false)
-        sharedPrefsDir.setReadable(true, false)
-        prefsFile.setReadable(true, false)
+    fun lastModified(context: Context): Long {
+        return prefs(context).getLong(KEY_LAST_MODIFIED, 0L)
+    }
+
+    fun buildHookSnapshot(context: Context): String {
+        val config = loadConfig(context)
+        return JSONObject()
+            .put(KEY_ENABLED, config.enabled)
+            .put(KEY_LAST_MODIFIED, lastModified(context))
+            .put(KEY_LATITUDE, config.latitude)
+            .put(KEY_LONGITUDE, config.longitude)
+            .put(KEY_ALTITUDE, config.altitude)
+            .put(KEY_ACCURACY, config.accuracy.toDouble())
+            .put(KEY_SPEED, config.speed.toDouble())
+            .put(KEY_BEARING, config.bearing.toDouble())
+            .put(KEY_SATELLITES, config.satellites)
+            .toString()
+    }
+
+    private fun prefs(context: Context): SharedPreferences {
+        return try {
+            @Suppress("DEPRECATION")
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_WORLD_READABLE)
+        } catch (_: SecurityException) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }
+    }
+
+    private fun migratePrivatePrefsIfNeeded(context: Context, sharedPrefs: SharedPreferences) {
+        if (sharedPrefs.contains(KEY_LAST_MODIFIED)) return
+
+        val privatePrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!privatePrefs.contains(KEY_LAST_MODIFIED) &&
+            !privatePrefs.contains(KEY_ENABLED)
+        ) {
+            return
+        }
+
+        sharedPrefs.edit(commit = true) {
+            putBoolean(KEY_ENABLED, privatePrefs.getBoolean(KEY_ENABLED, false))
+            putLong(KEY_LAST_MODIFIED, privatePrefs.getLong(KEY_LAST_MODIFIED, Date().time))
+            privatePrefs.getString(KEY_LATITUDE, null)?.let { putString(KEY_LATITUDE, it) }
+            privatePrefs.getString(KEY_LONGITUDE, null)?.let { putString(KEY_LONGITUDE, it) }
+            privatePrefs.getString(KEY_ALTITUDE, null)?.let { putString(KEY_ALTITUDE, it) }
+            privatePrefs.getString(KEY_ACCURACY, null)?.let { putString(KEY_ACCURACY, it) }
+            privatePrefs.getString(KEY_SPEED, null)?.let { putString(KEY_SPEED, it) }
+            privatePrefs.getString(KEY_BEARING, null)?.let { putString(KEY_BEARING, it) }
+            if (privatePrefs.contains(KEY_SATELLITES)) {
+                putInt(KEY_SATELLITES, privatePrefs.getInt(KEY_SATELLITES, DEFAULT_SATELLITES))
+            }
+        }
     }
 }

@@ -3,4 +3,4 @@ name=arirang-submodule
 version=0.1.0
 versionCode=1
 author=PaulPerkenstein
-description=Native process-side fallbacks for Arirang surfaces that cannot be rewritten from system Java hooks.
+description=Zygote-level native framework fallback layer for Arirang surfaces that cannot be rewritten from system Java hooks.

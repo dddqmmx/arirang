@@ -12,6 +12,7 @@ import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import org.json.JSONObject
 import java.lang.reflect.Method
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -26,6 +27,9 @@ class FuckLocation : BaseHookModule(
 ) {
 
     private companion object {
+        private const val DEBUG_HARDCODED_CONFIG = false
+        private const val DEBUG_LATITUDE = 39.019444
+        private const val DEBUG_LONGITUDE = 125.738052
         private const val MOCK_VERTICAL_ACCURACY = 2.0f
         private const val MOCK_SPEED_ACCURACY = 0.1f
         private const val MOCK_BEARING_ACCURACY = 0.5f
@@ -36,6 +40,12 @@ class FuckLocation : BaseHookModule(
             "com.android.server.location.gnss.hal.GnssNative",
             "com.android.server.location.gnss.GnssLocationProvider",
             "com.android.server.location.gnss.GnssLocationProviderImpl"
+        )
+
+        private val debugConfig = HookLocationConfig(
+            enabled = true,
+            latitude = DEBUG_LATITUDE,
+            longitude = DEBUG_LONGITUDE
         )
     }
 
@@ -88,6 +98,8 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun currentConfig(): HookLocationConfig {
+        if (DEBUG_HARDCODED_CONFIG) return debugConfig
+
         val now = SystemClock.uptimeMillis()
         if (now - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) return cachedConfig
 
@@ -97,30 +109,56 @@ class FuckLocation : BaseHookModule(
                 return@synchronized cachedConfig
             }
 
-            val prefs = XSharedPreferences(BuildConfig.APPLICATION_ID, LocationConfigPrefs.PREFS_NAME).apply {
-                makeWorldReadable()
-                reload()
-            }
-            cachedConfig = HookLocationConfig(
-                enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
-                latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_LATITUDE,
-                longitude = prefs.getString(LocationConfigPrefs.KEY_LONGITUDE, null)?.toDoubleOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
-                altitude = prefs.getString(LocationConfigPrefs.KEY_ALTITUDE, null)?.toDoubleOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
-                accuracy = prefs.getString(LocationConfigPrefs.KEY_ACCURACY, null)?.toFloatOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_ACCURACY,
-                speed = prefs.getString(LocationConfigPrefs.KEY_SPEED, null)?.toFloatOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_SPEED,
-                bearing = prefs.getString(LocationConfigPrefs.KEY_BEARING, null)?.toFloatOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_BEARING,
-                satellites = prefs.getInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
-                    .coerceIn(0, 64)
-            )
+            cachedConfig = readConfigFromHookNotify() ?: readConfigFromPrefs()
             cachedConfigAt = checkedAt
             cachedConfig
         }
+    }
+
+    private fun readConfigFromHookNotify(): HookLocationConfig? {
+        val snapshot = HookNotifyClient.readLocationConfigSnapshot(allowBind = true)
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        return runCatching {
+            val json = JSONObject(snapshot)
+            HookLocationConfig(
+                enabled = json.optBoolean(LocationConfigPrefs.KEY_ENABLED, false),
+                latitude = json.optDouble(LocationConfigPrefs.KEY_LATITUDE, LocationConfigPrefs.DEFAULT_LATITUDE),
+                longitude = json.optDouble(LocationConfigPrefs.KEY_LONGITUDE, LocationConfigPrefs.DEFAULT_LONGITUDE),
+                altitude = json.optDouble(LocationConfigPrefs.KEY_ALTITUDE, LocationConfigPrefs.DEFAULT_ALTITUDE),
+                accuracy = json.optDouble(LocationConfigPrefs.KEY_ACCURACY, LocationConfigPrefs.DEFAULT_ACCURACY.toDouble()).toFloat(),
+                speed = json.optDouble(LocationConfigPrefs.KEY_SPEED, LocationConfigPrefs.DEFAULT_SPEED.toDouble()).toFloat(),
+                bearing = json.optDouble(LocationConfigPrefs.KEY_BEARING, LocationConfigPrefs.DEFAULT_BEARING.toDouble()).toFloat(),
+                satellites = json.optInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
+                    .coerceIn(0, 64)
+            )
+        }.onFailure {
+            HookLog.w(HookLog.Module.LOCATION, "failed to parse location config snapshot: ${it.message}")
+        }.getOrNull()
+    }
+
+    private fun readConfigFromPrefs(): HookLocationConfig {
+        val prefs = XSharedPreferences(BuildConfig.APPLICATION_ID, LocationConfigPrefs.PREFS_NAME).apply {
+            makeWorldReadable()
+            reload()
+        }
+        return HookLocationConfig(
+            enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
+            latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
+                ?: LocationConfigPrefs.DEFAULT_LATITUDE,
+            longitude = prefs.getString(LocationConfigPrefs.KEY_LONGITUDE, null)?.toDoubleOrNull()
+                ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
+            altitude = prefs.getString(LocationConfigPrefs.KEY_ALTITUDE, null)?.toDoubleOrNull()
+                ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
+            accuracy = prefs.getString(LocationConfigPrefs.KEY_ACCURACY, null)?.toFloatOrNull()
+                ?: LocationConfigPrefs.DEFAULT_ACCURACY,
+            speed = prefs.getString(LocationConfigPrefs.KEY_SPEED, null)?.toFloatOrNull()
+                ?: LocationConfigPrefs.DEFAULT_SPEED,
+            bearing = prefs.getString(LocationConfigPrefs.KEY_BEARING, null)?.toFloatOrNull()
+                ?: LocationConfigPrefs.DEFAULT_BEARING,
+            satellites = prefs.getInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
+                .coerceIn(0, 64)
+        )
     }
 
     private fun hookLocationAccessors() {
