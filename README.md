@@ -141,7 +141,6 @@ Use at your own risk.
 4. Select scope:
    - System / Android framework (required)
    - `com.android.phone`
-   - `com.android.wifi`
    - `com.google.android.gms`
 
 #### Install `arirang-submodule` (Required for Native Features)
