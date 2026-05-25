@@ -66,6 +66,7 @@ object LocationConfigPrefs {
             putString(KEY_BEARING, config.bearing.toString())
             putInt(KEY_SATELLITES, config.satellites.coerceAtLeast(0))
         }
+        SubmoduleConfigFiles.write(context)
     }
 
     fun lastModified(context: Context): Long {

@@ -36,11 +36,15 @@ object HookLogSettings {
     }
 
     fun setEnabled(context: Context, key: String, enabled: Boolean): Boolean {
-        return prefs(context)
+        val saved = prefs(context)
             .edit()
             .putBoolean(prefKey(key), enabled)
             .putLong(KEY_LAST_MODIFIED, Date().time)
             .commit()
+        if (saved) {
+            SubmoduleConfigFiles.write(context)
+        }
+        return saved
     }
 
     fun lastModified(context: Context): Long {

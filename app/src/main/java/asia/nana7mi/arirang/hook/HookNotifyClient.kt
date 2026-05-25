@@ -16,6 +16,7 @@ import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.service.HookNotifyService
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -89,50 +90,13 @@ object HookNotifyClient {
     @Volatile
     private var sConnectLatch: CountDownLatch? = null
 
-    @Volatile
-    private var sSimConfigSnapshot: String? = null
+    private data class CachedConfig(
+        @Volatile var snapshot: String? = null,
+        @Volatile var version: Long = Long.MIN_VALUE,
+        @Volatile var checkedAt: Long = 0L
+    )
 
-    @Volatile
-    private var sSimConfigVersion = Long.MIN_VALUE
-
-    @Volatile
-    private var sLastSimConfigCheckAt = 0L
-
-    @Volatile
-    private var sUniqueIdentifierConfigSnapshot: String? = null
-
-    @Volatile
-    private var sUniqueIdentifierConfigVersion = Long.MIN_VALUE
-
-    @Volatile
-    private var sLastUniqueIdentifierConfigCheckAt = 0L
-
-    @Volatile
-    private var sHookLogConfigSnapshot: String? = null
-
-    @Volatile
-    private var sHookLogConfigVersion = Long.MIN_VALUE
-
-    @Volatile
-    private var sLastHookLogConfigCheckAt = 0L
-
-    @Volatile
-    private var sWifiConfigSnapshot: String? = null
-
-    @Volatile
-    private var sWifiConfigVersion = Long.MIN_VALUE
-
-    @Volatile
-    private var sLastWifiConfigCheckAt = 0L
-
-    @Volatile
-    private var sLocationConfigSnapshot: String? = null
-
-    @Volatile
-    private var sLocationConfigVersion = Long.MIN_VALUE
-
-    @Volatile
-    private var sLastLocationConfigCheckAt = 0L
+    private val configCache = ConcurrentHashMap<String, CachedConfig>()
 
     /**
      * 同步锁对象
@@ -314,44 +278,7 @@ object HookNotifyClient {
     }
 
     fun readSimConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
-        val now = SystemClock.uptimeMillis()
-        val cachedSnapshot = sSimConfigSnapshot
-        if (!force && cachedSnapshot != null && now - sLastSimConfigCheckAt < CONFIG_CACHE_TTL_MS) {
-            return cachedSnapshot
-        }
-
-        val service = if (allowBind) {
-            val ctx = getSystemContext()
-            if (ctx == null) {
-                HookLog.i(HookLog.Module.NOTIFY, "readSimConfigSnapshot: no system context")
-                return cachedSnapshot
-            }
-            getOrBindService(ctx)
-        } else {
-            sService
-        } ?: return cachedSnapshot
-
-        return try {
-            withCleanCallingIdentity {
-                val version = service.readSimConfigVersion()
-                if (force || cachedSnapshot == null || version != sSimConfigVersion) {
-                    val snapshot = service.readSimConfigSnapshot()?.takeIf { it.isNotBlank() }
-                    if (snapshot != null) {
-                        sSimConfigSnapshot = snapshot
-                        sSimConfigVersion = version
-                    }
-                }
-                sLastSimConfigCheckAt = now
-                sSimConfigSnapshot
-            }
-        } catch (_: DeadObjectException) {
-            sService = null
-            cachedSnapshot
-        } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "readSimConfigSnapshot failed: ${t.stackTraceToString()}")
-            sService = null
-            cachedSnapshot
-        }
+        return readConfigSnapshot("sim", force, allowBind, logName = "SIM")
     }
 
     fun readUniqueIdentifierConfigSnapshot(
@@ -360,88 +287,18 @@ object HookNotifyClient {
         bindContext: Context? = null,
         bindCurrentUser: Boolean = false
     ): String? {
-        val now = SystemClock.uptimeMillis()
-        val cachedSnapshot = sUniqueIdentifierConfigSnapshot
-        if (!force && cachedSnapshot != null && now - sLastUniqueIdentifierConfigCheckAt < CONFIG_CACHE_TTL_MS) {
-            return cachedSnapshot
-        }
-
-        val service = if (allowBind) {
-            val ctx = bindContext ?: getSystemContext()
-            if (ctx == null) {
-                HookLog.i(HookLog.Module.NOTIFY, "readUniqueIdentifierConfigSnapshot: no system context")
-                return cachedSnapshot
-            }
-            if (bindCurrentUser) {
-                getOrBindServiceCurrentUser(ctx)
-            } else {
-                getOrBindService(ctx)
-            }
-        } else {
-            sService
-        } ?: return cachedSnapshot
-
-        return try {
-            withCleanCallingIdentity {
-                val version = service.readUniqueIdentifierConfigVersion()
-                if (force || cachedSnapshot == null || version != sUniqueIdentifierConfigVersion) {
-                    val snapshot = service.readUniqueIdentifierConfigSnapshot()?.takeIf { it.isNotBlank() }
-                    if (snapshot != null) {
-                        sUniqueIdentifierConfigSnapshot = snapshot
-                        sUniqueIdentifierConfigVersion = version
-                    }
-                }
-                sLastUniqueIdentifierConfigCheckAt = now
-                sUniqueIdentifierConfigSnapshot
-            }
-        } catch (_: DeadObjectException) {
-            sService = null
-            cachedSnapshot
-        } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "readUniqueIdentifierConfigSnapshot failed: ${t.stackTraceToString()}")
-            sService = null
-            cachedSnapshot
-        }
+        return readConfigSnapshot(
+            configName = "unique_identifier",
+            force = force,
+            allowBind = allowBind,
+            bindContext = bindContext,
+            bindCurrentUser = bindCurrentUser,
+            logName = "unique identifier"
+        )
     }
 
     fun readHookLogConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
-        val now = SystemClock.uptimeMillis()
-        val cachedSnapshot = sHookLogConfigSnapshot
-        if (!force && cachedSnapshot != null && now - sLastHookLogConfigCheckAt < CONFIG_CACHE_TTL_MS) {
-            return cachedSnapshot
-        }
-
-        val service = if (allowBind) {
-            val ctx = getSystemContext()
-            if (ctx == null) {
-                return cachedSnapshot
-            }
-            getOrBindService(ctx)
-        } else {
-            sService
-        } ?: return cachedSnapshot
-
-        return try {
-            withCleanCallingIdentity {
-                val version = service.readHookLogConfigVersion()
-                if (force || cachedSnapshot == null || version != sHookLogConfigVersion) {
-                    val snapshot = service.readHookLogConfigSnapshot()?.takeIf { it.isNotBlank() }
-                    if (snapshot != null) {
-                        sHookLogConfigSnapshot = snapshot
-                        sHookLogConfigVersion = version
-                    }
-                }
-                sLastHookLogConfigCheckAt = now
-                sHookLogConfigSnapshot
-            }
-        } catch (_: DeadObjectException) {
-            sService = null
-            cachedSnapshot
-        } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "readHookLogConfigSnapshot failed: ${t.stackTraceToString()}")
-            sService = null
-            cachedSnapshot
-        }
+        return readConfigSnapshot("hook_log", force, allowBind, logName = "hook log")
     }
 
     fun readWifiConfigSnapshot(
@@ -450,48 +307,7 @@ object HookNotifyClient {
         bindContext: Context? = null,
         bindCurrentUser: Boolean = false
     ): String? {
-        val now = SystemClock.uptimeMillis()
-        val cachedSnapshot = sWifiConfigSnapshot
-        if (!force && cachedSnapshot != null && now - sLastWifiConfigCheckAt < CONFIG_CACHE_TTL_MS) {
-            return cachedSnapshot
-        }
-
-        val service = if (allowBind) {
-            val ctx = bindContext ?: getSystemContext()
-            if (ctx == null) {
-                HookLog.i(HookLog.Module.NOTIFY, "readWifiConfigSnapshot: no context")
-                return cachedSnapshot
-            }
-            if (bindCurrentUser) {
-                getOrBindServiceCurrentUser(ctx)
-            } else {
-                getOrBindService(ctx)
-            }
-        } else {
-            sService
-        } ?: return cachedSnapshot
-
-        return try {
-            withCleanCallingIdentity {
-                val version = service.readWifiConfigVersion()
-                if (force || cachedSnapshot == null || version != sWifiConfigVersion) {
-                    val snapshot = service.readWifiConfigSnapshot()?.takeIf { it.isNotBlank() }
-                    if (snapshot != null) {
-                        sWifiConfigSnapshot = snapshot
-                        sWifiConfigVersion = version
-                    }
-                }
-                sLastWifiConfigCheckAt = now
-                sWifiConfigSnapshot
-            }
-        } catch (_: DeadObjectException) {
-            sService = null
-            cachedSnapshot
-        } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "readWifiConfigSnapshot failed: ${t.stackTraceToString()}")
-            sService = null
-            cachedSnapshot
-        }
+        return readConfigSnapshot("wifi", force, allowBind, bindContext, bindCurrentUser, logName = "Wi-Fi")
     }
 
     fun readLocationConfigSnapshot(
@@ -500,16 +316,28 @@ object HookNotifyClient {
         bindContext: Context? = null,
         bindCurrentUser: Boolean = false
     ): String? {
+        return readConfigSnapshot("location", force, allowBind, bindContext, bindCurrentUser)
+    }
+
+    fun readConfigSnapshot(
+        configName: String,
+        force: Boolean = false,
+        allowBind: Boolean = false,
+        bindContext: Context? = null,
+        bindCurrentUser: Boolean = false,
+        logName: String = configName
+    ): String? {
         val now = SystemClock.uptimeMillis()
-        val cachedSnapshot = sLocationConfigSnapshot
-        if (!force && cachedSnapshot != null && now - sLastLocationConfigCheckAt < CONFIG_CACHE_TTL_MS) {
+        val cache = configCache.getOrPut(configName) { CachedConfig() }
+        val cachedSnapshot = cache.snapshot
+        if (!force && cachedSnapshot != null && now - cache.checkedAt < CONFIG_CACHE_TTL_MS) {
             return cachedSnapshot
         }
 
         val service = if (allowBind) {
             val ctx = bindContext ?: getSystemContext()
             if (ctx == null) {
-                HookLog.i(HookLog.Module.NOTIFY, "readLocationConfigSnapshot: no context")
+                HookLog.i(HookLog.Module.NOTIFY, "read $logName config snapshot: no context")
                 return cachedSnapshot
             }
             if (bindCurrentUser) {
@@ -523,22 +351,22 @@ object HookNotifyClient {
 
         return try {
             withCleanCallingIdentity {
-                val version = service.readLocationConfigVersion()
-                if (force || cachedSnapshot == null || version != sLocationConfigVersion) {
-                    val snapshot = service.readLocationConfigSnapshot()?.takeIf { it.isNotBlank() }
+                val version = service.readConfigVersion(configName)
+                if (force || cachedSnapshot == null || version != cache.version) {
+                    val snapshot = service.readConfigSnapshot(configName)?.takeIf { it.isNotBlank() }
                     if (snapshot != null) {
-                        sLocationConfigSnapshot = snapshot
-                        sLocationConfigVersion = version
+                        cache.snapshot = snapshot
+                        cache.version = version
                     }
                 }
-                sLastLocationConfigCheckAt = now
-                sLocationConfigSnapshot
+                cache.checkedAt = now
+                cache.snapshot
             }
         } catch (_: DeadObjectException) {
             sService = null
             cachedSnapshot
         } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "readLocationConfigSnapshot failed: ${t.stackTraceToString()}")
+            HookLog.i(HookLog.Module.NOTIFY, "read $logName config snapshot failed: ${t.stackTraceToString()}")
             sService = null
             cachedSnapshot
         }

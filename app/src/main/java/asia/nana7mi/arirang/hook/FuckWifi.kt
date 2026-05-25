@@ -11,6 +11,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import org.json.JSONArray
+import org.json.JSONObject
 import java.lang.reflect.Method
 import java.util.Collections
 import java.util.WeakHashMap
@@ -49,10 +50,15 @@ class FuckWifi : BaseHookModule(
             ScanNetwork(ssid = "114", bssid = "02:00:00:00:01:14")
         )
     )
-    @Volatile
-    private var cachedConfig = WifiConfig()
-    @Volatile
-    private var cachedConfigAt = 0L
+    private val realtimeConfig = RealtimeHookConfig(
+        defaultValue = WifiConfig(),
+        refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
+        readSnapshot = { force ->
+            HookNotifyClient.readWifiConfigSnapshot(force = force, allowBind = true)
+        },
+        parseSnapshot = ::parseConfigSnapshot,
+        readFallback = ::readConfigFromPrefs
+    )
     private val hookedServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
     private val hookedScanRequestProxyClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
     private val hookedWifiSystemServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
@@ -291,20 +297,28 @@ class FuckWifi : BaseHookModule(
 
     private fun currentConfig(): WifiConfig {
         if (DEBUG_HARDCODED_CONFIG) return hardcodedConfig
+        return realtimeConfig.current()
+    }
 
-        val now = SystemClock.uptimeMillis()
-        if (now - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) return cachedConfig
-
-        return synchronized(this) {
-            val checkedAt = SystemClock.uptimeMillis()
-            if (checkedAt - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) {
-                return@synchronized cachedConfig
-            }
-
-            cachedConfig = readConfigFromPrefs()
-            cachedConfigAt = checkedAt
-            cachedConfig
-        }
+    private fun parseConfigSnapshot(snapshot: String): WifiConfig? {
+        return runCatching {
+            val json = JSONObject(snapshot)
+            WifiConfig(
+                enabled = json.optBoolean(WifiConfigPrefs.KEY_ENABLED, true),
+                currentSsid = json.optString(WifiConfigPrefs.KEY_CURRENT_SSID, "")
+                    .takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
+                currentBssid = json.optString(WifiConfigPrefs.KEY_CURRENT_BSSID, "")
+                    .takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
+                hideScanResults = json.optBoolean(WifiConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),
+                scanResults = parseScanResults(
+                    json.optJSONArray(WifiConfigPrefs.KEY_SCAN_RESULTS)?.toString(),
+                    json.optString(WifiConfigPrefs.KEY_SCAN_SSID).takeIf { it.isNotBlank() },
+                    json.optString(WifiConfigPrefs.KEY_SCAN_BSSID).takeIf { it.isNotBlank() }
+                )
+            )
+        }.onFailure {
+            HookLog.w(HookLog.Module.WIFI, "failed to parse Wi-Fi config snapshot: ${it.message}")
+        }.getOrNull()
     }
 
     private fun readConfigFromPrefs(): WifiConfig {

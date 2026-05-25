@@ -3,6 +3,8 @@ package asia.nana7mi.arirang.hook;
 interface IHookNotify {
     int requestClipboardRead(String pkgName, int uid, int userId, long timeoutMs);
     void onPermissionUsed(String pkgName, int uid, int userId, String opName);
+    long readConfigVersion(String configName);
+    String readConfigSnapshot(String configName);
     long readSimConfigVersion();
     String readSimConfigSnapshot();
     long readUniqueIdentifierConfigVersion();

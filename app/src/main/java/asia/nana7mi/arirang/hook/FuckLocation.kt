@@ -51,12 +51,6 @@ class FuckLocation : BaseHookModule(
 
     private val hookedClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
 
-    @Volatile
-    private var cachedConfig = HookLocationConfig()
-
-    @Volatile
-    private var cachedConfigAt = 0L
-
     private data class HookLocationConfig(
         val enabled: Boolean = false,
         val latitude: Double = LocationConfigPrefs.DEFAULT_LATITUDE,
@@ -66,6 +60,16 @@ class FuckLocation : BaseHookModule(
         val speed: Float = LocationConfigPrefs.DEFAULT_SPEED,
         val bearing: Float = LocationConfigPrefs.DEFAULT_BEARING,
         val satellites: Int = LocationConfigPrefs.DEFAULT_SATELLITES
+    )
+
+    private val realtimeConfig = RealtimeHookConfig(
+        defaultValue = HookLocationConfig(),
+        refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
+        readSnapshot = { force ->
+            HookNotifyClient.readLocationConfigSnapshot(force = force, allowBind = true)
+        },
+        parseSnapshot = ::parseConfigSnapshot,
+        readFallback = ::readConfigFromPrefs
     )
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -99,26 +103,10 @@ class FuckLocation : BaseHookModule(
 
     private fun currentConfig(): HookLocationConfig {
         if (DEBUG_HARDCODED_CONFIG) return debugConfig
-
-        val now = SystemClock.uptimeMillis()
-        if (now - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) return cachedConfig
-
-        return synchronized(this) {
-            val checkedAt = SystemClock.uptimeMillis()
-            if (checkedAt - cachedConfigAt < CONFIG_REFRESH_INTERVAL_MS) {
-                return@synchronized cachedConfig
-            }
-
-            cachedConfig = readConfigFromHookNotify() ?: readConfigFromPrefs()
-            cachedConfigAt = checkedAt
-            cachedConfig
-        }
+        return realtimeConfig.current()
     }
 
-    private fun readConfigFromHookNotify(): HookLocationConfig? {
-        val snapshot = HookNotifyClient.readLocationConfigSnapshot(allowBind = true)
-            ?.takeIf { it.isNotBlank() }
-            ?: return null
+    private fun parseConfigSnapshot(snapshot: String): HookLocationConfig? {
         return runCatching {
             val json = JSONObject(snapshot)
             HookLocationConfig(

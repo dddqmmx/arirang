@@ -75,6 +75,7 @@ object WifiConfigPrefs {
             putBoolean(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
             putString(KEY_SCAN_RESULTS, gson.toJson(config.scanResults))
         }
+        SubmoduleConfigFiles.write(context)
     }
 
     fun lastModified(context: Context): Long {

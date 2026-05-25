@@ -60,6 +60,11 @@ class HookNotifyService : Service() {
         private const val MAX_TIMEOUT_MS = 3000L        // 最大超时 3 秒
         private const val MAX_PENDING_REQUESTS = 8      // 最大同时等待请求数
         private const val LATE_DECISION_GRACE_MS = 15_000L // UI 决策延迟的宽限时间 15 秒
+        private const val CONFIG_SIM = "sim"
+        private const val CONFIG_UNIQUE_IDENTIFIER = "unique_identifier"
+        private const val CONFIG_HOOK_LOG = "hook_log"
+        private const val CONFIG_WIFI = "wifi"
+        private const val CONFIG_LOCATION = "location"
 
         private val TRUSTED_CALLER_PACKAGES = setOf(
             "android",
@@ -106,6 +111,22 @@ class HookNotifyService : Service() {
         val latch: CountDownLatch = CountDownLatch(1),
         @Volatile var decision: Int? = null,
         @Volatile var timedOut: Boolean = false
+    )
+
+    private data class HookConfigSource(
+        val lastModified: (Context) -> Long,
+        val snapshot: (Context) -> String
+    )
+
+    private val hookConfigSources = mapOf(
+        CONFIG_SIM to HookConfigSource(SimConfigPrefs::lastModified, SimConfigPrefs::buildHookSnapshot),
+        CONFIG_UNIQUE_IDENTIFIER to HookConfigSource(
+            UniqueIdentifierPrefs::lastModified,
+            UniqueIdentifierPrefs::buildHookSnapshot
+        ),
+        CONFIG_HOOK_LOG to HookConfigSource(HookLogSettings::lastModified, HookLogSettings::buildHookSnapshot),
+        CONFIG_WIFI to HookConfigSource(WifiConfigPrefs::lastModified, WifiConfigPrefs::buildHookSnapshot),
+        CONFIG_LOCATION to HookConfigSource(LocationConfigPrefs::lastModified, LocationConfigPrefs::buildHookSnapshot)
     )
 
     /**
@@ -221,94 +242,62 @@ class HookNotifyService : Service() {
             }
         }
 
-        override fun readSimConfigVersion(): Long {
+        override fun readConfigVersion(configName: String): Long {
             val callingUid = Binder.getCallingUid()
             if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected SIM config version request from uid=$callingUid")
+                Log.w(TAG, "Rejected config version request from uid=$callingUid config=$configName")
                 return 0L
             }
-            return SimConfigPrefs.lastModified(this@HookNotifyService)
+            return hookConfigSources[configName]?.lastModified?.invoke(this@HookNotifyService) ?: 0L
+        }
+
+        override fun readConfigSnapshot(configName: String): String {
+            val callingUid = Binder.getCallingUid()
+            if (!isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected config snapshot request from uid=$callingUid config=$configName")
+                return ""
+            }
+            return hookConfigSources[configName]?.snapshot?.invoke(this@HookNotifyService).orEmpty()
+        }
+
+        override fun readSimConfigVersion(): Long {
+            return readConfigVersion(CONFIG_SIM)
         }
 
         override fun readSimConfigSnapshot(): String {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected SIM config snapshot request from uid=$callingUid")
-                return ""
-            }
-            return SimConfigPrefs.buildHookSnapshot(this@HookNotifyService)
+            return readConfigSnapshot(CONFIG_SIM)
         }
 
         override fun readUniqueIdentifierConfigVersion(): Long {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected unique identifier config version request from uid=$callingUid")
-                return 0L
-            }
-            return UniqueIdentifierPrefs.lastModified(this@HookNotifyService)
+            return readConfigVersion(CONFIG_UNIQUE_IDENTIFIER)
         }
 
         override fun readUniqueIdentifierConfigSnapshot(): String {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected unique identifier config snapshot request from uid=$callingUid")
-                return ""
-            }
-            return UniqueIdentifierPrefs.buildHookSnapshot(this@HookNotifyService)
+            return readConfigSnapshot(CONFIG_UNIQUE_IDENTIFIER)
         }
 
         override fun readHookLogConfigVersion(): Long {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected hook log config version request from uid=$callingUid")
-                return 0L
-            }
-            return HookLogSettings.lastModified(this@HookNotifyService)
+            return readConfigVersion(CONFIG_HOOK_LOG)
         }
 
         override fun readHookLogConfigSnapshot(): String {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected hook log config snapshot request from uid=$callingUid")
-                return ""
-            }
-            return HookLogSettings.buildHookSnapshot(this@HookNotifyService)
+            return readConfigSnapshot(CONFIG_HOOK_LOG)
         }
 
         override fun readWifiConfigVersion(): Long {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected Wi-Fi config version request from uid=$callingUid")
-                return 0L
-            }
-            return WifiConfigPrefs.lastModified(this@HookNotifyService)
+            return readConfigVersion(CONFIG_WIFI)
         }
 
         override fun readWifiConfigSnapshot(): String {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected Wi-Fi config snapshot request from uid=$callingUid")
-                return ""
-            }
-            return WifiConfigPrefs.buildHookSnapshot(this@HookNotifyService)
+            return readConfigSnapshot(CONFIG_WIFI)
         }
 
         override fun readLocationConfigVersion(): Long {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected location config version request from uid=$callingUid")
-                return 0L
-            }
-            return LocationConfigPrefs.lastModified(this@HookNotifyService)
+            return readConfigVersion(CONFIG_LOCATION)
         }
 
         override fun readLocationConfigSnapshot(): String {
-            val callingUid = Binder.getCallingUid()
-            if (!isTrustedCaller(callingUid)) {
-                Log.w(TAG, "Rejected location config snapshot request from uid=$callingUid")
-                return ""
-            }
-            return LocationConfigPrefs.buildHookSnapshot(this@HookNotifyService)
+            return readConfigSnapshot(CONFIG_LOCATION)
         }
     }
 

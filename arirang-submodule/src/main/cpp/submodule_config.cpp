@@ -132,10 +132,24 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json) {
     config.widevine_id = parse_json_string(json, "widevineDrmId", config.widevine_id);
     config.app_set_id = parse_json_string(json, "appSetId", config.app_set_id);
     config.serial = parse_json_string(json, "serial", config.serial);
+    config.sim_config_version = parse_json_long(json, "simConfigVersion", config.sim_config_version);
+    config.sim_config_snapshot = parse_json_string(json, "simConfigSnapshot", config.sim_config_snapshot);
+    config.unique_identifier_config_version =
+        parse_json_long(json, "uniqueIdentifierConfigVersion", config.unique_identifier_config_version);
+    config.unique_identifier_config_snapshot =
+        parse_json_string(json, "uniqueIdentifierConfigSnapshot", config.unique_identifier_config_snapshot);
+    config.hook_log_config_version = parse_json_long(json, "hookLogConfigVersion", config.hook_log_config_version);
+    config.hook_log_config_snapshot = parse_json_string(json, "hookLogConfigSnapshot", config.hook_log_config_snapshot);
+    config.wifi_config_version = parse_json_long(json, "wifiConfigVersion", config.wifi_config_version);
+    config.wifi_config_snapshot = parse_json_string(json, "wifiConfigSnapshot", config.wifi_config_snapshot);
+    config.location_config_version = parse_json_long(json, "locationConfigVersion", config.location_config_version);
+    config.location_config_snapshot = parse_json_string(json, "locationConfigSnapshot", config.location_config_snapshot);
     log_info(
         std::string("loaded submodule config uniqueIdentifierEnabled=") +
         (config.unique_identifier_enabled ? "true" : "false") +
-        " widevineLen=" + std::to_string(config.widevine_id.size())
+        " widevineLen=" + std::to_string(config.widevine_id.size()) +
+        " locationConfigVersion=" + std::to_string(config.location_config_version) +
+        " wifiConfigVersion=" + std::to_string(config.wifi_config_version)
     );
 }
 

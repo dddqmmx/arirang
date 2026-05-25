@@ -38,6 +38,16 @@ struct SubmoduleConfig {
     std::string widevine_id;
     std::string app_set_id;
     std::string serial;
+    jlong sim_config_version = 0;
+    std::string sim_config_snapshot;
+    jlong unique_identifier_config_version = 0;
+    std::string unique_identifier_config_snapshot;
+    jlong hook_log_config_version = 0;
+    std::string hook_log_config_snapshot;
+    jlong wifi_config_version = 0;
+    std::string wifi_config_snapshot;
+    jlong location_config_version = 0;
+    std::string location_config_snapshot;
 };
 
 void apply_json_config(SubmoduleConfig &config, const std::string &json);
