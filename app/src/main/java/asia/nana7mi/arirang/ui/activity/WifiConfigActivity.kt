@@ -26,7 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiFind
 import androidx.compose.material3.CardDefaults
@@ -128,7 +128,7 @@ class WifiConfigActivity : ComponentActivity() {
                         IconButton(onClick = {
                             config = WifiConfigPrefs.Config()
                         }) {
-                            Icon(Icons.Default.RestartAlt, contentDescription = stringResource(R.string.wifi_apply_defaults))
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.wifi_apply_defaults))
                         }
                         SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
