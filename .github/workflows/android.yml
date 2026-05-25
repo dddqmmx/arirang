@@ -35,7 +35,7 @@ jobs:
           "$SDKMANAGER" --install "ndk;23.1.7779620"
 
       - name: Build with Gradle
-        run: ./gradlew assembleDebug assembleRelease :arirang-submodule:packageModule
+        run: ./gradlew :app:assembleDebug :app:assembleRelease :arirang-selfcheck:assembleDebug :arirang-selfcheck:assembleRelease :arirang-submodule:packageModule
 
       - name: Get Build Tools Version
         run: |
@@ -53,10 +53,26 @@ jobs:
           keyPassword: ${{ secrets.KEY_PASSWORD }}
           buildToolsVersion: ${{ env.BUILD_TOOLS_VERSION }}
 
+      - name: Sign Self-Check Release APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_selfcheck
+        with:
+          releaseDirectory: arirang-selfcheck/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          buildToolsVersion: ${{ env.BUILD_TOOLS_VERSION }}
+
       - name: Rename Signed APK
         run: |
           mv ${{ steps.sign_app.outputs.signedReleaseFile }} app/build/outputs/apk/release/arirang-${{ github.ref_name }}-release.apk
           echo "RELEASE_APK_PATH=app/build/outputs/apk/release/arirang-${{ github.ref_name }}-release.apk" >> $GITHUB_ENV
+
+      - name: Rename Signed Self-Check APK
+        run: |
+          mv ${{ steps.sign_selfcheck.outputs.signedReleaseFile }} arirang-selfcheck/build/outputs/apk/release/arirang-selfcheck-${{ github.ref_name }}-release.apk
+          echo "SELFCHECK_RELEASE_APK_PATH=arirang-selfcheck/build/outputs/apk/release/arirang-selfcheck-${{ github.ref_name }}-release.apk" >> $GITHUB_ENV
 
       - name: Rename Submodule Zip
         run: |
@@ -69,11 +85,23 @@ jobs:
           name: arirang-debug
           path: app/build/outputs/apk/debug/*.apk
 
+      - name: Upload Self-Check Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: arirang-selfcheck-debug
+          path: arirang-selfcheck/build/outputs/apk/debug/*.apk
+
       - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
           name: arirang-release
           path: ${{ env.RELEASE_APK_PATH }}
+
+      - name: Upload Signed Self-Check Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: arirang-selfcheck-release
+          path: ${{ env.SELFCHECK_RELEASE_APK_PATH }}
 
       - name: Upload Submodule Zip
         uses: actions/upload-artifact@v4
@@ -90,7 +118,9 @@ jobs:
           prerelease: false
           files: |
             app/build/outputs/apk/debug/*.apk
+            arirang-selfcheck/build/outputs/apk/debug/*.apk
             ${{ env.RELEASE_APK_PATH }}
+            ${{ env.SELFCHECK_RELEASE_APK_PATH }}
             ${{ env.SUBMODULE_ZIP_PATH }}
           generate_release_notes: true
         env:
