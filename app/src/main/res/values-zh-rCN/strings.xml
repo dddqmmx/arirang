@@ -264,7 +264,6 @@
     <string name="device_hook_enabled_summary">在下次目标进程启动时，将选中的设备档案应用到原生 Zygisk 辅助模块。</string>
     <string name="device_preset_title">设备预设</string>
     <string name="device_preset_custom">自定义</string>
-    <string name="device_import_current">使用当前设备</string>
     <string name="device_section_identity">身份信息</string>
     <string name="device_section_build_target">构建目标</string>
     <string name="device_section_build_meta">构建元数据</string>

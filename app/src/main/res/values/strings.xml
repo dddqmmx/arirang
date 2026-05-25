@@ -263,7 +263,6 @@
     <string name="device_hook_enabled_summary">Applies the selected device profile to the native Zygisk helper on next target process start.</string>
     <string name="device_preset_title">Device preset</string>
     <string name="device_preset_custom">Custom</string>
-    <string name="device_import_current">Use current device</string>
     <string name="device_section_identity">Identity</string>
     <string name="device_section_build_target">Build Target</string>
     <string name="device_section_build_meta">Build Metadata</string>

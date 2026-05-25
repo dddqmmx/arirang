@@ -262,7 +262,6 @@
     <string name="device_hook_enabled_summary">次回の対象プロセス起動時に、選択した端末プロファイルをネイティブ Zygisk 補助モジュールへ適用します。</string>
     <string name="device_preset_title">端末プリセット</string>
     <string name="device_preset_custom">カスタム</string>
-    <string name="device_import_current">現在の端末を使用</string>
     <string name="device_section_identity">識別情報</string>
     <string name="device_section_build_target">ビルド対象</string>
     <string name="device_section_build_meta">ビルドメタデータ</string>

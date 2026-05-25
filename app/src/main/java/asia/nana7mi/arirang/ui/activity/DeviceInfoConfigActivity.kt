@@ -21,7 +21,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
@@ -138,9 +137,6 @@ class DeviceInfoConfigActivity : ComponentActivity() {
                         }
                     },
                     actions = {
-                        IconButton(onClick = { updateConfig(DeviceInfoPrefs.currentDeviceConfig()) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.device_import_current))
-                        }
                         SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
                     scrollBehavior = scrollBehavior
@@ -236,13 +232,6 @@ class DeviceInfoConfigActivity : ComponentActivity() {
                                             }
                                         )
                                     }
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.device_import_current)) },
-                                        onClick = {
-                                            updateConfig(DeviceInfoPrefs.currentDeviceConfig().copy(enabled = config.enabled))
-                                            expanded = false
-                                        }
-                                    )
                                 }
                             }
                         }

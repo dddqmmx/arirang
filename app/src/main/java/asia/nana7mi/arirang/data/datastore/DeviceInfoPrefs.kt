@@ -1,7 +1,6 @@
 package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
-import android.os.Build
 import androidx.core.content.edit
 import asia.nana7mi.arirang.model.DevicePresetCatalog
 import org.json.JSONObject
@@ -115,25 +114,4 @@ object DeviceInfoPrefs {
         SubmoduleConfigFiles.write(context, deviceConfig = config)
     }
 
-    fun currentDeviceConfig(): Config {
-        return Config(
-            enabled = true,
-            presetId = DevicePresetCatalog.CUSTOM_ID,
-            brand = Build.BRAND.orEmpty(),
-            manufacturer = Build.MANUFACTURER.orEmpty(),
-            model = Build.MODEL.orEmpty(),
-            device = Build.DEVICE.orEmpty(),
-            product = Build.PRODUCT.orEmpty(),
-            board = Build.BOARD.orEmpty(),
-            hardware = Build.HARDWARE.orEmpty(),
-            display = Build.DISPLAY.orEmpty(),
-            host = Build.HOST.orEmpty(),
-            id = Build.ID.orEmpty(),
-            tags = Build.TAGS.orEmpty(),
-            type = Build.TYPE.orEmpty(),
-            user = Build.USER.orEmpty(),
-            fingerprint = Build.FINGERPRINT.orEmpty(),
-            time = Build.TIME
-        )
-    }
 }
