@@ -139,9 +139,11 @@ Use at your own risk.
 ## 📦 Installation
 
 1. Install the latest `Arirang` APK  
-2. Open your Xposed Manager (e.g., LSPosed)  
-3. Enable the **Arirang** module  
-4. Select scope:
+2. Optional: install the latest `Arirang Self-Check` APK if you want to verify
+   what information ordinary apps can see after hooks are enabled.
+3. Open your Xposed Manager (e.g., LSPosed)  
+4. Enable the **Arirang** module  
+5. Select scope:
    - System / Android framework (required)
    - `com.android.phone`
    - `com.google.android.gms`
