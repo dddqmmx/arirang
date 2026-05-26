@@ -113,6 +113,8 @@ val configureNative by tasks.registering(Exec::class) {
 
 val buildNative by tasks.registering(Exec::class) {
     dependsOn(configureNative)
+    inputs.files(fileTree("src/main/cpp"))
+    inputs.file("CMakeLists.txt")
     outputs.file(nativeBuildDir.map { it.file("libarirang_zygisk.so") })
 
     doFirst {
