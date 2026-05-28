@@ -24,16 +24,25 @@ This submodule is a required beta-stage capability extension layer for
 functionality that cannot be reliably implemented through LSPosed or
 framework-level Java hooks alone.
 
-The current implementation avoids per-application specialization hooks. Native
-fallback hooks are installed at the Zygote/framework boundary so child processes
-inherit the rewritten framework behavior instead of receiving app-specific hook
-installation whenever possible.
+The current implementation attempts to avoid injecting hooks directly into
+applications whenever possible. Native fallback hooks are instead installed at
+the Zygote/framework boundary so child processes inherit rewritten framework
+behavior rather than receiving per-application hook installation.
+
+However, due to current technical limitations, some features may still require
+application-side injection to function correctly.
 
 Depending on the feature, the submodule may be:
-- Required to implement certain low-level behaviors
-- Used to strengthen spoofing consistency and anti-detection capabilities
-- Used to extend privacy protection into native framework surfaces such as
+
+* Required to implement certain low-level behaviors
+* Used to strengthen spoofing consistency and anti-detection capabilities
+* Used to extend privacy protection into native framework surfaces such as
   `SystemProperties` and `MediaDrm`
+
+It is believed that this is not an unsolvable problem, and future versions may
+further reduce or completely eliminate the need for direct application
+injection as more functionality is migrated into system framework services or
+lower-level framework surfaces.
 
 The long-term goal remains to move functionality into system framework services
 where possible and keep this submodule as the deeper native fallback layer for
