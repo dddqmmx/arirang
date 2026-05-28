@@ -7,8 +7,6 @@ import android.os.Bundle
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -62,14 +60,21 @@ class FuckLocation : BaseHookModule(
         val satellites: Int = LocationConfigPrefs.DEFAULT_SATELLITES
     )
 
-    private val realtimeConfig = RealtimeHookConfig(
+    private val configFile = HookConfigFile(
+        configName = "location",
+        prefsName = LocationConfigPrefs.PREFS_NAME,
         defaultValue = HookLocationConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
-        readSnapshot = { force ->
-            HookNotifyClient.readLocationConfigSnapshot(force = force, allowBind = true)
+        readRealtimeSnapshot = { force ->
+            HookNotifyClient.readConfigSnapshot(
+                configName = "location",
+                force = force,
+                allowBind = true,
+                logName = "location"
+            )
         },
-        parseSnapshot = ::parseConfigSnapshot,
-        readFallback = ::readConfigFromPrefs
+        parseRealtimeSnapshot = ::parseConfigSnapshot,
+        readStoredConfig = ::readConfigFromPrefs
     )
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -103,7 +108,7 @@ class FuckLocation : BaseHookModule(
 
     private fun currentConfig(): HookLocationConfig {
         if (DEBUG_HARDCODED_CONFIG) return debugConfig
-        return realtimeConfig.current()
+        return configFile.current()
     }
 
     private fun parseConfigSnapshot(snapshot: String): HookLocationConfig? {
@@ -125,11 +130,7 @@ class FuckLocation : BaseHookModule(
         }.getOrNull()
     }
 
-    private fun readConfigFromPrefs(): HookLocationConfig {
-        val prefs = XSharedPreferences(BuildConfig.APPLICATION_ID, LocationConfigPrefs.PREFS_NAME).apply {
-            makeWorldReadable()
-            reload()
-        }
+    private fun readConfigFromPrefs(prefs: de.robv.android.xposed.XSharedPreferences): HookLocationConfig {
         return HookLocationConfig(
             enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
             latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
@@ -152,65 +153,43 @@ class FuckLocation : BaseHookModule(
     private fun hookLocationAccessors() {
         if (!hookedClasses.add(Location::class.java)) return
 
-        XposedBridge.hookAllMethods(Location::class.java, "getLatitude", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                currentConfig().takeIf { it.enabled }?.let { param.result = it.latitude }
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getLatitude", beforeHookedMethod {
+            currentConfig().takeIf { it.enabled }?.let { result = it.latitude }
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getLongitude", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                currentConfig().takeIf { it.enabled }?.let { param.result = it.longitude }
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getLongitude", beforeHookedMethod {
+            currentConfig().takeIf { it.enabled }?.let { result = it.longitude }
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getAltitude", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                currentConfig().takeIf { it.enabled }?.let { param.result = it.altitude }
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getAltitude", beforeHookedMethod {
+            currentConfig().takeIf { it.enabled }?.let { result = it.altitude }
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getAccuracy", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                currentConfig().takeIf { it.enabled }?.let { param.result = it.accuracy }
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getAccuracy", beforeHookedMethod {
+            currentConfig().takeIf { it.enabled }?.let { result = it.accuracy }
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getSpeed", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                currentConfig().takeIf { it.enabled }?.let { param.result = it.speed }
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getSpeed", beforeHookedMethod {
+            currentConfig().takeIf { it.enabled }?.let { result = it.speed }
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getBearing", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                currentConfig().takeIf { it.enabled }?.let { param.result = it.bearing }
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getBearing", beforeHookedMethod {
+            currentConfig().takeIf { it.enabled }?.let { result = it.bearing }
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getProvider", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (currentConfig().enabled) param.result = LocationManager.GPS_PROVIDER
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getProvider", beforeHookedMethod {
+            if (currentConfig().enabled) result = LocationManager.GPS_PROVIDER
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getTime", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (currentConfig().enabled) param.result = System.currentTimeMillis()
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getTime", beforeHookedMethod {
+            if (currentConfig().enabled) result = System.currentTimeMillis()
         })
-        XposedBridge.hookAllMethods(Location::class.java, "getElapsedRealtimeNanos", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (currentConfig().enabled) param.result = SystemClock.elapsedRealtimeNanos()
-            }
+        XposedBridge.hookAllMethods(Location::class.java, "getElapsedRealtimeNanos", beforeHookedMethod {
+            if (currentConfig().enabled) result = SystemClock.elapsedRealtimeNanos()
         })
 
         runCatching {
-            XposedBridge.hookAllMethods(Location::class.java, "isFromMockProvider", object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (currentConfig().enabled) param.result = false
-                }
+            XposedBridge.hookAllMethods(Location::class.java, "isFromMockProvider", beforeHookedMethod {
+                if (currentConfig().enabled) result = false
             })
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching {
-                XposedBridge.hookAllMethods(Location::class.java, "isMock", object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        if (currentConfig().enabled) param.result = false
-                    }
+                XposedBridge.hookAllMethods(Location::class.java, "isMock", beforeHookedMethod {
+                    if (currentConfig().enabled) result = false
                 })
             }
         }
@@ -225,38 +204,32 @@ class FuckLocation : BaseHookModule(
         ) ?: return
         if (!hookedClasses.add(lmsClass)) return
 
-        XposedBridge.hookAllMethods(lmsClass, "getLastLocation", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                val provider = providerFromArgs(param.args)
-                param.result = fakeLocation(provider)
-                HookLog.d(HookLog.Module.LOCATION, "spoofed getLastLocation provider=$provider caller=${callerFromArgs(param.args)}")
-            }
+        XposedBridge.hookAllMethods(lmsClass, "getLastLocation", afterHookedMethod {
+            if (!currentConfig().enabled) return@afterHookedMethod
+            val provider = providerFromArgs(args)
+            result = fakeLocation(provider)
+            HookLog.d(HookLog.Module.LOCATION, "spoofed getLastLocation provider=$provider caller=${callerFromArgs(args)}")
         })
 
-        XposedBridge.hookAllMethods(lmsClass, "getCurrentLocation", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                val callback = param.args.firstOrNull { it?.javaClass?.hasLocationCallbackMethod() == true } ?: return
-                val location = fakeLocation(providerFromArgs(param.args))
-                if (callback.dispatchLocation(location)) {
-                    param.result = null
-                    HookLog.d(
-                        HookLog.Module.LOCATION,
-                        "spoofed getCurrentLocation provider=${location.provider} caller=${callerFromArgs(param.args)}"
-                    )
-                }
+        XposedBridge.hookAllMethods(lmsClass, "getCurrentLocation", beforeHookedMethod {
+            if (!currentConfig().enabled) return@beforeHookedMethod
+            val callback = args.firstOrNull { it?.javaClass?.hasLocationCallbackMethod() == true } ?: return@beforeHookedMethod
+            val location = fakeLocation(providerFromArgs(args))
+            if (callback.dispatchLocation(location)) {
+                result = null
+                HookLog.d(
+                    HookLog.Module.LOCATION,
+                    "spoofed getCurrentLocation provider=${location.provider} caller=${callerFromArgs(args)}"
+                )
             }
         })
 
         listOf("requestLocationUpdates", "requestLocationUpdatesWithPackageName").forEach { methodName ->
-            XposedBridge.hookAllMethods(lmsClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    param.args.forEachIndexed { index, arg ->
-                        if (arg is Location) {
-                            param.args[index] = arg.spoofed()
-                        }
+            XposedBridge.hookAllMethods(lmsClass, methodName, beforeHookedMethod {
+                if (!currentConfig().enabled) return@beforeHookedMethod
+                args.forEachIndexed { index, arg ->
+                    if (arg is Location) {
+                        args[index] = arg.spoofed()
                     }
                 }
             })
@@ -270,18 +243,16 @@ class FuckLocation : BaseHookModule(
         ) ?: return
         if (!hookedClasses.add(providerManagerClass)) return
 
-        XposedBridge.hookAllMethods(providerManagerClass, "onReportLocation", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                val report = param.args.firstOrNull() ?: return
-                if (report is Location) {
-                    param.args[0] = report.spoofed()
-                    return
-                }
+        XposedBridge.hookAllMethods(providerManagerClass, "onReportLocation", beforeHookedMethod {
+            if (!currentConfig().enabled) return@beforeHookedMethod
+            val report = args.firstOrNull() ?: return@beforeHookedMethod
+            if (report is Location) {
+                args[0] = report.spoofed()
+                return@beforeHookedMethod
+            }
 
-                if (rewriteLocationResult(report)) {
-                    HookLog.d(HookLog.Module.LOCATION, "rewrote provider LocationResult ${report.javaClass.name}")
-                }
+            if (rewriteLocationResult(report)) {
+                HookLog.d(HookLog.Module.LOCATION, "rewrote provider LocationResult ${report.javaClass.name}")
             }
         })
     }
@@ -293,21 +264,17 @@ class FuckLocation : BaseHookModule(
         ) ?: return
         if (!hookedClasses.add(fusedProviderClass)) return
 
-        XposedBridge.hookAllMethods(fusedProviderClass, "chooseBestLocation", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                if (param.result is Location) {
-                    param.result = (param.result as Location).spoofed()
-                }
+        XposedBridge.hookAllMethods(fusedProviderClass, "chooseBestLocation", afterHookedMethod {
+            if (!currentConfig().enabled) return@afterHookedMethod
+            if (result is Location) {
+                result = (result as Location).spoofed()
             }
         })
 
-        XposedBridge.hookAllMethods(fusedProviderClass, "reportBestLocationLocked", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                param.args.forEachIndexed { index, arg ->
-                    param.args[index] = rewriteLocationContainer(arg)
-                }
+        XposedBridge.hookAllMethods(fusedProviderClass, "reportBestLocationLocked", beforeHookedMethod {
+            if (!currentConfig().enabled) return@beforeHookedMethod
+            args.forEachIndexed { index, arg ->
+                args[index] = rewriteLocationContainer(arg)
             }
         })
 
@@ -318,12 +285,10 @@ class FuckLocation : BaseHookModule(
         val locationManagerClass = XposedHelpers.findClassIfExists("android.location.LocationManager", classLoader)
             ?: return
         if (hookedClasses.add(locationManagerClass)) {
-            XposedBridge.hookAllMethods(locationManagerClass, "getLastKnownLocation", object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    if (param.result is Location) {
-                        param.result = (param.result as Location).spoofed()
-                    }
+            XposedBridge.hookAllMethods(locationManagerClass, "getLastKnownLocation", afterHookedMethod {
+                if (!currentConfig().enabled) return@afterHookedMethod
+                if (result is Location) {
+                    result = (result as Location).spoofed()
                 }
             })
         }
@@ -335,12 +300,10 @@ class FuckLocation : BaseHookModule(
         ).forEach { (className, methodName) ->
             val transportClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
             if (!hookedClasses.add(transportClass)) return@forEach
-            XposedBridge.hookAllMethods(transportClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    param.args.forEachIndexed { index, arg ->
-                        param.args[index] = rewriteLocationContainer(arg)
-                    }
+            XposedBridge.hookAllMethods(transportClass, methodName, beforeHookedMethod {
+                if (!currentConfig().enabled) return@beforeHookedMethod
+                args.forEachIndexed { index, arg ->
+                    args[index] = rewriteLocationContainer(arg)
                 }
             })
         }
@@ -369,10 +332,8 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(clientClass)) return
 
         listOf("getLastLocation", "getCurrentLocation").forEach { methodName ->
-            XposedBridge.hookAllMethods(clientClass, methodName, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    hookConcreteGoogleTask(param.result)
-                }
+            XposedBridge.hookAllMethods(clientClass, methodName, afterHookedMethod {
+                hookConcreteGoogleTask(result)
             })
         }
 
@@ -383,28 +344,22 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(resultClass)) return
 
         listOf("asList", "getLocations").forEach { methodName ->
-            XposedBridge.hookAllMethods(resultClass, methodName, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    param.result = rewriteLocationContainer(param.result)
-                }
+            XposedBridge.hookAllMethods(resultClass, methodName, afterHookedMethod {
+                if (!currentConfig().enabled) return@afterHookedMethod
+                result = rewriteLocationContainer(result)
             })
         }
 
-        XposedBridge.hookAllMethods(resultClass, "getLastLocation", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                if (param.result is Location) {
-                    param.result = (param.result as Location).spoofed()
-                }
+        XposedBridge.hookAllMethods(resultClass, "getLastLocation", afterHookedMethod {
+            if (!currentConfig().enabled) return@afterHookedMethod
+            if (result is Location) {
+                result = (result as Location).spoofed()
             }
         })
 
-        XposedBridge.hookAllMethods(resultClass, "writeToParcel", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                rewriteLocationResult(param.thisObject)
-            }
+        XposedBridge.hookAllMethods(resultClass, "writeToParcel", beforeHookedMethod {
+            if (!currentConfig().enabled) return@beforeHookedMethod
+            rewriteLocationResult(thisObject)
         })
 
         HookLog.i(HookLog.Module.LOCATION, "hooked LocationResult ${resultClass.name}")
@@ -415,28 +370,25 @@ class FuckLocation : BaseHookModule(
             ?: return
         if (!hookedClasses.add(taskClass)) return
 
-        XposedBridge.hookAllMethods(taskClass, "getResult", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                param.result = rewriteLocationContainer(param.result)
-            }
+        XposedBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
+            if (!currentConfig().enabled) return@afterHookedMethod
+            result = rewriteLocationContainer(result)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
-            XposedBridge.hookAllMethods(taskClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    param.args.forEach { arg ->
+            XposedBridge.hookAllMethods(taskClass, methodName, hookedMethod(
+                before = {
+                    if (!currentConfig().enabled) return@hookedMethod
+                    args.forEach { arg ->
                         hookGoogleTaskListener(arg)
                     }
+                },
+                after = {
+                    if (!currentConfig().enabled) return@hookedMethod
+                    hookConcreteGoogleTask(thisObject)
+                    hookConcreteGoogleTask(result)
                 }
-
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    hookConcreteGoogleTask(param.thisObject)
-                    hookConcreteGoogleTask(param.result)
-                }
-            })
+            ))
         }
 
         HookLog.i(HookLog.Module.LOCATION, "hooked Google Task base")
@@ -448,20 +400,16 @@ class FuckLocation : BaseHookModule(
         if (!taskClass.name.startsWith("com.google.android.gms.tasks.")) return
         if (!hookedClasses.add(taskClass)) return
 
-        XposedBridge.hookAllMethods(taskClass, "getResult", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                param.result = rewriteLocationContainer(param.result)
-            }
+        XposedBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
+            if (!currentConfig().enabled) return@afterHookedMethod
+            result = rewriteLocationContainer(result)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
-            XposedBridge.hookAllMethods(taskClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!currentConfig().enabled) return
-                    param.args.forEach { arg ->
-                        hookGoogleTaskListener(arg)
-                    }
+            XposedBridge.hookAllMethods(taskClass, methodName, beforeHookedMethod {
+                if (!currentConfig().enabled) return@beforeHookedMethod
+                args.forEach { arg ->
+                    hookGoogleTaskListener(arg)
                 }
             })
         }
@@ -479,21 +427,17 @@ class FuckLocation : BaseHookModule(
         }
         if (!hookedClasses.add(listenerClass)) return
 
-        XposedBridge.hookAllMethods(listenerClass, "onSuccess", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                param.args.forEachIndexed { index, arg ->
-                    param.args[index] = rewriteLocationContainer(arg)
-                }
+        XposedBridge.hookAllMethods(listenerClass, "onSuccess", beforeHookedMethod {
+            if (!currentConfig().enabled) return@beforeHookedMethod
+            args.forEachIndexed { index, arg ->
+                args[index] = rewriteLocationContainer(arg)
             }
         })
 
-        XposedBridge.hookAllMethods(listenerClass, "onComplete", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!currentConfig().enabled) return
-                param.args.forEach { arg ->
-                    hookConcreteGoogleTask(arg)
-                }
+        XposedBridge.hookAllMethods(listenerClass, "onComplete", beforeHookedMethod {
+            if (!currentConfig().enabled) return@beforeHookedMethod
+            args.forEach { arg ->
+                hookConcreteGoogleTask(arg)
             }
         })
 
@@ -507,23 +451,19 @@ class FuckLocation : BaseHookModule(
                 if (!hookedClasses.add(targetClass)) return@forEach
 
                 listOf("reportLocation", "reportLocationBatch").forEach { methodName ->
-                    XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            if (!currentConfig().enabled) return
-                            param.args.forEachIndexed { index, arg ->
-                                param.args[index] = rewriteLocationContainer(arg)
-                            }
+                    XposedBridge.hookAllMethods(targetClass, methodName, beforeHookedMethod {
+                        if (!currentConfig().enabled) return@beforeHookedMethod
+                        args.forEachIndexed { index, arg ->
+                            args[index] = rewriteLocationContainer(arg)
                         }
                     })
                 }
 
-                XposedBridge.hookAllMethods(targetClass, "reportNmea", object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        if (!currentConfig().enabled) return
-                        param.args.forEachIndexed { index, arg ->
-                            if (arg is String) {
-                                param.args[index] = spoofNmea(arg)
-                            }
+                XposedBridge.hookAllMethods(targetClass, "reportNmea", beforeHookedMethod {
+                    if (!currentConfig().enabled) return@beforeHookedMethod
+                    args.forEachIndexed { index, arg ->
+                        if (arg is String) {
+                            args[index] = spoofNmea(arg)
                         }
                     }
                 })
@@ -533,11 +473,9 @@ class FuckLocation : BaseHookModule(
                     "reportAntennaInfo",
                     "reportNavigationMessage"
                 ).forEach { methodName ->
-                    XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            if (!currentConfig().enabled) return
-                            param.result = null
-                        }
+                    XposedBridge.hookAllMethods(targetClass, methodName, beforeHookedMethod {
+                        if (!currentConfig().enabled) return@beforeHookedMethod
+                        result = null
                     })
                 }
 

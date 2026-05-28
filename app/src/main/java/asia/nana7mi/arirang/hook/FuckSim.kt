@@ -3,16 +3,12 @@ package asia.nana7mi.arirang.hook
 import android.os.Binder
 import android.os.Process
 import android.os.SystemClock
-import android.util.Xml
-import asia.nana7mi.arirang.BuildConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.io.FileInputStream
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Array as ReflectArray
@@ -229,15 +225,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         phoneConfigBindHookInstalled = true
 
         val applicationClass = XposedHelpers.findClassIfExists("android.app.Application", classLoader) ?: return
-        XposedBridge.hookAllMethods(applicationClass, "onCreate", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val app = param.thisObject as? android.app.Application ?: return
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    HookNotifyClient.autoBindCurrentUser(app)
-                    currentHookConfig(force = true)
-                    writeProofTelephonyProperties()
-                }, 5_000L)
-            }
+        XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
+            val app = thisObject as? android.app.Application ?: return@afterHookedMethod
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                HookNotifyClient.autoBindCurrentUser(app)
+                currentHookConfig(force = true)
+                writeProofTelephonyProperties()
+            }, 5_000L)
         })
     }
 
@@ -263,31 +257,30 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             targetClass.declaredMethods
                 .filter { it.returnType == serviceStateClass }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            val config = hookConfig
-                            if (!config.enabled) return
-                            rewriteServiceState(param.result, config.primaryProfile)
-                        }
+                    XposedBridge.hookMethod(method, afterHookedMethod {
+                        val config = hookConfig
+                        if (!config.enabled) return@afterHookedMethod
+                        rewriteServiceState(result, config.primaryProfile)
                     })
                 }
 
             targetClass.declaredMethods
                 .filter { method -> method.parameterTypes.any { it == serviceStateClass } }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
+                    XposedBridge.hookMethod(method, hookedMethod(
+                        before = {
                             val config = hookConfig
-                            if (!config.enabled) return
-                            param.args.forEach { rewriteServiceState(it, config.primaryProfile) }
-                        }
-
-                        override fun afterHookedMethod(param: MethodHookParam) {
+                            if (config.enabled) {
+                                args.forEach { rewriteServiceState(it, config.primaryProfile) }
+                            }
+                        },
+                        after = {
                             val config = hookConfig
-                            if (!config.enabled) return
-                            rewriteServiceState(param.result, config.primaryProfile)
+                            if (config.enabled) {
+                                rewriteServiceState(result, config.primaryProfile)
+                            }
                         }
-                    })
+                    ))
                 }
         }
     }
@@ -414,12 +407,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             phoneInterfaceManagerClass.declaredMethods
                 .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            val config = hookConfig
-                            if (!config.enabled) return
-                            rewriteNestedTelephonyObject(param.result, config.primaryProfile)
-                        }
+                    XposedBridge.hookMethod(method, afterHookedMethod {
+                        val config = hookConfig
+                        if (!config.enabled) return@afterHookedMethod
+                        rewriteNestedTelephonyObject(result, config.primaryProfile)
                     })
                 }
         }
@@ -528,12 +519,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             telephonyManagerClass.declaredMethods
                 .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            val config = hookConfig
-                            if (!config.enabled) return
-                            rewriteNestedTelephonyObject(param.result, config.primaryProfile)
-                        }
+                    XposedBridge.hookMethod(method, afterHookedMethod {
+                        val config = hookConfig
+                        if (!config.enabled) return@afterHookedMethod
+                        rewriteNestedTelephonyObject(result, config.primaryProfile)
                     })
                 }
         }
@@ -581,12 +570,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     method.returnType.name.startsWith("android.telephony.CellIdentity")
             }
             .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = hookConfig
-                        if (!config.enabled) return
-                        rewriteNestedTelephonyObject(param.result, config.primaryProfile)
-                    }
+                XposedBridge.hookMethod(method, afterHookedMethod {
+                    val config = hookConfig
+                    if (!config.enabled) return@afterHookedMethod
+                    rewriteNestedTelephonyObject(result, config.primaryProfile)
                 })
             }
 
@@ -603,19 +590,20 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass.declaredMethods
             .filter { it.name == methodName && it.parameterTypes.isEmpty() && !Modifier.isAbstract(it.modifiers) }
             .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
+                XposedBridge.hookMethod(method, hookedMethod(
+                    before = {
                         val config = hookConfig
-                        if (!config.enabled) return
-                        rewriteNestedTelephonyObject(param.thisObject, config.primaryProfile)
-                    }
-
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (config.enabled) {
+                            rewriteNestedTelephonyObject(thisObject, config.primaryProfile)
+                        }
+                    },
+                    after = {
                         val config = hookConfig
-                        if (!config.enabled) return
-                        param.result = coerceHookResult(valueProvider(config.primaryProfile), param.result)
+                        if (config.enabled) {
+                            result = coerceHookResult(valueProvider(config.primaryProfile), result)
+                        }
                     }
-                })
+                ))
             }
     }
 
@@ -626,19 +614,20 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass.declaredMethods
             .filter { it.name == "toString" && it.parameterTypes.isEmpty() && !Modifier.isAbstract(it.modifiers) }
             .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
+                XposedBridge.hookMethod(method, hookedMethod(
+                    before = {
                         val config = hookConfig
-                        if (!config.enabled) return
-                        rewriter(param.thisObject, config.primaryProfile)
-                    }
-
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (config.enabled) {
+                            rewriter(thisObject, config.primaryProfile)
+                        }
+                    },
+                    after = {
                         val config = hookConfig
-                        if (!config.enabled || param.result !is String) return
-                        param.result = rewriteTelephonyDebugString(param.result as String, config.primaryProfile)
+                        if (config.enabled && result is String) {
+                            result = rewriteTelephonyDebugString(result as String, config.primaryProfile)
+                        }
                     }
-                })
+                ))
             }
     }
 
@@ -699,25 +688,23 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             classLoader
         ) ?: return
 
-        XposedBridge.hookAllMethods(telephonyManagerClass, "setTelephonyProperty", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!hookConfig.enabled) return
-                val profile = profileForSlot(
-                    param.args.getOrNull(0).asIntOrNull(),
-                    allowFallback = false
-                ) ?: return
-                val propertyName = param.args.getOrNull(1)?.toString() ?: return
-                when {
-                    propertyName.endsWith("icc_operator_iso_country") -> param.args[2] = profile.countryIso
-                    propertyName.endsWith("sim.operator.iso-country") -> param.args[2] = profile.countryIso
-                    propertyName.endsWith("operator.iso-country") -> param.args[2] = profile.countryIso
-                    propertyName.endsWith("icc_operator_numeric") -> param.args[2] = profile.operatorNumeric
-                    propertyName.endsWith("sim.operator.numeric") -> param.args[2] = profile.operatorNumeric
-                    propertyName.endsWith("operator.numeric") -> param.args[2] = profile.operatorNumeric
-                    propertyName.endsWith("icc_operator_alpha") -> param.args[2] = profile.alphaLong
-                    propertyName.endsWith("sim.operator.alpha") -> param.args[2] = profile.alphaLong
-                    propertyName.endsWith("operator.alpha") -> param.args[2] = profile.alphaLong
-                }
+        XposedBridge.hookAllMethods(telephonyManagerClass, "setTelephonyProperty", beforeHookedMethod {
+            if (!hookConfig.enabled) return@beforeHookedMethod
+            val profile = profileForSlot(
+                args.getOrNull(0).asIntOrNull(),
+                allowFallback = false
+            ) ?: return@beforeHookedMethod
+            val propertyName = args.getOrNull(1)?.toString() ?: return@beforeHookedMethod
+            when {
+                propertyName.endsWith("icc_operator_iso_country") -> args[2] = profile.countryIso
+                propertyName.endsWith("sim.operator.iso-country") -> args[2] = profile.countryIso
+                propertyName.endsWith("operator.iso-country") -> args[2] = profile.countryIso
+                propertyName.endsWith("icc_operator_numeric") -> args[2] = profile.operatorNumeric
+                propertyName.endsWith("sim.operator.numeric") -> args[2] = profile.operatorNumeric
+                propertyName.endsWith("operator.numeric") -> args[2] = profile.operatorNumeric
+                propertyName.endsWith("icc_operator_alpha") -> args[2] = profile.alphaLong
+                propertyName.endsWith("sim.operator.alpha") -> args[2] = profile.alphaLong
+                propertyName.endsWith("operator.alpha") -> args[2] = profile.alphaLong
             }
         })
 
@@ -772,11 +759,9 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     it.parameterTypes[1] == String::class.java
             }
             .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val override = systemPropertyOverride(param.args.firstOrNull()) ?: return
-                        param.args[1] = override
-                    }
+                XposedBridge.hookMethod(method, beforeHookedMethod {
+                    val override = systemPropertyOverride(args.firstOrNull()) ?: return@beforeHookedMethod
+                    args[1] = override
                 })
             }
     }
@@ -801,23 +786,24 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "operator_numeric" to { it.operatorNumericList },
             "operator_alpha" to { it.alphaList }
         ).forEach { (methodName, value) ->
-            XposedBridge.hookAllMethods(telephonyPropertiesClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (param.args.size == 1 && param.args[0] is List<*>) {
+            XposedBridge.hookAllMethods(telephonyPropertiesClass, methodName, hookedMethod(
+                before = {
+                    if (args.size == 1 && args[0] is List<*>) {
                         val config = hookConfig
-                        if (!config.enabled) return
-                        param.args[0] = value(config)
+                        if (config.enabled) {
+                            args[0] = value(config)
+                        }
+                    }
+                },
+                after = {
+                    if (args.isEmpty() && result is List<*>) {
+                        val config = hookConfig
+                        if (config.enabled) {
+                            result = value(config)
+                        }
                     }
                 }
-
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (param.args.isEmpty() && param.result is List<*>) {
-                        val config = hookConfig
-                        if (!config.enabled) return
-                        param.result = value(config)
-                    }
-                }
-            })
+            ))
         }
     }
 
@@ -833,11 +819,9 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     it.parameterTypes.firstOrNull() == String::class.java
             }
             .forEach { method ->
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val override = systemPropertyOverride(param.args.firstOrNull()) ?: return
-                        param.result = override
-                    }
+                XposedBridge.hookMethod(method, beforeHookedMethod {
+                    val override = systemPropertyOverride(args.firstOrNull()) ?: return@beforeHookedMethod
+                    result = override
                 })
             }
     }
@@ -849,13 +833,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     ) {
         if (telephonyManagerClass.declaredMethods.none { it.name == methodName }) return
 
-        XposedBridge.hookAllMethods(telephonyManagerClass, methodName, object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                if (!hookConfig.enabled) return
-                val value = valueProvider(param) ?: return
-                val valueIndex = param.args.indexOfLast { it is String }
-                if (valueIndex >= 0) param.args[valueIndex] = value
-            }
+        XposedBridge.hookAllMethods(telephonyManagerClass, methodName, beforeHookedMethod {
+            if (!hookConfig.enabled) return@beforeHookedMethod
+            val value = valueProvider(this) ?: return@beforeHookedMethod
+            val valueIndex = args.indexOfLast { it is String }
+            if (valueIndex >= 0) args[valueIndex] = value
         })
     }
 
@@ -1225,12 +1207,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                             method.returnType.name.startsWith("android.telephony.CellIdentity")
                     }
                     .forEach { method ->
-                        XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                            override fun afterHookedMethod(param: MethodHookParam) {
-                                val config = hookConfig
-                                if (!config.enabled) return
-                                rewriteNestedTelephonyObject(param.result, config.primaryProfile)
-                            }
+                        XposedBridge.hookMethod(method, afterHookedMethod {
+                            val config = hookConfig
+                            if (!config.enabled) return@afterHookedMethod
+                            rewriteNestedTelephonyObject(result, config.primaryProfile)
                         })
                     }
 
@@ -1268,49 +1248,51 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                         )
                     }
                     .forEach { method ->
-                        XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                            override fun beforeHookedMethod(param: MethodHookParam) {
+                        XposedBridge.hookMethod(method, hookedMethod(
+                            before = {
                                 val config = hookConfig
-                                if (!config.enabled) return
-                                rewriteCommonOperatorFields(param.thisObject, config.primaryProfile)
-                            }
-
-                            override fun afterHookedMethod(param: MethodHookParam) {
+                                if (config.enabled) {
+                                    rewriteCommonOperatorFields(thisObject, config.primaryProfile)
+                                }
+                            },
+                            after = {
                                 val config = hookConfig
-                                if (!config.enabled) return
-                                val profile = config.primaryProfile
-                                param.result = when (method.name) {
-                                    "getOperatorAlphaLong" -> profile.alphaLong
-                                    "getOperatorAlphaShort" -> profile.alphaShort
-                                    "getMcc" -> profile.mcc.toIntOrNull() ?: 0
-                                    "getMnc" -> profile.mnc.toIntOrNull() ?: 0
-                                    "getMccString" -> profile.mcc
-                                    "getMncString" -> profile.mnc
-                                    else -> param.result
+                                if (config.enabled) {
+                                    val profile = config.primaryProfile
+                                    result = when (method.name) {
+                                        "getOperatorAlphaLong" -> profile.alphaLong
+                                        "getOperatorAlphaShort" -> profile.alphaShort
+                                        "getMcc" -> profile.mcc.toIntOrNull() ?: 0
+                                        "getMnc" -> profile.mnc.toIntOrNull() ?: 0
+                                        "getMccString" -> profile.mcc
+                                        "getMncString" -> profile.mnc
+                                        else -> result
+                                    }
                                 }
                             }
-                        })
+                        ))
                     }
 
                 cellIdentityClass.declaredMethods
                     .filter { it.name == "toString" && it.parameterTypes.isEmpty() }
                     .forEach { method ->
-                        XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                            override fun beforeHookedMethod(param: MethodHookParam) {
+                        XposedBridge.hookMethod(method, hookedMethod(
+                            before = {
                                 val config = hookConfig
-                                if (!config.enabled) return
-                                rewriteCommonOperatorFields(param.thisObject, config.primaryProfile)
-                            }
-
-                            override fun afterHookedMethod(param: MethodHookParam) {
+                                if (config.enabled) {
+                                    rewriteCommonOperatorFields(thisObject, config.primaryProfile)
+                                }
+                            },
+                            after = {
                                 val config = hookConfig
-                                if (!config.enabled || param.result !is String) return
-                                param.result = rewriteTelephonyDebugString(
-                                    param.result as String,
-                                    config.primaryProfile
-                                )
+                                if (config.enabled && result is String) {
+                                    result = rewriteTelephonyDebugString(
+                                        result as String,
+                                        config.primaryProfile
+                                    )
+                                }
                             }
-                        })
+                        ))
                     }
             }
     }
@@ -1336,21 +1318,20 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         ).forEach { methodName ->
             if (targetClass.declaredMethods.none { it.name == methodName }) return@forEach
 
-            XposedBridge.hookAllMethods(targetClass, methodName, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
+            XposedBridge.hookAllMethods(targetClass, methodName, hookedMethod(
+                before = {
                     val config = hookConfig
-                    if (!config.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
-                    if (shouldShortCircuitInternalSubscriptionIdRead()) {
-                        param.result = config.visibleProfiles.map { it.subId }.toIntArray()
+                    if (config.enabled && shouldRewriteForCaller(externalClientsOnly) && shouldShortCircuitInternalSubscriptionIdRead()) {
+                        result = config.visibleProfiles.map { it.subId }.toIntArray()
+                    }
+                },
+                after = {
+                    val config = hookConfig
+                    if (config.enabled && shouldRewriteForCaller(externalClientsOnly)) {
+                        result = config.visibleProfiles.map { it.subId }.toIntArray()
                     }
                 }
-
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val config = hookConfig
-                    if (!config.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
-                    param.result = config.visibleProfiles.map { it.subId }.toIntArray()
-                }
-            })
+            ))
         }
     }
 
@@ -1363,16 +1344,14 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         if (methods.isEmpty()) return
 
         methods.forEach { method ->
-            XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return
-                    param.result = rewriteSubscriptionResult(
-                        result = param.result,
-                        methodName = method.name,
-                        classLoader = targetClass.classLoader,
-                        param = param
-                    )
-                }
+            XposedBridge.hookMethod(method, afterHookedMethod {
+                if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return@afterHookedMethod
+                result = rewriteSubscriptionResult(
+                    result = result,
+                    methodName = method.name,
+                    classLoader = targetClass.classLoader,
+                    param = this
+                )
             })
         }
     }
@@ -1389,21 +1368,24 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         if (methods.isEmpty()) return
 
         methods.forEach { method ->
-            XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!beforeOriginal) return
-                    val config = hookConfig
-                    if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
-                    param.result = coerceHookResult(valueProvider(param, method), null)
+            XposedBridge.hookMethod(method, hookedMethod(
+                before = {
+                    if (beforeOriginal) {
+                        val config = hookConfig
+                        if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
+                            result = coerceHookResult(valueProvider(this, method), null)
+                        }
+                    }
+                },
+                after = {
+                    if (!beforeOriginal) {
+                        val config = hookConfig
+                        if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
+                            result = coerceHookResult(valueProvider(this, method), result)
+                        }
+                    }
                 }
-
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (beforeOriginal) return
-                    val config = hookConfig
-                    if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
-                    param.result = coerceHookResult(valueProvider(param, method), param.result)
-                }
-            })
+            ))
         }
     }
 
@@ -1468,23 +1450,24 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                         "install TAC hook ${targetClass.name}.${method.name}(${method.parameterTypes.joinToString { it.simpleName }}) beforeOriginal=$beforeOriginal"
                     )
                 }
-                XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        if (!beforeOriginal) return
-                        val config = hookConfig
-                        if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
-                        param.result = resultProvider(param, method)
-                    }
-
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        if (beforeOriginal) return
-                        val config = hookConfig
-                        if (!shouldHandle(config) || !shouldRewriteForCaller(externalClientsOnly)) return
-                        if (param.result == null || param.result is String) {
-                            param.result = resultProvider(param, method)
+                XposedBridge.hookMethod(method, hookedMethod(
+                    before = {
+                        if (beforeOriginal) {
+                            val config = hookConfig
+                            if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
+                                result = resultProvider(this, method)
+                            }
+                        }
+                    },
+                    after = {
+                        if (!beforeOriginal) {
+                            val config = hookConfig
+                            if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly) && (result == null || result is String)) {
+                                result = resultProvider(this, method)
+                            }
                         }
                     }
-                })
+                ))
             }
         }
     }
@@ -1801,26 +1784,17 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private fun readHookNotifyValues(force: Boolean = false): Map<String, String>? {
         if (!preferHookNotifyConfig) return null
-        return HookNotifyClient.readSimConfigSnapshot(force = force)
+        return HookNotifyClient.readConfigSnapshot(
+            configName = "sim",
+            force = force,
+            logName = "SIM"
+        )
             ?.let(::parseConfigSnapshot)
             ?.takeIf { it.isNotEmpty() }
     }
 
     private fun parseConfigSnapshot(json: String): Map<String, String> {
-        return runCatching {
-            val root = JSONObject(json)
-            buildMap {
-                val keys = root.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    if (!root.isNull(key)) {
-                        put(key, root.optString(key))
-                    }
-                }
-            }
-        }.onFailure {
-            HookLog.w(HookLog.Module.SIM, "failed to parse SIM config snapshot: ${it.message}")
-        }.getOrDefault(emptyMap())
+        return HookConfigFile.readSnapshotValues(json, HookLog.Module.SIM, "SIM")
     }
 
     private fun readSharedPrefsValues(): Map<String, String>? {
@@ -1828,7 +1802,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun readUniqueIdentifierConfig(force: Boolean = false): UniqueIdentifierConfig {
-        val hookNotifyValues = HookNotifyClient.readUniqueIdentifierConfigSnapshot(force = force)
+        val hookNotifyValues = HookNotifyClient.readConfigSnapshot(
+            configName = "unique_identifier",
+            force = force,
+            logName = "unique identifier"
+        )
             ?.let(::parseConfigSnapshot)
             ?.takeIf { it.isNotEmpty() }
         val sharedPrefsValues = if (hookNotifyValues == null || force) {
@@ -1870,38 +1848,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun readPrefsValues(prefsName: String): Map<String, String>? {
-        val candidates = listOf(
-            File("/data/user/0/${BuildConfig.APPLICATION_ID}/shared_prefs/$prefsName.xml"),
-            File("/data/data/${BuildConfig.APPLICATION_ID}/shared_prefs/$prefsName.xml")
+        return HookConfigFile.readSharedPrefsValues(
+            prefsName = prefsName,
+            logModule = HookLog.Module.SIM,
+            logName = prefsName
         )
-        val prefsFile = candidates.firstOrNull { it.isFile && it.canRead() } ?: return null
-        return runCatching {
-            val values = linkedMapOf<String, String>()
-            FileInputStream(prefsFile).use { input ->
-                val parser = Xml.newPullParser()
-                parser.setInput(input, Charsets.UTF_8.name())
-
-                var event = parser.eventType
-                while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
-                    if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
-                        val tagName = parser.name
-                        val key = parser.getAttributeValue(null, "name")
-                        if (!key.isNullOrBlank()) {
-                            when (tagName) {
-                                "boolean", "int", "long", "float" -> {
-                                    parser.getAttributeValue(null, "value")?.let { values[key] = it }
-                                }
-                                "string" -> values[key] = parser.nextText()
-                            }
-                        }
-                    }
-                    event = parser.next()
-                }
-            }
-            values
-        }.onFailure {
-            HookLog.w(HookLog.Module.SIM, "failed to read $prefsName config: ${it.message}")
-        }.getOrNull()
     }
 
     private fun parseProfileMap(json: String): Map<Int, SimProfile> {

@@ -2,9 +2,7 @@ package asia.nana7mi.arirang.hook
 
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
-import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
@@ -20,10 +18,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             XposedHelpers.findAndHookMethod(
                 computerEngine, "getInstalledApplications",
                 Long::class.java, Int::class.java, Int::class.java, Boolean::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        filterList<ApplicationInfo>(param) { it.packageName }
-                    }
+                afterHookedMethod {
+                    filterList<ApplicationInfo>(this) { it.packageName }
                 }
             )
 
@@ -31,17 +27,15 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             XposedHelpers.findAndHookMethod(
                 computerEngine, "getInstalledPackagesBody",
                 Long::class.java, Int::class.java, Int::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val parceledListSlice = param.result ?: return
-                        runCatching {
-                            val list = XposedHelpers.callMethod(parceledListSlice, "getList") as List<*>
-                            val filtered = list.filterIsInstance<PackageInfo>().filter {
-                                config.loadIfUpdated("visible_list", "invisible_list")
-                                config.shouldKeep(it.packageName)
-                            }
-                            param.result = XposedHelpers.newInstance(parceledListSlice.javaClass, filtered)
+                afterHookedMethod {
+                    val parceledListSlice = result ?: return@afterHookedMethod
+                    runCatching {
+                        val list = XposedHelpers.callMethod(parceledListSlice, "getList") as List<*>
+                        val filtered = list.filterIsInstance<PackageInfo>().filter {
+                            config.loadIfUpdated("visible_list", "invisible_list")
+                            config.shouldKeep(it.packageName)
                         }
+                        result = XposedHelpers.newInstance(parceledListSlice.javaClass, filtered)
                     }
                 }
             )
@@ -50,13 +44,11 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             XposedHelpers.findAndHookMethod(
                 computerEngine, "getPackageInfoInternal",
                 String::class.java, Long::class.java, Long::class.java, Int::class.java, Int::class.java,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val packageName = param.args[0] as String
-                        if (!config.shouldKeep(packageName)) {
-                            // 模拟包不存在的情况，返回 null
-                            param.result = null
-                        }
+                beforeHookedMethod {
+                    val packageName = args[0] as String
+                    if (!config.shouldKeep(packageName)) {
+                        // 模拟包不存在的情况，返回 null
+                        result = null
                     }
                 }
             )
@@ -66,16 +58,14 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 computerEngine, "queryIntentActivitiesInternal",
                 android.content.Intent::class.java, String::class.java, Long::class.java, Long::class.java, Int::class.java,Int::class.java,Int::class.java,
                 Boolean::class.java,Boolean::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val list = param.result as? List<*> ?: return
-                        val filtered = list.filter { resolveInfo ->
-                            val activityInfo = XposedHelpers.getObjectField(resolveInfo, "activityInfo")
-                            val pkg = XposedHelpers.getObjectField(activityInfo, "packageName") as String
-                            config.shouldKeep(pkg)
-                        }
-                        param.result = filtered
+                afterHookedMethod {
+                    val list = result as? List<*> ?: return@afterHookedMethod
+                    val filtered = list.filter { resolveInfo ->
+                        val activityInfo = XposedHelpers.getObjectField(resolveInfo, "activityInfo")
+                        val pkg = XposedHelpers.getObjectField(activityInfo, "packageName") as String
+                        config.shouldKeep(pkg)
                     }
+                    result = filtered
                 }
             )
 

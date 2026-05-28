@@ -259,46 +259,6 @@ class HookNotifyService : Service() {
             }
             return hookConfigSources[configName]?.snapshot?.invoke(this@HookNotifyService).orEmpty()
         }
-
-        override fun readSimConfigVersion(): Long {
-            return readConfigVersion(CONFIG_SIM)
-        }
-
-        override fun readSimConfigSnapshot(): String {
-            return readConfigSnapshot(CONFIG_SIM)
-        }
-
-        override fun readUniqueIdentifierConfigVersion(): Long {
-            return readConfigVersion(CONFIG_UNIQUE_IDENTIFIER)
-        }
-
-        override fun readUniqueIdentifierConfigSnapshot(): String {
-            return readConfigSnapshot(CONFIG_UNIQUE_IDENTIFIER)
-        }
-
-        override fun readHookLogConfigVersion(): Long {
-            return readConfigVersion(CONFIG_HOOK_LOG)
-        }
-
-        override fun readHookLogConfigSnapshot(): String {
-            return readConfigSnapshot(CONFIG_HOOK_LOG)
-        }
-
-        override fun readWifiConfigVersion(): Long {
-            return readConfigVersion(CONFIG_WIFI)
-        }
-
-        override fun readWifiConfigSnapshot(): String {
-            return readConfigSnapshot(CONFIG_WIFI)
-        }
-
-        override fun readLocationConfigVersion(): Long {
-            return readConfigVersion(CONFIG_LOCATION)
-        }
-
-        override fun readLocationConfigSnapshot(): String {
-            return readConfigSnapshot(CONFIG_LOCATION)
-        }
     }
 
     override fun onCreate() {

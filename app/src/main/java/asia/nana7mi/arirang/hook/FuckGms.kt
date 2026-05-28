@@ -7,6 +7,7 @@ import android.os.IBinder
 import android.os.IInterface
 import android.os.Parcel
 import android.os.Parcelable
+import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import com.google.android.gms.appset.zzc as AppSetIdResult
 import com.google.android.gms.common.api.Status
 import de.robv.android.xposed.XC_MethodHook
@@ -37,13 +38,31 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         private const val APP_SET_SERVICE_DESCRIPTOR =
             "com.google.android.gms.appset.internal.IAppSetService"
         private const val APP_SET_CALLBACK_TRANSACTION = 1
+        private const val CONFIG_REFRESH_INTERVAL_MS = 300L
     }
 
     @Volatile
-    private var cachedConfig = IdentifierConfig()
-
-    @Volatile
     private var gmsContext: Context? = null
+
+    private val configFile = HookConfigFile(
+        configName = "unique_identifier",
+        prefsName = UniqueIdentifierPrefs.PREFS_NAME,
+        defaultValue = IdentifierConfig(),
+        refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
+        readRealtimeSnapshot = { force ->
+            val context = gmsContext
+            HookNotifyClient.readConfigSnapshot(
+                configName = "unique_identifier",
+                force = force,
+                allowBind = context != null,
+                bindContext = context,
+                bindCurrentUser = true,
+                logName = "unique identifier"
+            )
+        },
+        parseRealtimeSnapshot = ::parseIdentifierConfigSnapshot,
+        readStoredConfig = ::readIdentifierConfigFromPrefs
+    )
 
     private val hookedServiceClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
     private val hookedAppSetServiceClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
@@ -58,12 +77,10 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
     private fun hookApplicationContext(classLoader: ClassLoader) {
         val applicationClass = XposedHelpers.findClassIfExists("android.app.Application", classLoader)
             ?: Application::class.java
-        XposedBridge.hookAllMethods(applicationClass, "onCreate", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val app = param.thisObject as? Application ?: return
-                gmsContext = app.applicationContext
-                HookNotifyClient.autoBindCurrentUser(app)
-            }
+        XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
+            val app = thisObject as? Application ?: return@afterHookedMethod
+            gmsContext = app.applicationContext
+            HookNotifyClient.autoBindCurrentUser(app)
         })
     }
 
@@ -73,14 +90,12 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
             "attachInterface",
             IInterface::class.java,
             String::class.java,
-            object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val descriptor = param.args.getOrNull(1) as? String ?: return
-                    val owner = param.args.getOrNull(0) ?: return
-                    when (descriptor) {
-                        ADS_IDENTIFIER_DESCRIPTOR -> hookAdvertisingIdServiceTransact(owner.javaClass)
-                        APP_SET_SERVICE_DESCRIPTOR -> logAppSetService(owner.javaClass)
-                    }
+            afterHookedMethod {
+                val descriptor = args.getOrNull(1) as? String ?: return@afterHookedMethod
+                val owner = args.getOrNull(0) ?: return@afterHookedMethod
+                when (descriptor) {
+                    ADS_IDENTIFIER_DESCRIPTOR -> hookAdvertisingIdServiceTransact(owner.javaClass)
+                    APP_SET_SERVICE_DESCRIPTOR -> logAppSetService(owner.javaClass)
                 }
             }
         )
@@ -92,10 +107,8 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
 
         logAdvertisingIdServiceMethods(ownerClass)
         hookAdvertisingIdGetters(ownerClass)
-        XposedBridge.hookAllMethods(transactClass, "onTransact", object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                spoofAdvertisingIdIfMatched(param)
-            }
+        XposedBridge.hookAllMethods(transactClass, "onTransact", beforeHookedMethod {
+            spoofAdvertisingIdIfMatched(this)
         })
         HookLog.i(HookLog.Module.GMS, "hooked GMS Advertising ID service ${ownerClass.name}/${transactClass.name}")
     }
@@ -112,12 +125,10 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
 
         methods.forEach { method ->
             method.isAccessible = true
-            XposedBridge.hookMethod(method, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val gaid = currentConfig().gaid.takeIf { it.isNotBlank() } ?: return
-                    param.result = gaid
-                    HookLog.i(HookLog.Module.GMS, "GAID spoofed from ${ownerClass.name}.${method.name}()")
-                }
+            XposedBridge.hookMethod(method, afterHookedMethod {
+                val gaid = currentConfig().gaid.takeIf { it.isNotBlank() } ?: return@afterHookedMethod
+                result = gaid
+                HookLog.i(HookLog.Module.GMS, "GAID spoofed from ${ownerClass.name}.${method.name}()")
             })
             HookLog.i(HookLog.Module.GMS, "hooked GMS Advertising ID getter ${ownerClass.name}.${method.name}()")
         }
@@ -145,23 +156,21 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         }
 
         method.isAccessible = true
-        XposedBridge.hookMethod(method, object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val request = param.args.getOrNull(0)
-                val callback = param.args.getOrNull(1)
-                val appSetClassLoader = ownerClass.classLoader ?: ClassLoader.getSystemClassLoader()
-                if (spoofAppSetRequest(appSetClassLoader, callback)) {
-                    param.result = null
-                    return
-                }
-                HookLog.i(
-                    HookLog.Module.GMS,
-                    "App Set request entered request=${request?.javaClass?.name} callback=${callback?.javaClass?.name}"
-                )
-                request?.javaClass?.let { logClassHierarchyMethods("App Set request object", it) }
-                callback?.javaClass?.let { logClassHierarchyMethods("App Set callback object", it) }
-                method.parameterTypes.getOrNull(1)?.let { logClassHierarchyMethods("App Set callback type", it) }
+        XposedBridge.hookMethod(method, beforeHookedMethod {
+            val request = args.getOrNull(0)
+            val callback = args.getOrNull(1)
+            val appSetClassLoader = ownerClass.classLoader ?: ClassLoader.getSystemClassLoader()
+            if (spoofAppSetRequest(appSetClassLoader, callback)) {
+                result = null
+                return@beforeHookedMethod
             }
+            HookLog.i(
+                HookLog.Module.GMS,
+                "App Set request entered request=${request?.javaClass?.name} callback=${callback?.javaClass?.name}"
+            )
+            request?.javaClass?.let { logClassHierarchyMethods("App Set request object", it) }
+            callback?.javaClass?.let { logClassHierarchyMethods("App Set callback object", it) }
+            method.parameterTypes.getOrNull(1)?.let { logClassHierarchyMethods("App Set callback type", it) }
         })
         HookLog.i(HookLog.Module.GMS, "hooked GMS App Set request method ${ownerClass.name}.${method.name}()")
     }
@@ -253,28 +262,26 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
             Parcel::class.java,
             Parcel::class.java,
             Int::class.javaPrimitiveType,
-            object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val code = param.args.getOrNull(0) as? Int ?: return
-                    if (code != APP_SET_CALLBACK_TRANSACTION) return
+            beforeHookedMethod {
+                val code = args.getOrNull(0) as? Int ?: return@beforeHookedMethod
+                if (code != APP_SET_CALLBACK_TRANSACTION) return@beforeHookedMethod
 
-                    val data = param.args.getOrNull(1) as? Parcel ?: return
-                    if (data.interfaceTokenOrNull() != APP_SET_CALLBACK_DESCRIPTOR) return
+                val data = args.getOrNull(1) as? Parcel ?: return@beforeHookedMethod
+                if (data.interfaceTokenOrNull() != APP_SET_CALLBACK_DESCRIPTOR) return@beforeHookedMethod
 
-                    val appSetId = currentConfig().appSetId.takeIf { it.isNotBlank() } ?: return
-                    HookLog.i(HookLog.Module.GMS, "App Set ID callback matched in GMS")
-                    val replacement = Parcel.obtain()
-                    try {
-                        val status = data.readParcelableAfterInterfaceToken(Status.CREATOR) ?: Status.RESULT_SUCCESS
-                        replacement.writeInterfaceToken(APP_SET_CALLBACK_DESCRIPTOR)
-                        replacement.writeParcelableCompat(status, 0)
-                        replacement.writeParcelableCompat(AppSetIdResult(appSetId, 1), 0)
-                        param.args[1] = replacement
-                        HookLog.i(HookLog.Module.GMS, "App Set ID spoofed from GMS callback")
-                    } catch (t: Throwable) {
-                        replacement.recycle()
-                        HookLog.i(HookLog.Module.GMS, "failed to rewrite App Set ID callback: ${t.message}")
-                    }
+                val appSetId = currentConfig().appSetId.takeIf { it.isNotBlank() } ?: return@beforeHookedMethod
+                HookLog.i(HookLog.Module.GMS, "App Set ID callback matched in GMS")
+                val replacement = Parcel.obtain()
+                try {
+                    val status = data.readParcelableAfterInterfaceToken(Status.CREATOR) ?: Status.RESULT_SUCCESS
+                    replacement.writeInterfaceToken(APP_SET_CALLBACK_DESCRIPTOR)
+                    replacement.writeParcelableCompat(status, 0)
+                    replacement.writeParcelableCompat(AppSetIdResult(appSetId, 1), 0)
+                    args[1] = replacement
+                    HookLog.i(HookLog.Module.GMS, "App Set ID spoofed from GMS callback")
+                } catch (t: Throwable) {
+                    replacement.recycle()
+                    HookLog.i(HookLog.Module.GMS, "failed to rewrite App Set ID callback: ${t.message}")
                 }
             }
         )
@@ -288,20 +295,14 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                 appSetId = DEBUG_APP_SET_ID
             )
         }
-        return readHookNotifyConfig()?.also { cachedConfig = it } ?: cachedConfig
+        return configFile.current()
     }
 
-    private fun readHookNotifyConfig(): IdentifierConfig? {
+    private fun parseIdentifierConfigSnapshot(snapshot: String): IdentifierConfig? {
         return runCatching {
-            val context = gmsContext
-            val snapshot = HookNotifyClient.readUniqueIdentifierConfigSnapshot(
-                allowBind = context != null,
-                bindContext = context,
-                bindCurrentUser = true
-            ) ?: return cachedConfig
             val root = JSONObject(snapshot)
             if (!root.optString(KEY_ENABLED).toBooleanStrictOrNull().orFalse()) {
-                return IdentifierConfig()
+                return@runCatching IdentifierConfig()
             }
             IdentifierConfig(
                 enabled = true,
@@ -309,8 +310,18 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
                 appSetId = root.optString(KEY_APP_SET_ID)
             )
         }.onFailure {
-            HookLog.i(HookLog.Module.GMS, "failed to read GMS identifier config through IHookNotify: ${it.message}")
+            HookLog.i(HookLog.Module.GMS, "failed to parse GMS identifier config: ${it.message}")
         }.getOrNull()
+    }
+
+    private fun readIdentifierConfigFromPrefs(prefs: de.robv.android.xposed.XSharedPreferences): IdentifierConfig? {
+        if (!prefs.file.canRead()) return null
+        if (!prefs.getBoolean(KEY_ENABLED, false)) return IdentifierConfig()
+        return IdentifierConfig(
+            enabled = true,
+            gaid = prefs.getString(KEY_GAID, null).orEmpty(),
+            appSetId = prefs.getString(KEY_APP_SET_ID, null).orEmpty()
+        )
     }
 
     private fun Boolean?.orFalse(): Boolean {

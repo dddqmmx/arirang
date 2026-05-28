@@ -5,14 +5,4 @@ interface IHookNotify {
     void onPermissionUsed(String pkgName, int uid, int userId, String opName);
     long readConfigVersion(String configName);
     String readConfigSnapshot(String configName);
-    long readSimConfigVersion();
-    String readSimConfigSnapshot();
-    long readUniqueIdentifierConfigVersion();
-    String readUniqueIdentifierConfigSnapshot();
-    long readHookLogConfigVersion();
-    String readHookLogConfigSnapshot();
-    long readWifiConfigVersion();
-    String readWifiConfigSnapshot();
-    long readLocationConfigVersion();
-    String readLocationConfigSnapshot();
 }

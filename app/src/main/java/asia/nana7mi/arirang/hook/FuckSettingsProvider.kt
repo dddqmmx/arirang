@@ -3,11 +3,9 @@ package asia.nana7mi.arirang.hook
 import android.content.Context
 import android.os.Bundle
 import android.provider.Settings
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
+import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import org.json.JSONObject
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
 // through the normal Settings.Secure path instead of per-app hooks.
@@ -27,31 +25,29 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
                 "com.android.providers.settings.SettingsProvider",
                 classLoader
             )
-            hookCall(lmsClass, classLoader)
+            hookCall(lmsClass)
 
         } catch (t: Throwable) {
             HookLog.e(HookLog.Module.SETTINGS, "hook failed", t)
         }
     }
 
-    private fun hookCall(lmsClass: Class<*>, classLoader: ClassLoader) {
+    private fun hookCall(lmsClass: Class<*>) {
         XposedHelpers.findAndHookMethod(
             lmsClass, "call",
             String::class.java,
             String::class.java,
             Bundle::class.java,
-            object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val method = param.args[0] as? String
-                    val request = param.args[1] as? String
-                    val callMethodGetSecureField = XposedHelpers.findField(Settings::class.java, "CALL_METHOD_GET_SECURE")
-                    val callMethodGetSecure = callMethodGetSecureField.get(null) as String
-                    if (method == callMethodGetSecure && request == Settings.Secure.ANDROID_ID) {
-                        val androidId = readAndroidIdFromConfig(param.thisObject) ?: return
-                        val bundle = Bundle()
-                        bundle.putString(Settings.NameValueTable.VALUE, androidId)
-                        param.result = bundle
-                    }
+            beforeHookedMethod {
+                val method = args[0] as? String
+                val request = args[1] as? String
+                val callMethodGetSecureField = XposedHelpers.findField(Settings::class.java, "CALL_METHOD_GET_SECURE")
+                val callMethodGetSecure = callMethodGetSecureField.get(null) as String
+                if (method == callMethodGetSecure && request == Settings.Secure.ANDROID_ID) {
+                    val androidId = readAndroidIdFromConfig(thisObject) ?: return@beforeHookedMethod
+                    val bundle = Bundle()
+                    bundle.putString(Settings.NameValueTable.VALUE, androidId)
+                    result = bundle
                 }
             }
         )
@@ -61,18 +57,23 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         val context = runCatching {
             XposedHelpers.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
-        val snapshot = HookNotifyClient.readUniqueIdentifierConfigSnapshot(
+        val snapshot = HookNotifyClient.readConfigSnapshot(
+            configName = "unique_identifier",
             allowBind = true,
-            bindContext = context
+            bindContext = context,
+            logName = "unique identifier"
         )
+        val values = snapshot
+            ?.let { HookConfigFile.readSnapshotValues(it, HookLog.Module.SETTINGS, "unique identifier") }
+            ?: HookConfigFile.readSharedPrefsValues(
+                prefsName = UniqueIdentifierPrefs.PREFS_NAME,
+                logModule = HookLog.Module.SETTINGS,
+                logName = "unique identifier"
+            )
             ?: return null
-        return runCatching {
-            val root = JSONObject(snapshot)
-            if (!root.optString(KEY_ENABLED).toBooleanStrictOrNull().orFalse()) return@runCatching null
-            root.optString(KEY_ANDROID_ID).takeIf { it.isNotBlank() }
-        }.onFailure {
-            HookLog.w(HookLog.Module.SETTINGS, "failed to parse unique identifier config: ${it.message}")
-        }.getOrNull()
+
+        if (!values[KEY_ENABLED]?.toBooleanStrictOrNull().orFalse()) return null
+        return values[KEY_ANDROID_ID]?.takeIf { it.isNotBlank() }
     }
 
     private fun Boolean?.orFalse(): Boolean {

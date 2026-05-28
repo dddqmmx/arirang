@@ -3,7 +3,6 @@ package asia.nana7mi.arirang.hook
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
-import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import org.json.JSONObject
@@ -106,15 +105,17 @@ object HookLog {
     }
 
     private fun hookLogSnapshotJson(): JSONObject? {
-        HookNotifyClient.readHookLogConfigSnapshot(allowBind = true)?.let { snapshot ->
+        HookNotifyClient.readConfigSnapshot(
+            configName = "hook_log",
+            allowBind = true,
+            logName = "hook log"
+        )?.let { snapshot ->
             runCatching { JSONObject(snapshot) }.getOrNull()?.let { return it }
         }
 
         return runCatching {
-            XSharedPreferences(BuildConfig.APPLICATION_ID, HookLogSettings.PREFS_NAME).takeIf {
+            HookConfigFile.xSharedPreferences(HookLogSettings.PREFS_NAME).takeIf {
                 it.file.canRead()
-            }?.apply {
-                reload()
             }?.let { prefs ->
                 JSONObject().apply {
                     Module.entries.forEach { module ->

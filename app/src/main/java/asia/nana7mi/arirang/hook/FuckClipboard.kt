@@ -3,7 +3,6 @@ package asia.nana7mi.arirang.hook
 import android.os.Binder
 import android.os.Process
 import android.os.UserHandle
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -21,23 +20,21 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
     }
 
     private fun hookClipboard(targetClass: Class<*>) {
-        val hookCallback = object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val callingPackage = param.args.firstOrNull { it is String } as? String ?: return
-                val uid = Binder.getCallingUid()
-                val userId = (param.args.firstOrNull { it is Int } as? Int)
-                    ?.takeIf { it >= 0 }
-                    ?: runCatching {
-                        XposedHelpers.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
-                    }.getOrDefault(uid / PER_USER_RANGE)
+        val hookCallback = beforeHookedMethod {
+            val callingPackage = args.firstOrNull { it is String } as? String ?: return@beforeHookedMethod
+            val uid = Binder.getCallingUid()
+            val userId = (args.firstOrNull { it is Int } as? Int)
+                ?.takeIf { it >= 0 }
+                ?: runCatching {
+                    XposedHelpers.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
+                }.getOrDefault(uid / PER_USER_RANGE)
 
-                if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return
+            if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
 
-                val allowed = HookNotifyClient.requestClipboardReadAccess(callingPackage, uid, userId)
-                if (!allowed) {
-                    HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
-                    param.result = null
-                }
+            val allowed = HookNotifyClient.requestClipboardReadAccess(callingPackage, uid, userId)
+            if (!allowed) {
+                HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
+                result = null
             }
         }
 

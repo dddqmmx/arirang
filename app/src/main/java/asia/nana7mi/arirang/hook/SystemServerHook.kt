@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import asia.nana7mi.arirang.BuildConfig
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -25,32 +24,30 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
 
             XposedBridge.hookMethod(
                 systemReady,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        HookLog.i(HookLog.Module.CORE, "AMS systemReady, starting auto-bind to HookNotifyService")
+                afterHookedMethod {
+                    HookLog.i(HookLog.Module.CORE, "AMS systemReady, starting auto-bind to HookNotifyService")
 
-                        val ctx = HookNotifyClient.getSystemContext()
-                        if (ctx != null) {
-                            HookNotifyClient.autoBind(ctx)
+                    val ctx = HookNotifyClient.getSystemContext()
+                    if (ctx != null) {
+                        HookNotifyClient.autoBind(ctx)
 
-                            val filter = IntentFilter().apply {
-                                addAction(Intent.ACTION_PACKAGE_REPLACED)
-                                addAction(Intent.ACTION_PACKAGE_RESTARTED)
-                                addAction(Intent.ACTION_PACKAGE_ADDED)
-                                addAction(Intent.ACTION_PACKAGE_CHANGED)
-                                addDataScheme("package")
-                            }
-
-                            ctx.registerReceiver(object : BroadcastReceiver() {
-                                override fun onReceive(context: Context, intent: Intent) {
-                                    val pkgName = intent.data?.schemeSpecificPart
-                                    if (pkgName == BuildConfig.APPLICATION_ID) {
-                                        HookLog.i(HookLog.Module.CORE, "package $pkgName updated/restarted, trying to bind service")
-                                        HookNotifyClient.autoBind(context)
-                                    }
-                                }
-                            }, filter, null, null)
+                        val filter = IntentFilter().apply {
+                            addAction(Intent.ACTION_PACKAGE_REPLACED)
+                            addAction(Intent.ACTION_PACKAGE_RESTARTED)
+                            addAction(Intent.ACTION_PACKAGE_ADDED)
+                            addAction(Intent.ACTION_PACKAGE_CHANGED)
+                            addDataScheme("package")
                         }
+
+                        ctx.registerReceiver(object : BroadcastReceiver() {
+                            override fun onReceive(context: Context, intent: Intent) {
+                                val pkgName = intent.data?.schemeSpecificPart
+                                if (pkgName == BuildConfig.APPLICATION_ID) {
+                                    HookLog.i(HookLog.Module.CORE, "package $pkgName updated/restarted, trying to bind service")
+                                    HookNotifyClient.autoBind(context)
+                                }
+                            }
+                        }, filter, null, null)
                     }
                 }
             )

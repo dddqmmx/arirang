@@ -277,48 +277,6 @@ object HookNotifyClient {
         }
     }
 
-    fun readSimConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
-        return readConfigSnapshot("sim", force, allowBind, logName = "SIM")
-    }
-
-    fun readUniqueIdentifierConfigSnapshot(
-        force: Boolean = false,
-        allowBind: Boolean = false,
-        bindContext: Context? = null,
-        bindCurrentUser: Boolean = false
-    ): String? {
-        return readConfigSnapshot(
-            configName = "unique_identifier",
-            force = force,
-            allowBind = allowBind,
-            bindContext = bindContext,
-            bindCurrentUser = bindCurrentUser,
-            logName = "unique identifier"
-        )
-    }
-
-    fun readHookLogConfigSnapshot(force: Boolean = false, allowBind: Boolean = false): String? {
-        return readConfigSnapshot("hook_log", force, allowBind, logName = "hook log")
-    }
-
-    fun readWifiConfigSnapshot(
-        force: Boolean = false,
-        allowBind: Boolean = false,
-        bindContext: Context? = null,
-        bindCurrentUser: Boolean = false
-    ): String? {
-        return readConfigSnapshot("wifi", force, allowBind, bindContext, bindCurrentUser, logName = "Wi-Fi")
-    }
-
-    fun readLocationConfigSnapshot(
-        force: Boolean = false,
-        allowBind: Boolean = false,
-        bindContext: Context? = null,
-        bindCurrentUser: Boolean = false
-    ): String? {
-        return readConfigSnapshot("location", force, allowBind, bindContext, bindCurrentUser)
-    }
-
     fun readConfigSnapshot(
         configName: String,
         force: Boolean = false,

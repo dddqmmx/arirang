@@ -1,7 +1,5 @@
 package asia.nana7mi.arirang.hook
 
-import asia.nana7mi.arirang.BuildConfig
-import de.robv.android.xposed.XSharedPreferences
 import java.util.Collections
 
 /**
@@ -14,9 +12,7 @@ class HookConfig(private val prefsName: String) {
     private var lastLoadedTimestamp = -1L
 
     private val pref by lazy {
-        XSharedPreferences(BuildConfig.APPLICATION_ID, prefsName).apply {
-            makeWorldReadable()
-        }
+        HookConfigFile.xSharedPreferences(prefsName)
     }
 
     fun loadIfUpdated(whiteListKey: String, blackListKey: String) {
