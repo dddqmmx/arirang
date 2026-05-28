@@ -18,6 +18,7 @@ object LocationConfigPrefs {
     const val KEY_SPEED = "speed"
     const val KEY_BEARING = "bearing"
     const val KEY_SATELLITES = "satellites"
+    const val KEY_PER_PACKAGE = "per_package"
 
     const val DEFAULT_LATITUDE = 39.019444
     const val DEFAULT_LONGITUDE = 125.738052
@@ -29,6 +30,18 @@ object LocationConfigPrefs {
 
     data class Config(
         val enabled: Boolean = false,
+        val latitude: Double = DEFAULT_LATITUDE,
+        val longitude: Double = DEFAULT_LONGITUDE,
+        val altitude: Double = DEFAULT_ALTITUDE,
+        val accuracy: Float = DEFAULT_ACCURACY,
+        val speed: Float = DEFAULT_SPEED,
+        val bearing: Float = DEFAULT_BEARING,
+        val satellites: Int = DEFAULT_SATELLITES,
+        val perPackage: Map<String, Profile> = emptyMap()
+    )
+
+    data class Profile(
+        val enabled: Boolean = true,
         val latitude: Double = DEFAULT_LATITUDE,
         val longitude: Double = DEFAULT_LONGITUDE,
         val altitude: Double = DEFAULT_ALTITUDE,
@@ -50,7 +63,8 @@ object LocationConfigPrefs {
             accuracy = prefs.getString(KEY_ACCURACY, null)?.toFloatOrNull() ?: DEFAULT_ACCURACY,
             speed = prefs.getString(KEY_SPEED, null)?.toFloatOrNull() ?: DEFAULT_SPEED,
             bearing = prefs.getString(KEY_BEARING, null)?.toFloatOrNull() ?: DEFAULT_BEARING,
-            satellites = prefs.getInt(KEY_SATELLITES, DEFAULT_SATELLITES)
+            satellites = prefs.getInt(KEY_SATELLITES, DEFAULT_SATELLITES),
+            perPackage = parsePackageProfiles(prefs.getString(KEY_PER_PACKAGE, null))
         )
     }
 
@@ -65,6 +79,7 @@ object LocationConfigPrefs {
             putString(KEY_SPEED, config.speed.toString())
             putString(KEY_BEARING, config.bearing.toString())
             putInt(KEY_SATELLITES, config.satellites.coerceAtLeast(0))
+            putString(KEY_PER_PACKAGE, packageProfilesToJson(config.perPackage).toString())
         }
         SubmoduleConfigFiles.write(context)
     }
@@ -85,7 +100,55 @@ object LocationConfigPrefs {
             .put(KEY_SPEED, config.speed.toDouble())
             .put(KEY_BEARING, config.bearing.toDouble())
             .put(KEY_SATELLITES, config.satellites)
+            .put(KEY_PER_PACKAGE, packageProfilesToJson(config.perPackage))
             .toString()
+    }
+
+    private fun parsePackageProfiles(json: String?): Map<String, Profile> {
+        if (json.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            val root = JSONObject(json)
+            buildMap {
+                val keys = root.keys()
+                while (keys.hasNext()) {
+                    val packageName = keys.next()
+                    val profile = root.optJSONObject(packageName) ?: continue
+                    put(packageName, profileFromJson(profile))
+                }
+            }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun profileFromJson(json: JSONObject): Profile {
+        return Profile(
+            enabled = json.optBoolean(KEY_ENABLED, true),
+            latitude = json.optDouble(KEY_LATITUDE, DEFAULT_LATITUDE),
+            longitude = json.optDouble(KEY_LONGITUDE, DEFAULT_LONGITUDE),
+            altitude = json.optDouble(KEY_ALTITUDE, DEFAULT_ALTITUDE),
+            accuracy = json.optDouble(KEY_ACCURACY, DEFAULT_ACCURACY.toDouble()).toFloat(),
+            speed = json.optDouble(KEY_SPEED, DEFAULT_SPEED.toDouble()).toFloat(),
+            bearing = json.optDouble(KEY_BEARING, DEFAULT_BEARING.toDouble()).toFloat(),
+            satellites = json.optInt(KEY_SATELLITES, DEFAULT_SATELLITES).coerceAtLeast(0)
+        )
+    }
+
+    private fun packageProfilesToJson(profiles: Map<String, Profile>): JSONObject {
+        return JSONObject().apply {
+            profiles.toSortedMap().forEach { (packageName, profile) ->
+                put(
+                    packageName,
+                    JSONObject()
+                        .put(KEY_ENABLED, profile.enabled)
+                        .put(KEY_LATITUDE, profile.latitude)
+                        .put(KEY_LONGITUDE, profile.longitude)
+                        .put(KEY_ALTITUDE, profile.altitude)
+                        .put(KEY_ACCURACY, profile.accuracy.toDouble())
+                        .put(KEY_SPEED, profile.speed.toDouble())
+                        .put(KEY_BEARING, profile.bearing.toDouble())
+                        .put(KEY_SATELLITES, profile.satellites.coerceAtLeast(0))
+                )
+            }
+        }
     }
 
     private fun prefs(context: Context): SharedPreferences {
@@ -116,6 +179,7 @@ object LocationConfigPrefs {
             privatePrefs.getString(KEY_ACCURACY, null)?.let { putString(KEY_ACCURACY, it) }
             privatePrefs.getString(KEY_SPEED, null)?.let { putString(KEY_SPEED, it) }
             privatePrefs.getString(KEY_BEARING, null)?.let { putString(KEY_BEARING, it) }
+            privatePrefs.getString(KEY_PER_PACKAGE, null)?.let { putString(KEY_PER_PACKAGE, it) }
             if (privatePrefs.contains(KEY_SATELLITES)) {
                 putInt(KEY_SATELLITES, privatePrefs.getInt(KEY_SATELLITES, DEFAULT_SATELLITES))
             }

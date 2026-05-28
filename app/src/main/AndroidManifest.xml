@@ -56,6 +56,9 @@
             android:name=".ui.activity.LocationConfigActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.activity.LocationAppConfigActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.activity.WifiConfigActivity"
             android:exported="false" />
         <activity

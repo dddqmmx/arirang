@@ -1,26 +1,35 @@
 package asia.nana7mi.arirang.ui.activity
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
@@ -32,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
+import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Profile
 import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
 import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
@@ -120,75 +131,112 @@ class LocationConfigActivity : ComponentActivity() {
             revision++
         }
 
-        fun parsedConfig(): Config? {
-            val latitude = parseDouble(
-                latitudeText,
+        fun parseProfile(
+            latitude: String,
+            longitude: String,
+            altitude: String,
+            accuracy: String,
+            speed: String,
+            bearing: String,
+            satellites: String
+        ): Profile? {
+            val parsedLatitude = parseDouble(
+                latitude,
                 context.getString(R.string.location_field_latitude),
                 -90.0,
                 90.0,
                 context.getString(R.string.location_invalid_number)
             )
-            val longitude = parseDouble(
-                longitudeText,
+            val parsedLongitude = parseDouble(
+                longitude,
                 context.getString(R.string.location_field_longitude),
                 -180.0,
                 180.0,
                 context.getString(R.string.location_invalid_number)
             )
-            val altitude = parseDouble(
-                altitudeText,
+            val parsedAltitude = parseDouble(
+                altitude,
                 context.getString(R.string.location_field_altitude),
                 -500.0,
                 10000.0,
                 context.getString(R.string.location_invalid_number)
             )
-            val accuracy = parseFloat(
-                accuracyText,
+            val parsedAccuracy = parseFloat(
+                accuracy,
                 context.getString(R.string.location_field_accuracy),
                 0.1f,
                 10000f,
                 context.getString(R.string.location_invalid_number)
             )
-            val speed = parseFloat(
-                speedText,
+            val parsedSpeed = parseFloat(
+                speed,
                 context.getString(R.string.location_field_speed),
                 0.0f,
                 400f,
                 context.getString(R.string.location_invalid_number)
             )
-            val bearing = parseFloat(
-                bearingText,
+            val parsedBearing = parseFloat(
+                bearing,
                 context.getString(R.string.location_field_bearing),
                 0.0f,
                 360f,
                 context.getString(R.string.location_invalid_number)
             )
-            val satellites = parseInt(
-                satellitesText,
+            val parsedSatellites = parseInt(
+                satellites,
                 context.getString(R.string.location_field_satellites),
                 0,
                 64,
                 context.getString(R.string.location_invalid_number)
             )
-            val firstError = listOf(latitude, longitude, altitude, accuracy, speed, bearing, satellites)
-                .firstOrNull { it.error != null }
-                ?.error
+            val firstError = listOf(
+                parsedLatitude,
+                parsedLongitude,
+                parsedAltitude,
+                parsedAccuracy,
+                parsedSpeed,
+                parsedBearing,
+                parsedSatellites
+            ).firstOrNull { it.error != null }?.error
 
             if (firstError != null) {
                 validationError = firstError
                 return null
             }
 
+            return Profile(
+                latitude = parsedLatitude.doubleValue ?: LocationConfigPrefs.DEFAULT_LATITUDE,
+                longitude = parsedLongitude.doubleValue ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
+                altitude = parsedAltitude.doubleValue ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
+                accuracy = parsedAccuracy.floatValue ?: LocationConfigPrefs.DEFAULT_ACCURACY,
+                speed = parsedSpeed.floatValue ?: LocationConfigPrefs.DEFAULT_SPEED,
+                bearing = parsedBearing.floatValue ?: LocationConfigPrefs.DEFAULT_BEARING,
+                satellites = parsedSatellites.intValue ?: LocationConfigPrefs.DEFAULT_SATELLITES
+            )
+        }
+
+        fun parsedConfig(): Config? {
+            val profile = parseProfile(
+                latitudeText,
+                longitudeText,
+                altitudeText,
+                accuracyText,
+                speedText,
+                bearingText,
+                satellitesText
+            ) ?: return null
+
             validationError = null
             return Config(
                 enabled = config.enabled,
-                latitude = latitude.doubleValue ?: LocationConfigPrefs.DEFAULT_LATITUDE,
-                longitude = longitude.doubleValue ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
-                altitude = altitude.doubleValue ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
-                accuracy = accuracy.floatValue ?: LocationConfigPrefs.DEFAULT_ACCURACY,
-                speed = speed.floatValue ?: LocationConfigPrefs.DEFAULT_SPEED,
-                bearing = bearing.floatValue ?: LocationConfigPrefs.DEFAULT_BEARING,
-                satellites = satellites.intValue ?: LocationConfigPrefs.DEFAULT_SATELLITES
+                latitude = profile.latitude,
+                longitude = profile.longitude,
+                altitude = profile.altitude,
+                accuracy = profile.accuracy,
+                speed = profile.speed,
+                bearing = profile.bearing,
+                satellites = profile.satellites,
+                perPackage = LocationConfigPrefs.loadConfig(context).perPackage
             )
         }
 
@@ -351,6 +399,44 @@ class LocationConfigActivity : ComponentActivity() {
                     }
                 }
 
+                item {
+                    ElevatedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                context.startActivity(Intent(context, LocationAppConfigActivity::class.java))
+                            },
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.location_app_config_entry),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.location_app_config_entry_summary),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                }
+
                 validationError?.let { error ->
                     item {
                         Text(
@@ -409,6 +495,7 @@ class LocationConfigActivity : ComponentActivity() {
         value: String,
         revision: Long,
         keyboardType: KeyboardType,
+        modifier: Modifier = Modifier.fillMaxWidth(),
         onValueChange: (String) -> Unit
     ) {
         var localValue by remember(revision, label) { mutableStateOf(value) }
@@ -421,7 +508,7 @@ class LocationConfigActivity : ComponentActivity() {
             label = { Text(label) },
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = modifier
         )
     }
 

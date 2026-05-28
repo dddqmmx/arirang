@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.hook
 
 import android.location.Location
 import android.location.LocationManager
+import android.os.Binder
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -25,9 +26,12 @@ class FuckLocation : BaseHookModule(
 ) {
 
     private companion object {
-        private const val DEBUG_HARDCODED_CONFIG = false
+        private const val DEBUG_HARDCODED_CONFIG = true
+        private const val DEBUG_PACKAGE_NAME = "asia.nana7mi.arirang.selfcheck"
         private const val DEBUG_LATITUDE = 39.019444
         private const val DEBUG_LONGITUDE = 125.738052
+        private const val DEBUG_PACKAGE_LATITUDE = 35.681236
+        private const val DEBUG_PACKAGE_LONGITUDE = 139.767125
         private const val MOCK_VERTICAL_ACCURACY = 2.0f
         private const val MOCK_SPEED_ACCURACY = 0.1f
         private const val MOCK_BEARING_ACCURACY = 0.5f
@@ -42,8 +46,16 @@ class FuckLocation : BaseHookModule(
 
         private val debugConfig = HookLocationConfig(
             enabled = true,
-            latitude = DEBUG_LATITUDE,
-            longitude = DEBUG_LONGITUDE
+            defaultProfile = LocationProfile(
+                latitude = DEBUG_LATITUDE,
+                longitude = DEBUG_LONGITUDE
+            ),
+            perPackage = mapOf(
+                DEBUG_PACKAGE_NAME to LocationProfile(
+                    latitude = DEBUG_PACKAGE_LATITUDE,
+                    longitude = DEBUG_PACKAGE_LONGITUDE
+                )
+            )
         )
     }
 
@@ -51,6 +63,12 @@ class FuckLocation : BaseHookModule(
 
     private data class HookLocationConfig(
         val enabled: Boolean = false,
+        val defaultProfile: LocationProfile = LocationProfile(),
+        val perPackage: Map<String, LocationProfile> = emptyMap()
+    )
+
+    private data class LocationProfile(
+        val enabled: Boolean = true,
         val latitude: Double = LocationConfigPrefs.DEFAULT_LATITUDE,
         val longitude: Double = LocationConfigPrefs.DEFAULT_LONGITUDE,
         val altitude: Double = LocationConfigPrefs.DEFAULT_ALTITUDE,
@@ -116,14 +134,8 @@ class FuckLocation : BaseHookModule(
             val json = JSONObject(snapshot)
             HookLocationConfig(
                 enabled = json.optBoolean(LocationConfigPrefs.KEY_ENABLED, false),
-                latitude = json.optDouble(LocationConfigPrefs.KEY_LATITUDE, LocationConfigPrefs.DEFAULT_LATITUDE),
-                longitude = json.optDouble(LocationConfigPrefs.KEY_LONGITUDE, LocationConfigPrefs.DEFAULT_LONGITUDE),
-                altitude = json.optDouble(LocationConfigPrefs.KEY_ALTITUDE, LocationConfigPrefs.DEFAULT_ALTITUDE),
-                accuracy = json.optDouble(LocationConfigPrefs.KEY_ACCURACY, LocationConfigPrefs.DEFAULT_ACCURACY.toDouble()).toFloat(),
-                speed = json.optDouble(LocationConfigPrefs.KEY_SPEED, LocationConfigPrefs.DEFAULT_SPEED.toDouble()).toFloat(),
-                bearing = json.optDouble(LocationConfigPrefs.KEY_BEARING, LocationConfigPrefs.DEFAULT_BEARING.toDouble()).toFloat(),
-                satellites = json.optInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
-                    .coerceIn(0, 64)
+                defaultProfile = profileFromJson(json),
+                perPackage = parsePackageProfiles(json)
             )
         }.onFailure {
             HookLog.w(HookLog.Module.LOCATION, "failed to parse location config snapshot: ${it.message}")
@@ -133,63 +145,125 @@ class FuckLocation : BaseHookModule(
     private fun readConfigFromPrefs(prefs: de.robv.android.xposed.XSharedPreferences): HookLocationConfig {
         return HookLocationConfig(
             enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
-            latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
-                ?: LocationConfigPrefs.DEFAULT_LATITUDE,
-            longitude = prefs.getString(LocationConfigPrefs.KEY_LONGITUDE, null)?.toDoubleOrNull()
-                ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
-            altitude = prefs.getString(LocationConfigPrefs.KEY_ALTITUDE, null)?.toDoubleOrNull()
-                ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
-            accuracy = prefs.getString(LocationConfigPrefs.KEY_ACCURACY, null)?.toFloatOrNull()
-                ?: LocationConfigPrefs.DEFAULT_ACCURACY,
-            speed = prefs.getString(LocationConfigPrefs.KEY_SPEED, null)?.toFloatOrNull()
-                ?: LocationConfigPrefs.DEFAULT_SPEED,
-            bearing = prefs.getString(LocationConfigPrefs.KEY_BEARING, null)?.toFloatOrNull()
-                ?: LocationConfigPrefs.DEFAULT_BEARING,
-            satellites = prefs.getInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
+            defaultProfile = LocationProfile(
+                latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_LATITUDE,
+                longitude = prefs.getString(LocationConfigPrefs.KEY_LONGITUDE, null)?.toDoubleOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
+                altitude = prefs.getString(LocationConfigPrefs.KEY_ALTITUDE, null)?.toDoubleOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
+                accuracy = prefs.getString(LocationConfigPrefs.KEY_ACCURACY, null)?.toFloatOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_ACCURACY,
+                speed = prefs.getString(LocationConfigPrefs.KEY_SPEED, null)?.toFloatOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_SPEED,
+                bearing = prefs.getString(LocationConfigPrefs.KEY_BEARING, null)?.toFloatOrNull()
+                    ?: LocationConfigPrefs.DEFAULT_BEARING,
+                satellites = prefs.getInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
+                    .coerceIn(0, 64)
+            ),
+            perPackage = prefs.getString(LocationConfigPrefs.KEY_PER_PACKAGE, null)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { parsePackageProfiles(JSONObject(it)) }
+                .orEmpty()
+        )
+    }
+
+    private fun profileFromJson(json: JSONObject): LocationProfile {
+        return LocationProfile(
+            enabled = json.optBoolean(LocationConfigPrefs.KEY_ENABLED, true),
+            latitude = json.optDouble(LocationConfigPrefs.KEY_LATITUDE, LocationConfigPrefs.DEFAULT_LATITUDE),
+            longitude = json.optDouble(LocationConfigPrefs.KEY_LONGITUDE, LocationConfigPrefs.DEFAULT_LONGITUDE),
+            altitude = json.optDouble(LocationConfigPrefs.KEY_ALTITUDE, LocationConfigPrefs.DEFAULT_ALTITUDE),
+            accuracy = json.optDouble(LocationConfigPrefs.KEY_ACCURACY, LocationConfigPrefs.DEFAULT_ACCURACY.toDouble()).toFloat(),
+            speed = json.optDouble(LocationConfigPrefs.KEY_SPEED, LocationConfigPrefs.DEFAULT_SPEED.toDouble()).toFloat(),
+            bearing = json.optDouble(LocationConfigPrefs.KEY_BEARING, LocationConfigPrefs.DEFAULT_BEARING.toDouble()).toFloat(),
+            satellites = json.optInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
                 .coerceIn(0, 64)
         )
+    }
+
+    private fun parsePackageProfiles(json: JSONObject): Map<String, LocationProfile> {
+        val root = json.optJSONObject("per_package")
+            ?: json.optJSONObject("package_profiles")
+            ?: return emptyMap()
+
+        return buildMap {
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val packageName = keys.next()
+                val profileJson = root.optJSONObject(packageName) ?: continue
+                put(packageName, profileFromJson(profileJson))
+            }
+        }
+    }
+
+    private fun defaultProfile(): LocationProfile? {
+        val config = currentConfig()
+        if (!config.enabled || !config.defaultProfile.enabled) return null
+        return config.defaultProfile
+    }
+
+    private fun globalRewriteProfile(): LocationProfile? {
+        val config = currentConfig()
+        if (!config.enabled || config.perPackage.isNotEmpty() || !config.defaultProfile.enabled) return null
+        return config.defaultProfile
+    }
+
+    private fun profileForPackage(packageName: String?): LocationProfile? {
+        val config = currentConfig()
+        if (!config.enabled) return null
+        val profile = packageName?.let { config.perPackage[it] } ?: config.defaultProfile
+        return profile.takeIf { it.enabled }
+    }
+
+    private fun profileForArgs(args: Array<Any?>): LocationProfile? {
+        return profileForPackage(callerFromArgs(args) ?: packageNameForUid(Binder.getCallingUid()))
+    }
+
+    private fun profileForReceiver(receiver: Any?): LocationProfile? {
+        return profileForPackage(packageNameFromObject(receiver))
     }
 
     private fun hookLocationAccessors() {
         if (!hookedClasses.add(Location::class.java)) return
 
         XposedBridge.hookAllMethods(Location::class.java, "getLatitude", beforeHookedMethod {
-            currentConfig().takeIf { it.enabled }?.let { result = it.latitude }
+            defaultProfile()?.let { result = it.latitude }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getLongitude", beforeHookedMethod {
-            currentConfig().takeIf { it.enabled }?.let { result = it.longitude }
+            defaultProfile()?.let { result = it.longitude }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getAltitude", beforeHookedMethod {
-            currentConfig().takeIf { it.enabled }?.let { result = it.altitude }
+            defaultProfile()?.let { result = it.altitude }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getAccuracy", beforeHookedMethod {
-            currentConfig().takeIf { it.enabled }?.let { result = it.accuracy }
+            defaultProfile()?.let { result = it.accuracy }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getSpeed", beforeHookedMethod {
-            currentConfig().takeIf { it.enabled }?.let { result = it.speed }
+            defaultProfile()?.let { result = it.speed }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getBearing", beforeHookedMethod {
-            currentConfig().takeIf { it.enabled }?.let { result = it.bearing }
+            defaultProfile()?.let { result = it.bearing }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getProvider", beforeHookedMethod {
-            if (currentConfig().enabled) result = LocationManager.GPS_PROVIDER
+            if (defaultProfile() != null) result = LocationManager.GPS_PROVIDER
         })
         XposedBridge.hookAllMethods(Location::class.java, "getTime", beforeHookedMethod {
-            if (currentConfig().enabled) result = System.currentTimeMillis()
+            if (defaultProfile() != null) result = System.currentTimeMillis()
         })
         XposedBridge.hookAllMethods(Location::class.java, "getElapsedRealtimeNanos", beforeHookedMethod {
-            if (currentConfig().enabled) result = SystemClock.elapsedRealtimeNanos()
+            if (defaultProfile() != null) result = SystemClock.elapsedRealtimeNanos()
         })
 
         runCatching {
             XposedBridge.hookAllMethods(Location::class.java, "isFromMockProvider", beforeHookedMethod {
-                if (currentConfig().enabled) result = false
+                if (defaultProfile() != null) result = false
             })
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching {
                 XposedBridge.hookAllMethods(Location::class.java, "isMock", beforeHookedMethod {
-                    if (currentConfig().enabled) result = false
+                    if (defaultProfile() != null) result = false
                 })
             }
         }
@@ -203,18 +277,19 @@ class FuckLocation : BaseHookModule(
             classLoader
         ) ?: return
         if (!hookedClasses.add(lmsClass)) return
+        hookLocationReceiverDelivery(lmsClass)
 
         XposedBridge.hookAllMethods(lmsClass, "getLastLocation", afterHookedMethod {
-            if (!currentConfig().enabled) return@afterHookedMethod
+            val profile = profileForArgs(args) ?: return@afterHookedMethod
             val provider = providerFromArgs(args)
-            result = fakeLocation(provider)
+            result = fakeLocation(profile, provider)
             HookLog.d(HookLog.Module.LOCATION, "spoofed getLastLocation provider=$provider caller=${callerFromArgs(args)}")
         })
 
         XposedBridge.hookAllMethods(lmsClass, "getCurrentLocation", beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
+            val profile = profileForArgs(args) ?: return@beforeHookedMethod
             val callback = args.firstOrNull { it?.javaClass?.hasLocationCallbackMethod() == true } ?: return@beforeHookedMethod
-            val location = fakeLocation(providerFromArgs(args))
+            val location = fakeLocation(profile, providerFromArgs(args))
             if (callback.dispatchLocation(location)) {
                 result = null
                 HookLog.d(
@@ -226,13 +301,39 @@ class FuckLocation : BaseHookModule(
 
         listOf("requestLocationUpdates", "requestLocationUpdatesWithPackageName").forEach { methodName ->
             XposedBridge.hookAllMethods(lmsClass, methodName, beforeHookedMethod {
-                if (!currentConfig().enabled) return@beforeHookedMethod
+                val profile = profileForArgs(args) ?: return@beforeHookedMethod
                 args.forEachIndexed { index, arg ->
                     if (arg is Location) {
-                        args[index] = arg.spoofed()
+                        args[index] = arg.spoofed(profile)
                     }
                 }
             })
+        }
+    }
+
+    private fun hookLocationReceiverDelivery(lmsClass: Class<*>) {
+        val receiverClasses = lmsClass.declaredClasses
+            .filter { it.simpleName == "Receiver" || it.name.endsWith("\$Receiver") }
+
+        receiverClasses.forEach { receiverClass ->
+            if (!hookedClasses.add(receiverClass)) return@forEach
+            receiverClass.declaredMethods
+                .filter { method ->
+                    method.name == "callLocationChangedLocked" &&
+                        method.parameterTypes.any { it == Location::class.java || it.name.endsWith(".LocationResult") }
+                }
+                .forEach { method ->
+                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                        val profile = profileForReceiver(thisObject) ?: return@beforeHookedMethod
+                        args.forEachIndexed { index, arg ->
+                            args[index] = rewriteLocationContainer(arg, profile)
+                        }
+                        HookLog.d(
+                            HookLog.Module.LOCATION,
+                            "rewrote receiver delivery for ${packageNameFromObject(thisObject)} via ${method.name}"
+                        )
+                    })
+                }
         }
     }
 
@@ -244,14 +345,14 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(providerManagerClass)) return
 
         XposedBridge.hookAllMethods(providerManagerClass, "onReportLocation", beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
+            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
             val report = args.firstOrNull() ?: return@beforeHookedMethod
             if (report is Location) {
-                args[0] = report.spoofed()
+                args[0] = report.spoofed(profile)
                 return@beforeHookedMethod
             }
 
-            if (rewriteLocationResult(report)) {
+            if (rewriteLocationResult(report, profile)) {
                 HookLog.d(HookLog.Module.LOCATION, "rewrote provider LocationResult ${report.javaClass.name}")
             }
         })
@@ -265,16 +366,16 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(fusedProviderClass)) return
 
         XposedBridge.hookAllMethods(fusedProviderClass, "chooseBestLocation", afterHookedMethod {
-            if (!currentConfig().enabled) return@afterHookedMethod
+            val profile = globalRewriteProfile() ?: return@afterHookedMethod
             if (result is Location) {
-                result = (result as Location).spoofed()
+                result = (result as Location).spoofed(profile)
             }
         })
 
         XposedBridge.hookAllMethods(fusedProviderClass, "reportBestLocationLocked", beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
+            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
             args.forEachIndexed { index, arg ->
-                args[index] = rewriteLocationContainer(arg)
+                args[index] = rewriteLocationContainer(arg, profile)
             }
         })
 
@@ -286,9 +387,9 @@ class FuckLocation : BaseHookModule(
             ?: return
         if (hookedClasses.add(locationManagerClass)) {
             XposedBridge.hookAllMethods(locationManagerClass, "getLastKnownLocation", afterHookedMethod {
-                if (!currentConfig().enabled) return@afterHookedMethod
+                val profile = globalRewriteProfile() ?: return@afterHookedMethod
                 if (result is Location) {
-                    result = (result as Location).spoofed()
+                    result = (result as Location).spoofed(profile)
                 }
             })
         }
@@ -301,9 +402,9 @@ class FuckLocation : BaseHookModule(
             val transportClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
             if (!hookedClasses.add(transportClass)) return@forEach
             XposedBridge.hookAllMethods(transportClass, methodName, beforeHookedMethod {
-                if (!currentConfig().enabled) return@beforeHookedMethod
+                val profile = globalRewriteProfile() ?: return@beforeHookedMethod
                 args.forEachIndexed { index, arg ->
-                    args[index] = rewriteLocationContainer(arg)
+                    args[index] = rewriteLocationContainer(arg, profile)
                 }
             })
         }
@@ -345,21 +446,21 @@ class FuckLocation : BaseHookModule(
 
         listOf("asList", "getLocations").forEach { methodName ->
             XposedBridge.hookAllMethods(resultClass, methodName, afterHookedMethod {
-                if (!currentConfig().enabled) return@afterHookedMethod
-                result = rewriteLocationContainer(result)
+                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                result = rewriteLocationContainer(result, profile)
             })
         }
 
         XposedBridge.hookAllMethods(resultClass, "getLastLocation", afterHookedMethod {
-            if (!currentConfig().enabled) return@afterHookedMethod
+            val profile = globalRewriteProfile() ?: return@afterHookedMethod
             if (result is Location) {
-                result = (result as Location).spoofed()
+                result = (result as Location).spoofed(profile)
             }
         })
 
         XposedBridge.hookAllMethods(resultClass, "writeToParcel", beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
-            rewriteLocationResult(thisObject)
+            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+            rewriteLocationResult(thisObject, profile)
         })
 
         HookLog.i(HookLog.Module.LOCATION, "hooked LocationResult ${resultClass.name}")
@@ -371,20 +472,20 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(taskClass)) return
 
         XposedBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
-            if (!currentConfig().enabled) return@afterHookedMethod
-            result = rewriteLocationContainer(result)
+            val profile = globalRewriteProfile() ?: return@afterHookedMethod
+            result = rewriteLocationContainer(result, profile)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
             XposedBridge.hookAllMethods(taskClass, methodName, hookedMethod(
                 before = {
-                    if (!currentConfig().enabled) return@hookedMethod
+                    if (globalRewriteProfile() == null) return@hookedMethod
                     args.forEach { arg ->
                         hookGoogleTaskListener(arg)
                     }
                 },
                 after = {
-                    if (!currentConfig().enabled) return@hookedMethod
+                    if (globalRewriteProfile() == null) return@hookedMethod
                     hookConcreteGoogleTask(thisObject)
                     hookConcreteGoogleTask(result)
                 }
@@ -401,13 +502,13 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(taskClass)) return
 
         XposedBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
-            if (!currentConfig().enabled) return@afterHookedMethod
-            result = rewriteLocationContainer(result)
+            val profile = globalRewriteProfile() ?: return@afterHookedMethod
+            result = rewriteLocationContainer(result, profile)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
             XposedBridge.hookAllMethods(taskClass, methodName, beforeHookedMethod {
-                if (!currentConfig().enabled) return@beforeHookedMethod
+                if (globalRewriteProfile() == null) return@beforeHookedMethod
                 args.forEach { arg ->
                     hookGoogleTaskListener(arg)
                 }
@@ -428,14 +529,14 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(listenerClass)) return
 
         XposedBridge.hookAllMethods(listenerClass, "onSuccess", beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
+            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
             args.forEachIndexed { index, arg ->
-                args[index] = rewriteLocationContainer(arg)
+                args[index] = rewriteLocationContainer(arg, profile)
             }
         })
 
         XposedBridge.hookAllMethods(listenerClass, "onComplete", beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
+            if (globalRewriteProfile() == null) return@beforeHookedMethod
             args.forEach { arg ->
                 hookConcreteGoogleTask(arg)
             }
@@ -452,18 +553,18 @@ class FuckLocation : BaseHookModule(
 
                 listOf("reportLocation", "reportLocationBatch").forEach { methodName ->
                     XposedBridge.hookAllMethods(targetClass, methodName, beforeHookedMethod {
-                        if (!currentConfig().enabled) return@beforeHookedMethod
+                        val profile = globalRewriteProfile() ?: return@beforeHookedMethod
                         args.forEachIndexed { index, arg ->
-                            args[index] = rewriteLocationContainer(arg)
+                            args[index] = rewriteLocationContainer(arg, profile)
                         }
                     })
                 }
 
                 XposedBridge.hookAllMethods(targetClass, "reportNmea", beforeHookedMethod {
-                    if (!currentConfig().enabled) return@beforeHookedMethod
+                    val profile = globalRewriteProfile() ?: return@beforeHookedMethod
                     args.forEachIndexed { index, arg ->
                         if (arg is String) {
-                            args[index] = spoofNmea(arg)
+                            args[index] = spoofNmea(arg, profile)
                         }
                     }
                 })
@@ -474,7 +575,7 @@ class FuckLocation : BaseHookModule(
                     "reportNavigationMessage"
                 ).forEach { methodName ->
                     XposedBridge.hookAllMethods(targetClass, methodName, beforeHookedMethod {
-                        if (!currentConfig().enabled) return@beforeHookedMethod
+                        if (globalRewriteProfile() == null) return@beforeHookedMethod
                         result = null
                     })
                 }
@@ -483,55 +584,53 @@ class FuckLocation : BaseHookModule(
             }
     }
 
-    private fun rewriteLocationResult(locationResult: Any): Boolean {
+    private fun rewriteLocationResult(locationResult: Any, profile: LocationProfile): Boolean {
         val locationsField = XposedHelpers.findFieldIfExists(locationResult.javaClass, "mLocations") ?: return false
         locationsField.isAccessible = true
         val original = locationsField.get(locationResult)
-        val rewritten = rewriteLocationContainer(original)
+        val rewritten = rewriteLocationContainer(original, profile)
         if (rewritten === original) return false
         locationsField.set(locationResult, rewritten)
         return true
     }
 
-    private fun rewriteLocationContainer(value: Any?): Any? {
-        if (!currentConfig().enabled) return value
+    private fun rewriteLocationContainer(value: Any?, profile: LocationProfile): Any? {
         return when (value) {
-            is Location -> value.spoofed()
+            is Location -> value.spoofed(profile)
             is Array<*> -> {
                 value.forEachIndexed { index, item ->
                     if (item is Location) {
                         @Suppress("UNCHECKED_CAST")
-                        (value as Array<Any?>)[index] = item.spoofed()
+                        (value as Array<Any?>)[index] = item.spoofed(profile)
                     }
                 }
                 value
             }
-            is List<*> -> value.mapNotNull { rewriteLocationContainer(it) as? Location }
+            is List<*> -> value.map { rewriteLocationContainer(it, profile) }
             else -> value
         }
     }
 
-    private fun Location.spoofed(): Location {
-        if (!currentConfig().enabled) return this
-        return fakeLocation(provider ?: LocationManager.GPS_PROVIDER, this)
+    private fun Location.spoofed(profile: LocationProfile): Location {
+        return fakeLocation(profile, provider ?: LocationManager.GPS_PROVIDER, this)
     }
 
     private fun fakeLocation(
+        profile: LocationProfile,
         provider: String? = LocationManager.GPS_PROVIDER,
         source: Location? = null
     ): Location {
         val now = System.currentTimeMillis()
         val elapsed = SystemClock.elapsedRealtimeNanos()
-        val config = currentConfig()
         val location = source?.let(::Location) ?: Location(provider ?: LocationManager.GPS_PROVIDER)
 
         location.provider = provider ?: LocationManager.GPS_PROVIDER
-        location.latitude = config.latitude
-        location.longitude = config.longitude
-        location.altitude = config.altitude
-        location.speed = config.speed
-        location.bearing = config.bearing
-        location.accuracy = config.accuracy
+        location.latitude = profile.latitude
+        location.longitude = profile.longitude
+        location.altitude = profile.altitude
+        location.speed = profile.speed
+        location.bearing = profile.bearing
+        location.accuracy = profile.accuracy
         location.time = now
         location.elapsedRealtimeNanos = elapsed
 
@@ -548,9 +647,10 @@ class FuckLocation : BaseHookModule(
         val extras = Bundle(location.extras ?: Bundle())
         listOf("mockLocation", "is_mock", "portal.enable").forEach(extras::remove)
         extras.putBoolean("mockLocation", false)
-        extras.putInt("satellites", config.satellites)
-        extras.putInt("visible_satellites", (config.satellites + 4).coerceAtLeast(config.satellites))
+        extras.putInt("satellites", profile.satellites)
+        extras.putInt("visible_satellites", (profile.satellites + 4).coerceAtLeast(profile.satellites))
         extras.putFloat("hdop", MOCK_HDOP)
+        extras.putDouble("altitude", profile.altitude)
         location.extras = extras
 
         return location
@@ -563,8 +663,135 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun callerFromArgs(args: Array<Any?>): String? {
-        return args.filterIsInstance<String>()
-            .lastOrNull { it.contains('.') && it != LocationManager.GPS_PROVIDER && it != LocationManager.NETWORK_PROVIDER }
+        return args.asSequence()
+            .mapNotNull { arg ->
+                when (arg) {
+                    is String -> arg.takeIf { it.isLikelyPackageName() }
+                    else -> packageNameFromObject(arg)
+                }
+            }
+            .firstOrNull()
+            ?: args.filterIsInstance<String>()
+                .lastOrNull { it.isLikelyPackageName() }
+    }
+
+    private fun String.isLikelyPackageName(): Boolean {
+        return contains('.') &&
+            this != LocationManager.GPS_PROVIDER &&
+            this != LocationManager.NETWORK_PROVIDER &&
+            this != LocationManager.FUSED_PROVIDER
+    }
+
+    private fun packageNameForUid(uid: Int): String? {
+        if (uid <= 0) return null
+        return runCatching {
+            HookNotifyClient.getSystemContext()
+                ?.packageManager
+                ?.getPackagesForUid(uid)
+                ?.firstOrNull()
+        }.getOrNull()
+    }
+
+    private fun packageNameFromObject(value: Any?): String? {
+        value ?: return null
+        if (value is String) return value.takeIf { it.isLikelyPackageName() }
+
+        directPackageNameFromObject(value)?.let { return it }
+        packageNameFromWorkSource(value)?.let { return it }
+
+        listOf(
+            "mCallerIdentity",
+            "mIdentity",
+            "mCaller",
+            "mAttributionSource",
+            "attributionSource",
+            "mWorkSource",
+            "workSource"
+        ).forEach { fieldName ->
+            val nested = getFieldValue(value, fieldName)
+            directPackageNameFromObject(nested)?.let { return it }
+            packageNameFromWorkSource(nested)?.let { return it }
+        }
+
+        listOf("getCallerIdentity", "getIdentity", "getAttributionSource", "getWorkSource").forEach { methodName ->
+            val nested = callNoArg(value, methodName)
+            directPackageNameFromObject(nested)?.let { return it }
+            packageNameFromWorkSource(nested)?.let { return it }
+        }
+
+        return null
+    }
+
+    private fun directPackageNameFromObject(value: Any?): String? {
+        value ?: return null
+        if (value is String) return value.takeIf { it.isLikelyPackageName() }
+
+        listOf("mPackageName", "packageName", "mPackage", "package").forEach { fieldName ->
+            (getFieldValue(value, fieldName) as? String)
+                ?.takeIf { it.isLikelyPackageName() }
+                ?.let { return it }
+        }
+
+        listOf("getPackageName", "getPackage").forEach { methodName ->
+            (callNoArg(value, methodName) as? String)
+                ?.takeIf { it.isLikelyPackageName() }
+                ?.let { return it }
+        }
+
+        return null
+    }
+
+    private fun packageNameFromWorkSource(value: Any?): String? {
+        val workSource = value?.takeIf { it.javaClass.name == "android.os.WorkSource" } ?: return null
+        return runCatching {
+            val size = XposedHelpers.callMethod(workSource, "size") as? Int ?: return@runCatching null
+            repeat(size) { index ->
+                (XposedHelpers.callMethod(workSource, "getName", index) as? String)
+                    ?.takeIf { it.isLikelyPackageName() && it != "com.google.android.gms" }
+                    ?.let { return it }
+            }
+            repeat(size) { index ->
+                val uid = XposedHelpers.callMethod(workSource, "getUid", index) as? Int ?: return@repeat
+                packageNameForUid(uid)
+                    ?.takeIf { it != "com.google.android.gms" }
+                    ?.let { return it }
+            }
+            null
+        }.getOrNull()
+    }
+
+    private fun getFieldValue(owner: Any?, fieldName: String): Any? {
+        owner ?: return null
+        var current: Class<*>? = owner.javaClass
+        while (current != null && current != Any::class.java) {
+            val field = runCatching { current.getDeclaredField(fieldName) }.getOrNull()
+            if (field != null) {
+                return runCatching {
+                    field.isAccessible = true
+                    field.get(owner)
+                }.getOrNull()
+            }
+            current = current.superclass
+        }
+        return null
+    }
+
+    private fun callNoArg(owner: Any?, methodName: String): Any? {
+        owner ?: return null
+        var current: Class<*>? = owner.javaClass
+        while (current != null && current != Any::class.java) {
+            val method = current.declaredMethods.firstOrNull {
+                it.name == methodName && it.parameterTypes.isEmpty()
+            }
+            if (method != null) {
+                return runCatching {
+                    method.isAccessible = true
+                    method.invoke(owner)
+                }.getOrNull()
+            }
+            current = current.superclass
+        }
+        return null
     }
 
     private fun Class<*>.hasLocationCallbackMethod(): Boolean {
@@ -606,17 +833,15 @@ class FuckLocation : BaseHookModule(
         return null
     }
 
-    private fun spoofNmea(nmea: String): String {
-        val config = currentConfig()
-        if (!config.enabled) return nmea
+    private fun spoofNmea(nmea: String, profile: LocationProfile): String {
         val header = nmea.substringBefore(',').uppercase()
         if (!header.endsWith("GGA") && !header.endsWith("RMC")) return nmea
 
         val originalParts = nmea.substringBefore('*').split(',').toMutableList()
         if (originalParts.size < 7) return nmea
 
-        val lat = latitudeToNmea(config.latitude)
-        val lon = longitudeToNmea(config.longitude)
+        val lat = latitudeToNmea(profile.latitude)
+        val lon = longitudeToNmea(profile.longitude)
         originalParts[2] = lat.first
         originalParts[3] = lat.second
         originalParts[4] = lon.first
@@ -624,9 +849,9 @@ class FuckLocation : BaseHookModule(
 
         if (header.endsWith("GGA") && originalParts.size > 9) {
             originalParts[6] = "1"
-            originalParts[7] = config.satellites.toString().padStart(2, '0')
+            originalParts[7] = profile.satellites.toString().padStart(2, '0')
             originalParts[8] = "%.1f".format(java.util.Locale.US, MOCK_HDOP)
-            originalParts[9] = "%.1f".format(java.util.Locale.US, config.altitude)
+            originalParts[9] = "%.1f".format(java.util.Locale.US, profile.altitude)
         }
 
         if (header.endsWith("RMC") && originalParts.size > 8) {
