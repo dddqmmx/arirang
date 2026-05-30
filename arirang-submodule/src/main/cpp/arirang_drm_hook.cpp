@@ -38,7 +38,9 @@ extern "C" ARIRANG_HIDDEN void *g_trampoline = nullptr;
 extern "C" ARIRANG_HIDDEN void arirang_drm_aidl_post(void *this_ptr,
                                                      const void *name_ptr,
                                                      void *vec_ptr);
-extern "C" ARIRANG_HIDDEN void arirang_drm_aidl_entry();
+ARIRANG_HIDDEN void arirang_drm_hidl_entry(void *, const void *, void *);
+struct AIDL_ScopedAStatus;
+AIDL_ScopedAStatus arirang_drm_aidl_entry(void* this_ptr, void* name_ptr, void* vec_ptr);
 
 extern "C" ARIRANG_HIDDEN void *g_hidl_trampoline = nullptr;
 
@@ -212,14 +214,18 @@ void overwrite_vector_bytes(void *vec_ptr, const std::vector<uint8_t> &bytes) {
     raw[2] = new_begin + bytes.size();
 }
 
-bool symbol_is_aidl_target(const std::string &mangled) {
-    return mangled.find("aidl") != std::string::npos ||
-           mangled.find("AIDL") != std::string::npos;
+bool symbol_is_hidl_target(const std::string &mangled) {
+    // HIDL signature: getPropertyByteArray(..., hidl_string, std::function<... hidl_vec ...>)
+    return mangled.find("11hidl_string") != std::string::npos &&
+           mangled.find("8function") != std::string::npos &&
+           mangled.find("8hidl_vec") != std::string::npos;
 }
 
-bool symbol_is_hidl_target(const std::string &mangled) {
-    return mangled.find("hidl") != std::string::npos ||
-           mangled.find("widevine11WVDrmPlugin") != std::string::npos; // e.g. wvdrm::hardware::drm::V1_4::widevine::WVDrmPlugin
+bool symbol_is_aidl_target(const std::string &mangled) {
+    // AIDL signature: getPropertyByteArray(..., std::string, std::vector<uint8_t>*)
+    return mangled.find("basic_string") != std::string::npos &&
+           mangled.find("vector") != std::string::npos &&
+           !symbol_is_hidl_target(mangled);
 }
 
 bool install_hook_in_library(const char *library_path);
@@ -340,42 +346,24 @@ extern "C" void arirang_drm_aidl_post(void * /*this_ptr*/, const void *name_ptr,
     arirang::log_info("arirang_drm_hook: spoofed deviceUniqueId byte[]");
 }
 
-// ARM64 entry thunk. AIDL impl convention on entry:
-//   x8  = pointer to caller-allocated ScopedAStatus return slot
-//   x0  = this
-//   x1  = const std::string& propertyName
-//   x2  = std::vector<uint8_t>* _aidl_return
-//   x30 = caller (HAL daemon) return address
-//
-// We:
-//   1. Save x29/x30 and the AIDL args we want to consult later.
-//   2. Call the trampoline (which runs the saved prologue then jumps to
-//      target+16, eventually executing the original RET). The RET uses x30,
-//      which we set via BLR, so control returns here.
-//   3. Reload args and call arirang_drm_aidl_post for post-processing.
-//   4. Restore x30 and return to the HAL daemon caller.
-asm(
-    ".globl arirang_drm_aidl_entry\n"
-    ".hidden arirang_drm_aidl_entry\n"
-    ".type arirang_drm_aidl_entry, %function\n"
-    "arirang_drm_aidl_entry:\n"
-    "    stp x29, x30, [sp, #-64]!\n"
-    "    mov x29, sp\n"
-    "    stp x0, x1, [sp, #16]\n"          // save this, name
-    "    stp x2, x8, [sp, #32]\n"          // save vec, result
-    "\n"
-    "    adrp x16, g_trampoline\n"
-    "    add x16, x16, :lo12:g_trampoline\n"
-    "    ldr x16, [x16]\n"
-    "    blr x16\n"                         // x8/x0/x1/x2 already correct
-    "\n"
-    "    ldp x0, x1, [sp, #16]\n"          // restore this, name
-    "    ldp x2, x8, [sp, #32]\n"          // restore vec, result
-    "    bl arirang_drm_aidl_post\n"        // (this, name, vec) -> void
-    "\n"
-    "    ldp x29, x30, [sp], #64\n"
-    "    ret\n"
-);
+// We define a dummy struct with a non-trivial copy constructor and destructor.
+// According to the AArch64 AAPCS, returning a struct with non-trivial lifecycle
+// semantics forces the compiler to use the indirect return pointer (x8 register).
+// This guarantees that the caller's x8 buffer pointer is seamlessly forwarded
+// to the original HAL function without needing fragile inline assembly.
+struct AIDL_ScopedAStatus {
+    void* ptr;
+    AIDL_ScopedAStatus() : ptr(nullptr) {}
+    AIDL_ScopedAStatus(const AIDL_ScopedAStatus& other) : ptr(other.ptr) {}
+    ~AIDL_ScopedAStatus() {}
+};
+
+AIDL_ScopedAStatus arirang_drm_aidl_entry(void* this_ptr, void* name_ptr, void* vec_ptr) {
+    auto func = reinterpret_cast<AIDL_ScopedAStatus (*)(void*, void*, void*)>(g_trampoline);
+    AIDL_ScopedAStatus ret = func(this_ptr, name_ptr, vec_ptr);
+    arirang_drm_aidl_post(this_ptr, name_ptr, vec_ptr);
+    return ret;
+}
 
 extern "C" __attribute__((constructor)) void arirang_drm_hook_init() {
     arirang::log_info("arirang_drm_hook: constructor entered");
