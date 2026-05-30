@@ -31,7 +31,6 @@ configure_file(
 add_library(arirang_zygisk SHARED
     src/main/cpp/arirang_zygisk.cpp
     src/main/cpp/build_spoofer.cpp
-    src/main/cpp/id_spoofer.cpp
     src/main/cpp/io_utils.cpp
     src/main/cpp/jni_utils.cpp
     src/main/cpp/logging.cpp
@@ -46,3 +45,34 @@ target_include_directories(arirang_zygisk PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_link_libraries(arirang_zygisk log)
+
+# Separate native library LD_PRELOAD'd into the Widevine DRM HAL daemon.
+# Intentionally has NO overlap with the Zygisk module - it must never be
+# loaded into app processes.
+add_library(arirang_drm_hook SHARED
+    src/main/cpp/arirang_drm_hook.cpp
+    src/main/cpp/inline_hook.cpp
+    src/main/cpp/logging.cpp
+    src/main/cpp/symbol_resolver.cpp
+)
+
+target_compile_features(arirang_drm_hook PRIVATE cxx_std_17)
+target_compile_options(arirang_drm_hook PRIVATE -Wall -Wextra -Werror)
+target_include_directories(arirang_drm_hook PRIVATE
+    src/main/cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
+)
+target_link_libraries(arirang_drm_hook log dl)
+
+# Standalone executable launched from the module's service.sh after boot.
+# Uses ptrace to remote-dlopen libarirang_drm_hook.so inside the Widevine
+# HAL daemon's address space. Statically linked against libc++ so the
+# resulting binary can run from /data without depending on the daemon's
+# linker namespace.
+add_executable(arirang_injector
+    src/main/cpp/arirang_injector.cpp
+)
+
+target_compile_features(arirang_injector PRIVATE cxx_std_17)
+target_compile_options(arirang_injector PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(arirang_injector log dl)

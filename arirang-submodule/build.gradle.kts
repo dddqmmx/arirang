@@ -115,7 +115,11 @@ val buildNative by tasks.registering(Exec::class) {
     dependsOn(configureNative)
     inputs.files(fileTree("src/main/cpp"))
     inputs.file("CMakeLists.txt")
-    outputs.file(nativeBuildDir.map { it.file("libarirang_zygisk.so") })
+    outputs.files(
+        nativeBuildDir.map { it.file("libarirang_zygisk.so") },
+        nativeBuildDir.map { it.file("libarirang_drm_hook.so") },
+        nativeBuildDir.map { it.file("arirang_injector") }
+    )
 
     doFirst {
         commandLine("cmake", "--build", nativeBuildDir.get().asFile.absolutePath)
@@ -127,9 +131,28 @@ val stageModule by tasks.registering(Copy::class) {
     from("module/module.prop") {
         into("")
     }
+    from("module/post-fs-data.sh") {
+        into("")
+    }
+    from("module/service.sh") {
+        into("")
+    }
+    from("module/sepolicy.rule") {
+        into("")
+    }
     from(nativeBuildDir.map { it.file("libarirang_zygisk.so") }) {
         into("zygisk")
         rename { "arm64-v8a.so" }
+    }
+    // Hook .so is staged inside the module's own private directory and
+    // bind-mounted into a vendor library path at post-fs-data, so it is
+    // reachable to the vendor linker namespace without depending on a
+    // KSU metamodule overlay.
+    from(nativeBuildDir.map { it.file("libarirang_drm_hook.so") }) {
+        into("lib")
+    }
+    from(nativeBuildDir.map { it.file("arirang_injector") }) {
+        into("bin")
     }
     into(stageDir)
 }

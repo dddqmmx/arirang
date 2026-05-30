@@ -1,0 +1,99 @@
+# Arirang Widevine DRM HAL hook installer.
+#
+# This file is parsed by init AFTER the vendor's original Widevine HAL .rc
+# files (alphabetical order within /vendor/etc/init/, "zzz-" sorts last).
+# Each block uses `override` to replace the vendor's service definition so we
+# can inject `setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so`.
+#
+# We ship overrides for every Widevine HAL service name that has been observed
+# in the wild. Only the one matching the current device's actual service has
+# any effect; the rest are inert (override declarations for non-existent
+# services are silently ignored by init).
+#
+# IMPORTANT: an override block must reproduce the original service block's
+# settings (user/group/class/interface...) EXACTLY, because init replaces the
+# whole definition. If a device's vendor uses a configuration that differs
+# materially from what we ship here, those overrides will need to be tuned.
+# In that case the right place to add coverage is here.
+
+# --- Android 14+ AIDL Widevine HAL ----------------------------------------
+service vendor.drm-widevine-hal /vendor/bin/hw/android.hardware.drm-service.widevine
+    override
+    interface aidl android.hardware.drm.ICryptoFactory/widevine
+    interface aidl android.hardware.drm.IDrmFactory/widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    ioprio rt 4
+    task_profiles ProcessCapacityHigh
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+# Same binary, lazy variant naming sometimes seen on AOSP/GSI builds.
+service vendor.drm-widevine-hal-aidl /vendor/bin/hw/android.hardware.drm-service.widevine
+    override
+    interface aidl android.hardware.drm.ICryptoFactory/widevine
+    interface aidl android.hardware.drm.IDrmFactory/widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+# --- Android 13 HIDL 1.4 Widevine HAL ------------------------------------
+service vendor.drm-hal-1-4-widevine /vendor/bin/hw/android.hardware.drm@1.4-service.widevine
+    override
+    interface android.hardware.drm@1.4::ICryptoFactory widevine
+    interface android.hardware.drm@1.4::IDrmFactory widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+service vendor.drm-hal-1-4-widevine-lazy /vendor/bin/hw/android.hardware.drm@1.4-service-lazy.widevine
+    override
+    interface android.hardware.drm@1.4::ICryptoFactory widevine
+    interface android.hardware.drm@1.4::IDrmFactory widevine
+    oneshot
+    disabled
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+# --- HIDL 1.3 (Android 12) ------------------------------------------------
+service vendor.drm-hal-1-3-widevine /vendor/bin/hw/android.hardware.drm@1.3-service.widevine
+    override
+    interface android.hardware.drm@1.3::ICryptoFactory widevine
+    interface android.hardware.drm@1.3::IDrmFactory widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+# --- HIDL 1.2 (Android 11) ------------------------------------------------
+service vendor.drm-hal-1-2-widevine /vendor/bin/hw/android.hardware.drm@1.2-service.widevine
+    override
+    interface android.hardware.drm@1.2::ICryptoFactory widevine
+    interface android.hardware.drm@1.2::IDrmFactory widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+# --- HIDL 1.1 / 1.0 fallbacks --------------------------------------------
+service vendor.drm-hal-1-1-widevine /vendor/bin/hw/android.hardware.drm@1.1-service.widevine
+    override
+    interface android.hardware.drm@1.1::ICryptoFactory widevine
+    interface android.hardware.drm@1.1::IDrmFactory widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so
+
+service vendor.drm-hal-1-0-widevine /vendor/bin/hw/android.hardware.drm@1.0-service.widevine
+    override
+    interface android.hardware.drm@1.0::ICryptoFactory widevine
+    interface android.hardware.drm@1.0::IDrmFactory widevine
+    class hal
+    user mediadrm
+    group mediadrm drmrpc
+    setenv LD_PRELOAD /system/lib64/libarirang_drm_hook.so

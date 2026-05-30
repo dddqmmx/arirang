@@ -1,7 +1,6 @@
 #include "zygisk.hpp"
 #include "arirang_build_config.hpp"
 #include "build_spoofer.hpp"
-#include "id_spoofer.hpp"
 #include "jni_utils.hpp"
 #include "logging.hpp"
 #include "submodule_config.hpp"
@@ -39,7 +38,6 @@ public:
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
         if (!keep_module_loaded_in_app_) return;
         arirang::install_system_property_spoofer(api_, env_, config_, true);
-        arirang::install_id_spoofer(api_, env_, config_, true);
         arirang::log_info(std::string("installed service app native hooks process=") + current_app_process_);
     }
 
