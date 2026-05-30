@@ -48,8 +48,6 @@ object UniqueIdentifierPrefs {
 
     fun loadConfig(context: Context): Config {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val hasSavedConfig = prefs.contains(KEY_LAST_MODIFIED) || prefs.contains(KEY_ANDROID_ID)
-        val migratedImeiBySlot = if (hasSavedConfig) emptyMap() else loadLegacySimImeis(context)
 
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, true),
@@ -58,9 +56,7 @@ object UniqueIdentifierPrefs {
             widevineDrmId = prefs.getString(KEY_WIDEVINE_DRM_ID, null) ?: randomWidevineDrmId(),
             appSetId = prefs.getString(KEY_APP_SET_ID, null) ?: randomAppSetId(),
             serial = prefs.getString(KEY_SERIAL, null) ?: defaultSerial(),
-            imeiBySlot = loadImeiBySlot(prefs.getString(KEY_IMEI_BY_SLOT, null)).ifEmpty {
-                migratedImeiBySlot.ifEmpty { mapOf(0 to defaultImeiForSlot(0)) }
-            },
+            imeiBySlot = loadImeiBySlot(prefs.getString(KEY_IMEI_BY_SLOT, null)),
             tacBySlot = loadSlotStringMap(prefs.getString(KEY_TAC_BY_SLOT, null))
         )
     }
@@ -87,7 +83,7 @@ object UniqueIdentifierPrefs {
 
     fun configuredSlotCount(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return loadSlotStringMap(prefs.getString(KEY_IMEI_BY_SLOT, null)).size.coerceAtLeast(1)
+        return loadSlotStringMap(prefs.getString(KEY_IMEI_BY_SLOT, null)).size
     }
 
     fun buildHookSnapshot(context: Context): String {
@@ -155,12 +151,6 @@ object UniqueIdentifierPrefs {
         return runCatching { Build.getSerial() }.getOrNull()
             .takeUnless { it.isNullOrBlank() || it == Build.UNKNOWN }
             ?: randomSerial()
-    }
-
-    private fun loadLegacySimImeis(context: Context): Map<Int, String> {
-        return SimConfigPrefs.loadConfig(context).simInfoBySlot
-            .mapNotNull { (slot, simInfo) -> simInfo.imei?.takeIf { it.isNotBlank() }?.let { slot to it } }
-            .toMap()
     }
 
     private fun loadImeiBySlot(json: String?): Map<Int, String> {

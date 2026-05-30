@@ -15,6 +15,7 @@ object BluetoothConfigPrefs {
     const val KEY_ENABLED = "enabled"
     const val KEY_LAST_MODIFIED = "last_modified"
     const val KEY_CONNECTED_DEVICES = "connected_devices"
+    const val KEY_HIDE_CONNECTED_DEVICES = "hide_connected_devices"
     const val KEY_HIDE_SCAN_RESULTS = "hide_scan_results"
     const val KEY_SCAN_RESULTS = "scan_results"
 
@@ -31,21 +32,19 @@ object BluetoothConfigPrefs {
     data class Config(
         val enabled: Boolean = true,
         val connectedDevices: List<Device> = listOf(Device()),
+        val hideConnectedDevices: Boolean = false,
         val hideScanResults: Boolean = false,
         val scanResults: List<Device> = listOf(Device(name = "Nearby-BT", address = "02:00:00:DD:EE:FF"))
     )
 
     fun loadConfig(context: Context): Config {
         val prefs = prefs(context)
-        val connectedDevices = parseDevices(prefs.getString(KEY_CONNECTED_DEVICES, null)).ifEmpty {
-            listOf(Device())
-        }
-        val scanResults = parseDevices(prefs.getString(KEY_SCAN_RESULTS, null)).ifEmpty {
-            listOf(Device(name = "Nearby-BT", address = "02:00:00:DD:EE:FF"))
-        }
+        val connectedDevices = parseDevices(prefs.getString(KEY_CONNECTED_DEVICES, null))
+        val scanResults = parseDevices(prefs.getString(KEY_SCAN_RESULTS, null))
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, true),
             connectedDevices = connectedDevices,
+            hideConnectedDevices = prefs.getBoolean(KEY_HIDE_CONNECTED_DEVICES, false),
             hideScanResults = prefs.getBoolean(KEY_HIDE_SCAN_RESULTS, false),
             scanResults = scanResults
         )
@@ -56,6 +55,7 @@ object BluetoothConfigPrefs {
             putBoolean(KEY_ENABLED, config.enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
             putString(KEY_CONNECTED_DEVICES, gson.toJson(config.connectedDevices))
+            putBoolean(KEY_HIDE_CONNECTED_DEVICES, config.hideConnectedDevices)
             putBoolean(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
             putString(KEY_SCAN_RESULTS, gson.toJson(config.scanResults))
         }
@@ -90,6 +90,7 @@ object BluetoothConfigPrefs {
             .put(KEY_ENABLED, config.enabled)
             .put(KEY_LAST_MODIFIED, lastModified(context))
             .put(KEY_CONNECTED_DEVICES, connectedDevices)
+            .put(KEY_HIDE_CONNECTED_DEVICES, config.hideConnectedDevices)
             .put(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
             .put(KEY_SCAN_RESULTS, scanResults)
             .toString()

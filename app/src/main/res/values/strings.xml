@@ -170,6 +170,8 @@
     <string name="bluetooth_section_scan_result">Nearby Devices</string>
     <string name="bluetooth_field_name">Device Name</string>
     <string name="bluetooth_field_address">MAC Address</string>
+    <string name="bluetooth_hide_all_connected">Hide all connected devices</string>
+    <string name="bluetooth_hide_all_connected_summary">Return an empty connected device list to hooked apps.</string>
     <string name="bluetooth_hide_all_scan_results">Hide all nearby devices</string>
     <string name="bluetooth_hide_all_scan_results_summary">Return an empty scan list to hooked apps.</string>
     <string name="bluetooth_add_connected_device">Add connected device</string>

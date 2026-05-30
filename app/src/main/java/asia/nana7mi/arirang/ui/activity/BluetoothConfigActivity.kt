@@ -201,33 +201,42 @@ class BluetoothConfigActivity : ComponentActivity() {
                             }
                         }
                     ) {
-                        config.connectedDevices.forEachIndexed { index, device ->
-                            if (index > 0) HorizontalDivider()
-                            DeviceEditor(
-                                title = stringResource(R.string.bluetooth_connected_device_title, index + 1),
-                                removeContentDescription = stringResource(R.string.bluetooth_remove_connected_device),
-                                device = device,
-                                expanded = connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1),
-                                canRemove = config.connectedDevices.size > 1,
-                                onExpandedChange = {
-                                    connectedDeviceExpanded[index] = !(connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1))
-                                },
-                                onDeviceChange = { changed ->
-                                    config = config.copy(
-                                        connectedDevices = config.connectedDevices.toMutableList().also {
-                                            it[index] = changed
-                                        }
-                                    )
-                                },
-                                onRemove = {
-                                    config = config.copy(
-                                        connectedDevices = config.connectedDevices.filterIndexed { itemIndex, _ ->
-                                            itemIndex != index
-                                        }.ifEmpty { listOf(BluetoothConfigPrefs.defaultDevice(0, false)) }
-                                    )
-                                    connectedDeviceExpanded.remove(index)
-                                }
-                            )
+                        SwitchRow(
+                            title = stringResource(R.string.bluetooth_hide_all_connected),
+                            summary = stringResource(R.string.bluetooth_hide_all_connected_summary),
+                            checked = config.hideConnectedDevices,
+                            onCheckedChange = { config = config.copy(hideConnectedDevices = it) }
+                        )
+
+                        if (!config.hideConnectedDevices) {
+                            config.connectedDevices.forEachIndexed { index, device ->
+                                if (index > 0) HorizontalDivider()
+                                DeviceEditor(
+                                    title = stringResource(R.string.bluetooth_connected_device_title, index + 1),
+                                    removeContentDescription = stringResource(R.string.bluetooth_remove_connected_device),
+                                    device = device,
+                                    expanded = connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1),
+                                    canRemove = true,
+                                    onExpandedChange = {
+                                        connectedDeviceExpanded[index] = !(connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1))
+                                    },
+                                    onDeviceChange = { changed ->
+                                        config = config.copy(
+                                            connectedDevices = config.connectedDevices.toMutableList().also {
+                                                it[index] = changed
+                                            }
+                                        )
+                                    },
+                                    onRemove = {
+                                        config = config.copy(
+                                            connectedDevices = config.connectedDevices.filterIndexed { itemIndex, _ ->
+                                                itemIndex != index
+                                            }
+                                        )
+                                        connectedDeviceExpanded.remove(index)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -265,7 +274,7 @@ class BluetoothConfigActivity : ComponentActivity() {
                                     removeContentDescription = stringResource(R.string.bluetooth_remove_scan_result),
                                     device = device,
                                     expanded = scanResultExpanded[index] ?: (config.scanResults.size == 1),
-                                    canRemove = config.scanResults.size > 1,
+                                    canRemove = true,
                                     onExpandedChange = {
                                         scanResultExpanded[index] = !(scanResultExpanded[index] ?: (config.scanResults.size == 1))
                                     },
@@ -280,7 +289,7 @@ class BluetoothConfigActivity : ComponentActivity() {
                                         config = config.copy(
                                             scanResults = config.scanResults.filterIndexed { itemIndex, _ ->
                                                 itemIndex != index
-                                            }.ifEmpty { listOf(BluetoothConfigPrefs.defaultDevice(0, true)) }
+                                            }
                                         )
                                         scanResultExpanded.remove(index)
                                     }

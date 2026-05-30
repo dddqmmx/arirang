@@ -45,16 +45,7 @@ object WifiConfigPrefs {
         val prefs = prefs(context).also {
             migratePrivatePrefsIfNeeded(context, it)
         }
-        val scanResults = parseScanResults(prefs.getString(KEY_SCAN_RESULTS, null)).ifEmpty {
-            listOf(
-                ScanNetwork(
-                    ssid = prefs.getString(KEY_SCAN_SSID, null)?.takeIf { it.isNotBlank() }
-                        ?: DEFAULT_SCAN_SSID,
-                    bssid = prefs.getString(KEY_SCAN_BSSID, null)?.takeIf { it.isNotBlank() }
-                        ?: DEFAULT_SCAN_BSSID
-                )
-            )
-        }
+        val scanResults = parseScanResults(prefs.getString(KEY_SCAN_RESULTS, null))
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, true),
             currentSsid = prefs.getString(KEY_CURRENT_SSID, null)?.takeIf { it.isNotBlank() }

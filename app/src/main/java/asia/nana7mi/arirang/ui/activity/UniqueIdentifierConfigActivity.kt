@@ -346,7 +346,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         imei = row.imei,
                         tac = row.tac,
                         revision = revision,
-                        canRemove = imeiRows.size > 1,
+                        canRemove = true,
                         onImeiChange = { imei ->
                             if (index >= 0) {
                                 imeiRows[index] = imeiRows[index].copy(imei = imei)
@@ -360,9 +360,10 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                             }
                         },
                         onRemove = {
-                            if (index >= 0 && imeiRows.size > 1) {
+                            if (index >= 0) {
                                 imeiRows.removeAt(index)
                                 updateImeis()
+                                revision++
                             }
                         },
                         modifier = Modifier

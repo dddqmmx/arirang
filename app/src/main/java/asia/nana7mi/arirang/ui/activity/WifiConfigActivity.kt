@@ -234,7 +234,7 @@ class WifiConfigActivity : ComponentActivity() {
                                     index = index,
                                     network = network,
                                     expanded = scanNetworkExpanded[index] ?: true,
-                                    canRemove = config.scanResults.size > 1,
+                                    canRemove = true,
                                     onExpandedChange = {
                                         scanNetworkExpanded[index] = !(scanNetworkExpanded[index] ?: true)
                                     },
@@ -249,7 +249,7 @@ class WifiConfigActivity : ComponentActivity() {
                                         config = config.copy(
                                             scanResults = config.scanResults.filterIndexed { itemIndex, _ ->
                                                 itemIndex != index
-                                            }.ifEmpty { listOf(WifiConfigPrefs.defaultScanNetwork()) }
+                                            }
                                         )
                                         scanNetworkExpanded.remove(index)
                                     }
