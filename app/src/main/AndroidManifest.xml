@@ -62,6 +62,9 @@
             android:name=".ui.activity.WifiConfigActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.activity.BluetoothConfigActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.activity.SimConfigActivity"
             android:exported="false" />
         <activity

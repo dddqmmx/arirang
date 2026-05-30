@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.R
+import asia.nana7mi.arirang.ui.activity.BluetoothConfigActivity
 import asia.nana7mi.arirang.ui.activity.ClipboardConfigActivity
 import asia.nana7mi.arirang.ui.activity.DeviceInfoConfigActivity
 import asia.nana7mi.arirang.ui.activity.LocationConfigActivity
@@ -127,7 +128,7 @@ private fun HomeScreen(
                 items = listOf(
                     FeatureItem(R.string.feature_clipboard, Icons.Default.ContentPaste, ClipboardConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_sensor_info, Icons.Default.Sensors, null, false),
-                    FeatureItem(R.string.feature_bluetooth_list, Icons.Default.Bluetooth, null, false),
+                    FeatureItem(R.string.feature_bluetooth_list, Icons.Default.Bluetooth, BluetoothConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_wifi_list, Icons.Default.Wifi, WifiConfigActivity::class.java, true)
                 ),
                 onUnavailable = { showUnavailableDialog = true },

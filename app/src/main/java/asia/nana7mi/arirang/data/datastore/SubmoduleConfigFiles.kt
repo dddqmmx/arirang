@@ -17,7 +17,8 @@ object SubmoduleConfigFiles {
         context: Context,
         simConfig: SimConfigPrefs.Config = SimConfigPrefs.loadConfig(context),
         deviceConfig: DeviceInfoPrefs.Config = DeviceInfoPrefs.loadConfig(context),
-        uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context)
+        uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context),
+        bluetoothConfig: BluetoothConfigPrefs.Config = BluetoothConfigPrefs.loadConfig(context)
     ) {
         val configFile = configFile(context)
         configFile.parentFile?.mkdirs()
@@ -65,6 +66,8 @@ object SubmoduleConfigFiles {
             .put("hookLogConfigSnapshot", HookLogSettings.buildHookSnapshot(context))
             .put("wifiConfigVersion", WifiConfigPrefs.lastModified(context))
             .put("wifiConfigSnapshot", WifiConfigPrefs.buildHookSnapshot(context))
+            .put("bluetoothConfigVersion", BluetoothConfigPrefs.lastModified(context))
+            .put("bluetoothConfigSnapshot", BluetoothConfigPrefs.buildHookSnapshot(context))
             .put("locationConfigVersion", LocationConfigPrefs.lastModified(context))
             .put("locationConfigSnapshot", LocationConfigPrefs.buildHookSnapshot(context))
             .toString()

@@ -163,6 +163,23 @@
     <string name="wifi_scan_result_title">Nearby Wi-Fi %1$d</string>
     <string name="wifi_apply_defaults">Apply defaults</string>
 
+    <string name="bluetooth_config_title">Bluetooth Information</string>
+    <string name="bluetooth_hook_enabled">Enable hook</string>
+    <string name="bluetooth_hook_enabled_summary">Rewrites the connected Bluetooth devices and nearby scan results returned to apps.</string>
+    <string name="bluetooth_section_connected">Connected Devices</string>
+    <string name="bluetooth_section_scan_result">Nearby Devices</string>
+    <string name="bluetooth_field_name">Device Name</string>
+    <string name="bluetooth_field_address">MAC Address</string>
+    <string name="bluetooth_hide_all_scan_results">Hide all nearby devices</string>
+    <string name="bluetooth_hide_all_scan_results_summary">Return an empty scan list to hooked apps.</string>
+    <string name="bluetooth_add_connected_device">Add connected device</string>
+    <string name="bluetooth_remove_connected_device">Remove connected device</string>
+    <string name="bluetooth_connected_device_title">Connected Device %1$d</string>
+    <string name="bluetooth_add_scan_result">Add nearby device</string>
+    <string name="bluetooth_remove_scan_result">Remove nearby device</string>
+    <string name="bluetooth_scan_result_title">Nearby Device %1$d</string>
+    <string name="bluetooth_apply_defaults">Apply defaults</string>
+
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">Select Language</string>
     <string name="init_select_region">Select Region</string>
