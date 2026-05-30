@@ -7,143 +7,87 @@
 #include <cstdlib>
 #include <unistd.h>
 
+#include "json.hpp"
+
 namespace arirang {
 namespace {
 
 constexpr size_t kMaxConfigSize = 65536;
 
-std::string parse_json_string(const std::string &json, const char *key, const std::string &fallback) {
-    const std::string pattern = std::string("\"") + key + "\"";
-    size_t pos = json.find(pattern);
-    if (pos == std::string::npos) return fallback;
-    pos = json.find(':', pos + pattern.size());
-    if (pos == std::string::npos) return fallback;
-    pos = json.find('"', pos + 1);
-    if (pos == std::string::npos) return fallback;
-
-    std::string result;
-    bool escaped = false;
-    for (size_t i = pos + 1; i < json.size(); ++i) {
-        char c = json[i];
-        if (escaped) {
-            switch (c) {
-                case '"':
-                case '\\':
-                case '/':
-                    result.push_back(c);
-                    break;
-                case 'n':
-                    result.push_back('\n');
-                    break;
-                case 'r':
-                    result.push_back('\r');
-                    break;
-                case 't':
-                    result.push_back('\t');
-                    break;
-                default:
-                    result.push_back(c);
-                    break;
-            }
-            escaped = false;
-        } else if (c == '\\') {
-            escaped = true;
-        } else if (c == '"') {
-            return result;
-        } else {
-            result.push_back(c);
-        }
-    }
-    return fallback;
-}
-
-bool parse_json_bool(const std::string &json, const char *key, bool fallback) {
-    const std::string pattern = std::string("\"") + key + "\"";
-    size_t pos = json.find(pattern);
-    if (pos == std::string::npos) return fallback;
-    pos = json.find(':', pos + pattern.size());
-    if (pos == std::string::npos) return fallback;
-    ++pos;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t')) {
-        ++pos;
-    }
-    if (json.compare(pos, 4, "true") == 0) return true;
-    if (json.compare(pos, 5, "false") == 0) return false;
-    return fallback;
-}
-
-jlong parse_json_long(const std::string &json, const char *key, jlong fallback) {
-    const std::string pattern = std::string("\"") + key + "\"";
-    size_t pos = json.find(pattern);
-    if (pos == std::string::npos) return fallback;
-    pos = json.find(':', pos + pattern.size());
-    if (pos == std::string::npos) return fallback;
-    ++pos;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\n' || json[pos] == '\r' || json[pos] == '\t')) {
-        ++pos;
-    }
-    char *end = nullptr;
-    long long value = strtoll(json.c_str() + pos, &end, 10);
-    if (end == json.c_str() + pos) return fallback;
-    return static_cast<jlong>(value);
-}
-
 } // namespace
 
-void apply_json_config(SubmoduleConfig &config, const std::string &json) {
-    if (json.empty()) {
+void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
+    if (json_str.empty()) {
         log_warn("submodule config not found; using defaults");
         return;
     }
 
-    config.enabled = parse_json_bool(json, "enabled", config.enabled);
-    config.device_info_enabled = parse_json_bool(json, "deviceInfoEnabled", config.device_info_enabled);
-    config.build_brand = parse_json_string(json, "buildBrand", config.build_brand);
-    config.build_manufacturer = parse_json_string(json, "buildManufacturer", config.build_manufacturer);
-    config.build_model = parse_json_string(json, "buildModel", config.build_model);
-    config.build_device = parse_json_string(json, "buildDevice", config.build_device);
-    config.build_product = parse_json_string(json, "buildProduct", config.build_product);
-    config.build_board = parse_json_string(json, "buildBoard", config.build_board);
-    config.build_hardware = parse_json_string(json, "buildHardware", config.build_hardware);
-    config.build_display = parse_json_string(json, "buildDisplay", config.build_display);
-    config.build_host = parse_json_string(json, "buildHost", config.build_host);
-    config.build_id = parse_json_string(json, "buildId", config.build_id);
-    config.build_tags = parse_json_string(json, "buildTags", config.build_tags);
-    config.build_type = parse_json_string(json, "buildType", config.build_type);
-    config.build_user = parse_json_string(json, "buildUser", config.build_user);
-    config.build_fingerprint = parse_json_string(json, "buildFingerprint", config.build_fingerprint);
-    config.build_time = parse_json_long(json, "buildTime", config.build_time);
-    config.gsm_sim_operator_iso_country =
-        parse_json_string(json, "gsmSimOperatorIsoCountry", config.gsm_sim_operator_iso_country);
-    config.gsm_operator_iso_country =
-        parse_json_string(json, "gsmOperatorIsoCountry", config.gsm_operator_iso_country);
-    config.gsm_sim_operator_numeric =
-        parse_json_string(json, "gsmSimOperatorNumeric", config.gsm_sim_operator_numeric);
-    config.gsm_operator_numeric =
-        parse_json_string(json, "gsmOperatorNumeric", config.gsm_operator_numeric);
-    config.gsm_sim_operator_alpha =
-        parse_json_string(json, "gsmSimOperatorAlpha", config.gsm_sim_operator_alpha);
-    config.gsm_operator_alpha = parse_json_string(json, "gsmOperatorAlpha", config.gsm_operator_alpha);
-    config.unique_identifier_enabled =
-        parse_json_bool(json, "uniqueIdentifierEnabled", config.unique_identifier_enabled);
-    config.android_id = parse_json_string(json, "androidId", config.android_id);
-    config.gaid = parse_json_string(json, "gaid", config.gaid);
-    config.gsf_id = parse_json_string(json, "gsfId", config.gsf_id);
-    config.widevine_id = parse_json_string(json, "widevineDrmId", config.widevine_id);
-    config.app_set_id = parse_json_string(json, "appSetId", config.app_set_id);
-    config.serial = parse_json_string(json, "serial", config.serial);
-    config.sim_config_version = parse_json_long(json, "simConfigVersion", config.sim_config_version);
-    config.sim_config_snapshot = parse_json_string(json, "simConfigSnapshot", config.sim_config_snapshot);
-    config.unique_identifier_config_version =
-        parse_json_long(json, "uniqueIdentifierConfigVersion", config.unique_identifier_config_version);
-    config.unique_identifier_config_snapshot =
-        parse_json_string(json, "uniqueIdentifierConfigSnapshot", config.unique_identifier_config_snapshot);
-    config.hook_log_config_version = parse_json_long(json, "hookLogConfigVersion", config.hook_log_config_version);
-    config.hook_log_config_snapshot = parse_json_string(json, "hookLogConfigSnapshot", config.hook_log_config_snapshot);
-    config.wifi_config_version = parse_json_long(json, "wifiConfigVersion", config.wifi_config_version);
-    config.wifi_config_snapshot = parse_json_string(json, "wifiConfigSnapshot", config.wifi_config_snapshot);
-    config.location_config_version = parse_json_long(json, "locationConfigVersion", config.location_config_version);
-    config.location_config_snapshot = parse_json_string(json, "locationConfigSnapshot", config.location_config_snapshot);
+    try {
+        auto j = nlohmann::json::parse(json_str);
+
+        auto read_string = [&](const char* key, std::string& field) {
+            if (j.contains(key) && j[key].is_string()) {
+                field = j[key].get<std::string>();
+            }
+        };
+        auto read_bool = [&](const char* key, bool& field) {
+            if (j.contains(key) && j[key].is_boolean()) {
+                field = j[key].get<bool>();
+            }
+        };
+        auto read_long = [&](const char* key, jlong& field) {
+            if (j.contains(key) && j[key].is_number()) {
+                field = j[key].get<jlong>();
+            }
+        };
+
+        read_bool("enabled", config.enabled);
+        read_bool("deviceInfoEnabled", config.device_info_enabled);
+        read_string("buildBrand", config.build_brand);
+        read_string("buildManufacturer", config.build_manufacturer);
+        read_string("buildModel", config.build_model);
+        read_string("buildDevice", config.build_device);
+        read_string("buildProduct", config.build_product);
+        read_string("buildBoard", config.build_board);
+        read_string("buildHardware", config.build_hardware);
+        read_string("buildDisplay", config.build_display);
+        read_string("buildHost", config.build_host);
+        read_string("buildId", config.build_id);
+        read_string("buildTags", config.build_tags);
+        read_string("buildType", config.build_type);
+        read_string("buildUser", config.build_user);
+        read_string("buildFingerprint", config.build_fingerprint);
+        read_long("buildTime", config.build_time);
+        
+        read_string("gsmSimOperatorIsoCountry", config.gsm_sim_operator_iso_country);
+        read_string("gsmOperatorIsoCountry", config.gsm_operator_iso_country);
+        read_string("gsmSimOperatorNumeric", config.gsm_sim_operator_numeric);
+        read_string("gsmOperatorNumeric", config.gsm_operator_numeric);
+        read_string("gsmSimOperatorAlpha", config.gsm_sim_operator_alpha);
+        read_string("gsmOperatorAlpha", config.gsm_operator_alpha);
+        
+        read_bool("uniqueIdentifierEnabled", config.unique_identifier_enabled);
+        read_string("androidId", config.android_id);
+        read_string("gaid", config.gaid);
+        read_string("gsfId", config.gsf_id);
+        read_string("widevineDrmId", config.widevine_id);
+        read_string("appSetId", config.app_set_id);
+        read_string("serial", config.serial);
+        
+        read_long("simConfigVersion", config.sim_config_version);
+        read_string("simConfigSnapshot", config.sim_config_snapshot);
+        read_long("uniqueIdentifierConfigVersion", config.unique_identifier_config_version);
+        read_string("uniqueIdentifierConfigSnapshot", config.unique_identifier_config_snapshot);
+        read_long("hookLogConfigVersion", config.hook_log_config_version);
+        read_string("hookLogConfigSnapshot", config.hook_log_config_snapshot);
+        read_long("wifiConfigVersion", config.wifi_config_version);
+        read_string("wifiConfigSnapshot", config.wifi_config_snapshot);
+        read_long("locationConfigVersion", config.location_config_version);
+        read_string("locationConfigSnapshot", config.location_config_snapshot);
+
+    } catch (const nlohmann::json::exception& e) {
+        log_warn(std::string("failed to parse config json: ") + e.what());
+    }
     log_info(
         std::string("loaded submodule config uniqueIdentifierEnabled=") +
         (config.unique_identifier_enabled ? "true" : "false") +
