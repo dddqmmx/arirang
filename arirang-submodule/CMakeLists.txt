@@ -23,25 +23,30 @@ set(ARIRANG_CONFIG_PATH_CE
 )
 
 configure_file(
-    src/main/cpp/arirang_build_config.hpp.in
+    src/main/cpp/core/arirang_build_config.hpp.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/arirang_build_config.hpp
     @ONLY
 )
 
 add_library(arirang_zygisk SHARED
-    src/main/cpp/arirang_zygisk.cpp
-    src/main/cpp/build_spoofer.cpp
-    src/main/cpp/io_utils.cpp
-    src/main/cpp/jni_utils.cpp
-    src/main/cpp/logging.cpp
-    src/main/cpp/submodule_config.cpp
-    src/main/cpp/system_property_spoofer.cpp
+    src/main/cpp/core/arirang_zygisk.cpp
+    src/main/cpp/core/submodule_config.cpp
+    src/main/cpp/utils/io_utils.cpp
+    src/main/cpp/utils/jni_utils.cpp
+    src/main/cpp/utils/logging.cpp
+    src/main/cpp/spoofer/build_spoofer.cpp
+    src/main/cpp/spoofer/system_property_spoofer.cpp
 )
 
 target_compile_features(arirang_zygisk PRIVATE cxx_std_17)
 target_compile_options(arirang_zygisk PRIVATE -Wall -Wextra -Werror)
 target_include_directories(arirang_zygisk PRIVATE
     src/main/cpp
+    src/main/cpp/core
+    src/main/cpp/utils
+    src/main/cpp/spoofer
+    src/main/cpp/hook
+    src/main/cpp/api
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_link_libraries(arirang_zygisk log)
@@ -50,16 +55,20 @@ target_link_libraries(arirang_zygisk log)
 # Intentionally has NO overlap with the Zygisk module - it must never be
 # loaded into app processes.
 add_library(arirang_drm_hook SHARED
-    src/main/cpp/arirang_drm_hook.cpp
-    src/main/cpp/inline_hook.cpp
-    src/main/cpp/logging.cpp
-    src/main/cpp/symbol_resolver.cpp
+    src/main/cpp/drm/arirang_drm_hook.cpp
+    src/main/cpp/hook/inline_hook.cpp
+    src/main/cpp/hook/symbol_resolver.cpp
+    src/main/cpp/utils/logging.cpp
 )
 
 target_compile_features(arirang_drm_hook PRIVATE cxx_std_17)
 target_compile_options(arirang_drm_hook PRIVATE -Wall -Wextra -Werror)
 target_include_directories(arirang_drm_hook PRIVATE
     src/main/cpp
+    src/main/cpp/core
+    src/main/cpp/utils
+    src/main/cpp/hook
+    src/main/cpp/drm
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_link_libraries(arirang_drm_hook log dl)
@@ -70,9 +79,17 @@ target_link_libraries(arirang_drm_hook log dl)
 # resulting binary can run from /data without depending on the daemon's
 # linker namespace.
 add_executable(arirang_injector
-    src/main/cpp/arirang_injector.cpp
+    src/main/cpp/drm/arirang_injector.cpp
 )
 
 target_compile_features(arirang_injector PRIVATE cxx_std_17)
 target_compile_options(arirang_injector PRIVATE -Wall -Wextra -Werror)
+target_include_directories(arirang_injector PRIVATE
+    src/main/cpp
+    src/main/cpp/core
+    src/main/cpp/utils
+    src/main/cpp/drm
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
+)
 target_link_libraries(arirang_injector log dl)
+
