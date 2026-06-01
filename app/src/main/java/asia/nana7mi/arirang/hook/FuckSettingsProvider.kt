@@ -16,6 +16,10 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         private const val KEY_ANDROID_ID = "android_id"
     }
 
+    override fun isEnabled(): Boolean {
+        return readAndroidIdFromConfig(null) != null
+    }
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         val classLoader = lpparam.classLoader
         if (lpparam.packageName != "com.android.providers.settings") return

@@ -27,7 +27,7 @@ class FuckWifi : BaseHookModule(
     targetPackages = setOf("android", "com.android.wifi")
 ) {
     private data class WifiConfig(
-        val enabled: Boolean = true,
+        val enabled: Boolean = false,
         val currentSsid: String = WifiConfigPrefs.DEFAULT_CURRENT_SSID,
         val currentBssid: String = WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
         val hideScanResults: Boolean = false,
@@ -68,6 +68,8 @@ class FuckWifi : BaseHookModule(
     private val hookedWifiSystemServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
     @Volatile
     private var systemServiceManagerHookInstalled = false
+
+    override fun isEnabled(): Boolean = currentConfig().enabled
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
@@ -298,7 +300,7 @@ class FuckWifi : BaseHookModule(
         return runCatching {
             val json = JSONObject(snapshot)
             WifiConfig(
-                enabled = json.optBoolean(WifiConfigPrefs.KEY_ENABLED, true),
+                enabled = json.optBoolean(WifiConfigPrefs.KEY_ENABLED, false),
                 currentSsid = json.optString(WifiConfigPrefs.KEY_CURRENT_SSID, "")
                     .takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
                 currentBssid = json.optString(WifiConfigPrefs.KEY_CURRENT_BSSID, "")
@@ -317,7 +319,7 @@ class FuckWifi : BaseHookModule(
 
     private fun readConfigFromPrefs(prefs: de.robv.android.xposed.XSharedPreferences): WifiConfig {
         return WifiConfig(
-            enabled = prefs.getBoolean(WifiConfigPrefs.KEY_ENABLED, true),
+            enabled = prefs.getBoolean(WifiConfigPrefs.KEY_ENABLED, false),
             currentSsid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_SSID, null)
                 ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
             currentBssid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_BSSID, null)

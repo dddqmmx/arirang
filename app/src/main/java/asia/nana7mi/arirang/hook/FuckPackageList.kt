@@ -9,6 +9,11 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 class FuckPackageList : BaseHookModule(matchSystem = true) {
     private val config = HookConfig("clipboard_visibility_prefs")
 
+    override fun isEnabled(): Boolean {
+        config.loadIfUpdated("visible_list", "invisible_list")
+        return config.enabled
+    }
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
             val computerEngine = XposedHelpers.findClassIfExists("com.android.server.pm.ComputerEngine", lpparam.classLoader)

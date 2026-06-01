@@ -28,7 +28,7 @@ object DeviceInfoPrefs {
     private const val KEY_TIME = "time"
 
     data class Config(
-        val enabled: Boolean = true,
+        val enabled: Boolean = false,
         val presetId: String = DEFAULT_PRESET.id,
         val brand: String = DEFAULT_PRESET.brand,
         val manufacturer: String = DEFAULT_PRESET.manufacturer,
@@ -71,7 +71,7 @@ object DeviceInfoPrefs {
     fun loadConfig(context: Context): Config {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return Config(
-            enabled = prefs.getBoolean(KEY_ENABLED, true),
+            enabled = prefs.getBoolean(KEY_ENABLED, false),
             presetId = prefs.getString(KEY_PRESET_ID, DEFAULT_PRESET.id) ?: DEFAULT_PRESET.id,
             brand = prefs.getString(KEY_BRAND, null) ?: DEFAULT_PRESET.brand,
             manufacturer = prefs.getString(KEY_MANUFACTURER, null) ?: DEFAULT_PRESET.manufacturer,

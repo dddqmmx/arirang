@@ -93,10 +93,10 @@ class HookNotifyService : Service() {
     private val policyLock = Any()
 
     @Volatile
-    private var isFeatureEnabled = true
+    private var isFeatureEnabled = false
 
     @Volatile
-    private var defaultPolicy = ClipboardPromptPrefs.Policy.ALLOW
+    private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
 
     private var appPolicies = mapOf<String, ClipboardPromptPrefs.Policy>()
     private val serviceUserId = Process.myUid() / PER_USER_RANGE

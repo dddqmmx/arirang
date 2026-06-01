@@ -8,8 +8,8 @@
 namespace arirang {
 
 struct SubmoduleConfig {
-    bool enabled = true;
-    bool device_info_enabled = true;
+    bool enabled = false;
+    bool device_info_enabled = false;
     std::string build_brand = "google";
     std::string build_manufacturer = "Google";
     std::string build_model = "Pixel 9 Pro";

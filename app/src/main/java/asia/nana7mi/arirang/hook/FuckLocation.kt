@@ -26,7 +26,7 @@ class FuckLocation : BaseHookModule(
 ) {
 
     private companion object {
-        private const val DEBUG_HARDCODED_CONFIG = true
+        private const val DEBUG_HARDCODED_CONFIG = false
         private const val DEBUG_PACKAGE_NAME = "asia.nana7mi.arirang.selfcheck"
         private const val DEBUG_LATITUDE = 39.019444
         private const val DEBUG_LONGITUDE = 125.738052
@@ -94,6 +94,8 @@ class FuckLocation : BaseHookModule(
         parseRealtimeSnapshot = ::parseConfigSnapshot,
         readStoredConfig = ::readConfigFromPrefs
     )
+
+    override fun isEnabled(): Boolean = currentConfig().enabled
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {

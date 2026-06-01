@@ -67,6 +67,8 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
     private val hookedServiceClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
     private val hookedAppSetServiceClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
 
+    override fun isEnabled(): Boolean = currentConfig().enabled
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         hookApplicationContext(lpparam.classLoader)
         hookAdvertisingIdService()

@@ -40,8 +40,8 @@ class ClipboardConfigActivity : BaseActivity() {
 
     private val allApps = mutableListOf<AppInfo>()
     
-    private var isFeatureEnabled = true 
-    private var defaultPolicy = ClipboardPromptPrefs.Policy.ALLOW
+    private var isFeatureEnabled = false 
+    private var defaultPolicy = ClipboardPromptPrefs.Policy.ASK
 
     private var appFilter = ClipboardPromptPrefs.AppFilter.ALL
     private var suppressPolicySpinnerSelection = true

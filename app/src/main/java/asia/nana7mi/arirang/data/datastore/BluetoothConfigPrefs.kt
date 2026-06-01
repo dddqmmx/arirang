@@ -30,7 +30,7 @@ object BluetoothConfigPrefs {
     )
 
     data class Config(
-        val enabled: Boolean = true,
+        val enabled: Boolean = false,
         val connectedDevices: List<Device> = listOf(Device()),
         val hideConnectedDevices: Boolean = false,
         val hideScanResults: Boolean = false,
@@ -42,7 +42,7 @@ object BluetoothConfigPrefs {
         val connectedDevices = parseDevices(prefs.getString(KEY_CONNECTED_DEVICES, null))
         val scanResults = parseDevices(prefs.getString(KEY_SCAN_RESULTS, null))
         return Config(
-            enabled = prefs.getBoolean(KEY_ENABLED, true),
+            enabled = prefs.getBoolean(KEY_ENABLED, false),
             connectedDevices = connectedDevices,
             hideConnectedDevices = prefs.getBoolean(KEY_HIDE_CONNECTED_DEVICES, false),
             hideScanResults = prefs.getBoolean(KEY_HIDE_SCAN_RESULTS, false),

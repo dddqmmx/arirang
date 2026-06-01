@@ -183,11 +183,11 @@ object ClipboardPromptPrefs {
     private val IS_FEATURE_ENABLED = booleanPreferencesKey("is_feature_enabled")
 
     suspend fun isFeatureEnabled(context: Context): Boolean {
-        return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: true }.first()
+        return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: false }.first()
     }
 
     fun isFeatureEnabledFlow(context: Context): kotlinx.coroutines.flow.Flow<Boolean> {
-        return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: true }
+        return context.dataStore.data.map { preferences -> preferences[IS_FEATURE_ENABLED] ?: false }
     }
 
     suspend fun setFeatureEnabled(context: Context, enabled: Boolean) {

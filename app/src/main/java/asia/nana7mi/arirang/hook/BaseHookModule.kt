@@ -51,4 +51,26 @@ abstract class BaseHookModule(
         if (matchClient && BuildConfig.APPLICATION_ID == packageName) return true
         return packageName in targetPackages
     }
+
+    override fun isEnabled(): Boolean = true
+
+    protected fun isEnabledHook(
+        priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+        before: (XC_MethodHook.MethodHookParam.() -> Unit)? = null,
+        after: (XC_MethodHook.MethodHookParam.() -> Unit)? = null
+    ): XC_MethodHook {
+        return object : XC_MethodHook(priority) {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                if (isEnabled()) {
+                    before?.invoke(param)
+                }
+            }
+
+            override fun afterHookedMethod(param: MethodHookParam) {
+                if (isEnabled()) {
+                    after?.invoke(param)
+                }
+            }
+        }
+    }
 }

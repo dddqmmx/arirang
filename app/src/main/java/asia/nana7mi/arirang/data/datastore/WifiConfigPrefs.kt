@@ -34,7 +34,7 @@ object WifiConfigPrefs {
     )
 
     data class Config(
-        val enabled: Boolean = true,
+        val enabled: Boolean = false,
         val currentSsid: String = DEFAULT_CURRENT_SSID,
         val currentBssid: String = DEFAULT_CURRENT_BSSID,
         val hideScanResults: Boolean = false,
@@ -47,7 +47,7 @@ object WifiConfigPrefs {
         }
         val scanResults = parseScanResults(prefs.getString(KEY_SCAN_RESULTS, null))
         return Config(
-            enabled = prefs.getBoolean(KEY_ENABLED, true),
+            enabled = prefs.getBoolean(KEY_ENABLED, false),
             currentSsid = prefs.getString(KEY_CURRENT_SSID, null)?.takeIf { it.isNotBlank() }
                 ?: DEFAULT_CURRENT_SSID,
             currentBssid = prefs.getString(KEY_CURRENT_BSSID, null)?.takeIf { it.isNotBlank() }
@@ -123,7 +123,7 @@ object WifiConfigPrefs {
         if (!privatePrefs.contains(KEY_LAST_MODIFIED)) return
 
         sharedPrefs.edit(commit = true) {
-            putBoolean(KEY_ENABLED, privatePrefs.getBoolean(KEY_ENABLED, true))
+            putBoolean(KEY_ENABLED, privatePrefs.getBoolean(KEY_ENABLED, false))
             putLong(KEY_LAST_MODIFIED, privatePrefs.getLong(KEY_LAST_MODIFIED, Date().time))
             privatePrefs.getString(KEY_CURRENT_SSID, null)?.let { putString(KEY_CURRENT_SSID, it) }
             privatePrefs.getString(KEY_CURRENT_BSSID, null)?.let { putString(KEY_CURRENT_BSSID, it) }

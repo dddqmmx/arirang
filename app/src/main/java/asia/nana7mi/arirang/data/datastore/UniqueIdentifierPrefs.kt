@@ -28,7 +28,7 @@ object UniqueIdentifierPrefs {
     private val random = SecureRandom()
 
     data class Config(
-        val enabled: Boolean = true,
+        val enabled: Boolean = false,
         val androidId: String = "",
         val gaid: String = "",
         val widevineDrmId: String = "",
@@ -50,7 +50,7 @@ object UniqueIdentifierPrefs {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         return Config(
-            enabled = prefs.getBoolean(KEY_ENABLED, true),
+            enabled = prefs.getBoolean(KEY_ENABLED, false),
             androidId = prefs.getString(KEY_ANDROID_ID, null) ?: defaultAndroidId(context),
             gaid = prefs.getString(KEY_GAID, null) ?: randomGaid(),
             widevineDrmId = prefs.getString(KEY_WIDEVINE_DRM_ID, null) ?: randomWidevineDrmId(),
