@@ -1,10 +1,14 @@
 package asia.nana7mi.arirang.hook
 
+import android.app.Application
+import android.content.Context
 import android.location.Location
 import android.location.LocationManager
 import android.os.Binder
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
+import android.os.IInterface
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
@@ -14,6 +18,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import org.json.JSONObject
 import java.lang.reflect.Method
 import java.util.Collections
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 
 class FuckLocation : BaseHookModule(
@@ -21,8 +26,7 @@ class FuckLocation : BaseHookModule(
         "android",
         "com.android.location.fused",
         "com.google.android.gms"
-    ),
-    matchClient = true
+    )
 ) {
 
     private companion object {
@@ -61,6 +65,16 @@ class FuckLocation : BaseHookModule(
 
     private val hookedClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
 
+    // GMS 融合定位「按应用」修复所需的两张状态：
+    // receiverPackages —— 注册时（getCallingUid 仍指向真正请求方）把投递用的 callback/listener
+    //   binder 绑定到包名；key 为 GMS 持有的 BinderProxy，使用 WeakHashMap，GMS 注销后自动回收。
+    // activeDeliveryPackage —— 异步投递时按 binder 反查到的包名写入此 thread-local，供 resolveProfile() 消费。
+    private val receiverPackages = Collections.synchronizedMap(WeakHashMap<IBinder, String>())
+    private val activeDeliveryPackage = ThreadLocal<String?>()
+
+    @Volatile
+    private var gmsContext: Context? = null
+
     private data class HookLocationConfig(
         val enabled: Boolean = false,
         val defaultProfile: LocationProfile = LocationProfile(),
@@ -84,10 +98,13 @@ class FuckLocation : BaseHookModule(
         defaultValue = HookLocationConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
+            val context = gmsContext
             HookNotifyClient.readConfigSnapshot(
                 configName = "location",
                 force = force,
                 allowBind = true,
+                bindContext = context,
+                bindCurrentUser = context != null,
                 logName = "location"
             )
         },
@@ -112,17 +129,144 @@ class FuckLocation : BaseHookModule(
                     hookFrameworkLocationResult(lpparam.classLoader)
                 }
                 "com.google.android.gms", BuildConfig.APPLICATION_ID -> {
+                    hookApplicationContext(lpparam.classLoader)
+                    hookGmsReceiverBinding(lpparam.classLoader)
                     hookLocationAccessors()
                     hookFrameworkLocationManagerClient(lpparam.classLoader)
                     hookFrameworkLocationResult(lpparam.classLoader)
                     hookGoogleFusedClient(lpparam.classLoader)
                     hookGoogleLocationResult(lpparam.classLoader)
                     hookGoogleTasks(lpparam.classLoader)
+                    hookGoogleLocationCallbacks(lpparam.classLoader)
+                    hookGmsInternalLocationService(lpparam.classLoader)
                 }
             }
             HookLog.i(HookLog.Module.LOCATION, "location hook installed for ${lpparam.packageName}")
         }.onFailure {
             HookLog.e(HookLog.Module.LOCATION, "location hook failed for ${lpparam.packageName}", it)
+        }
+    }
+
+    private fun hookApplicationContext(classLoader: ClassLoader) {
+        val applicationClass = XposedHelpers.findClassIfExists("android.app.Application", classLoader)
+            ?: Application::class.java
+        if (!hookedClasses.add(applicationClass)) return
+
+        XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
+            val app = thisObject as? Application ?: return@afterHookedMethod
+            gmsContext = app.applicationContext
+            HookNotifyClient.autoBindCurrentUser(app)
+        })
+    }
+
+    /**
+     * GMS 融合定位路径的「按应用」修复（保持 system-level，不注入任何第三方进程）。
+     *
+     * 问题：第三方 App 通过 play-services 客户端库向 GMS 进程注册回调，GMS 用共享引擎算出位置后，
+     * 在自己的线程上把结果异步 push 回各回调；投递时没有来自该 App 的 Binder 事务，
+     * Binder.getCallingUid() 只会返回 GMS 自身，于是 perPackage 永远命不中、只能套默认档。
+     *
+     * 方案：在「注册时刻」（此时仍处于来自该 App 的 Binder 事务中，getCallingUid 有效）把投递用的
+     * callback/listener binder 与请求方包名绑定；随后在投递代理上 hook，按 binder 反查包名并写入
+     * thread-local，让既有的 LocationResult/Location 改写链路自动使用对应 App 的档案。
+     */
+    private fun hookGmsReceiverBinding(classLoader: ClassLoader) {
+        // 稳定的 SDK 类名（不随 GMS 混淆/版本变化），注册时携带投递 binder 与请求方身份。
+        listOf(
+            "com.google.android.gms.location.internal.LocationReceiver",
+            "com.google.android.gms.location.internal.LocationRequestUpdateData"
+        ).forEach { className ->
+            val clazz = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
+            if (!hookedClasses.add(clazz)) return@forEach
+            XposedBridge.hookAllConstructors(clazz, afterHookedMethod {
+                captureReceiverBinding(thisObject)
+            })
+            HookLog.i(HookLog.Module.LOCATION, "hooked GMS receiver binding via ${clazz.simpleName}")
+        }
+    }
+
+    private fun captureReceiverBinding(holder: Any?) {
+        holder ?: return
+        val pkg = callingPackageForBinding()
+
+        // 1) 绑定所有投递 binder（ILocationCallback / ILocationListener / IFusedLocationProviderCallback）。
+        var current: Class<*>? = holder.javaClass
+        while (current != null && current != Any::class.java) {
+            current.declaredFields.forEach { field ->
+                runCatching {
+                    field.isAccessible = true
+                    when (val value = field.get(holder)) {
+                        is IInterface -> {
+                            value.asBinder()?.let { bindBinder(it, pkg) }
+                            hookDeliveryProxyClass(value.javaClass)
+                        }
+                        is IBinder -> bindBinder(value, pkg)
+                    }
+                }
+            }
+            current = current.superclass
+        }
+
+        // 2) 现代 LocationReceiver 仅持有裸 IBinder，投递代理须经其 accessor 取得：
+        //    扫描无参且返回 IInterface 的方法，惰性发现并 hook 投递代理类。
+        holder.javaClass.declaredMethods.forEach { method ->
+            if (method.parameterTypes.isEmpty() && IInterface::class.java.isAssignableFrom(method.returnType)) {
+                runCatching {
+                    method.isAccessible = true
+                    (method.invoke(holder) as? IInterface)?.let { hookDeliveryProxyClass(it.javaClass) }
+                }
+            }
+        }
+    }
+
+    private fun bindBinder(binder: IBinder, pkg: String?) {
+        pkg ?: return
+        receiverPackages[binder] = pkg
+        HookLog.d(HookLog.Module.LOCATION, "bound GMS delivery binder -> $pkg")
+    }
+
+    /**
+     * 注册发生在来自请求方 App 的 Binder 事务中时，getCallingUid() 即真正的请求方；
+     * 若构造发生在 GMS 内部（无事务上下文），则回退为 GMS 自身，放弃归属（保持默认档）。
+     */
+    private fun callingPackageForBinding(): String? {
+        val pkg = packageNameForUid(Binder.getCallingUid()) ?: return null
+        return pkg.takeIf { it != "com.google.android.gms" && it != "android" }
+    }
+
+    private fun hookDeliveryProxyClass(proxyClass: Class<*>) {
+        if (!IInterface::class.java.isAssignableFrom(proxyClass)) return
+        if (!hookedClasses.add(proxyClass)) return
+
+        var hooked = false
+        proxyClass.declaredMethods.forEach { method ->
+            val carriesLocation = method.parameterTypes.any { type ->
+                type == Location::class.java ||
+                    type.name == "com.google.android.gms.location.LocationResult" ||
+                    type.name == "com.google.android.gms.location.internal.FusedLocationProviderResult"
+            }
+            if (!carriesLocation) return@forEach
+
+            XposedBridge.hookMethod(method, hookedMethod(
+                before = {
+                    // 按投递目标 binder 反查包名，写入 thread-local（供同线程内嵌的 writeToParcel 等改写点消费），
+                    // 并就地改写入参，双保险。
+                    val pkg = (thisObject as? IInterface)?.asBinder()?.let { receiverPackages[it] }
+                    activeDeliveryPackage.set(pkg)
+                    resolveProfile(pkg)?.let { profile ->
+                        args.forEachIndexed { index, arg ->
+                            rewriteLocationContainer(arg, profile)?.let { args[index] = it }
+                        }
+                    }
+                },
+                after = {
+                    activeDeliveryPackage.remove()
+                }
+            ))
+            hooked = true
+        }
+        if (hooked) {
+            HookLog.i(HookLog.Module.LOCATION, "hooked GMS delivery proxy ${proxyClass.name}")
         }
     }
 
@@ -199,23 +343,34 @@ class FuckLocation : BaseHookModule(
         }
     }
 
-    private fun defaultProfile(): LocationProfile? {
+    private fun globalRewriteProfile(): LocationProfile? {
         val config = currentConfig()
         if (!config.enabled || !config.defaultProfile.enabled) return null
         return config.defaultProfile
     }
 
-    private fun globalRewriteProfile(): LocationProfile? {
+    private fun resolveProfile(packageName: String? = null): LocationProfile? {
         val config = currentConfig()
-        if (!config.enabled || config.perPackage.isNotEmpty() || !config.defaultProfile.enabled) return null
-        return config.defaultProfile
+        if (!config.enabled) return null
+
+        val callingUid = Binder.getCallingUid()
+        val pkg = packageName ?: activeDeliveryPackage.get() ?: packageNameForUid(callingUid)
+
+        val profile = if (pkg != null && pkg != "android" && pkg != "com.google.android.gms") {
+            config.perPackage[pkg] ?: config.defaultProfile
+        } else {
+            config.defaultProfile
+        }
+
+        if (profile.enabled) {
+            HookLog.d(HookLog.Module.LOCATION, "resolved profile for pkg=$pkg uid=$callingUid: lat=${profile.latitude} lon=${profile.longitude}")
+            return profile
+        }
+        return null
     }
 
     private fun profileForPackage(packageName: String?): LocationProfile? {
-        val config = currentConfig()
-        if (!config.enabled) return null
-        val profile = packageName?.let { config.perPackage[it] } ?: config.defaultProfile
-        return profile.takeIf { it.enabled }
+        return resolveProfile(packageName)
     }
 
     private fun profileForArgs(args: Array<Any?>): LocationProfile? {
@@ -230,47 +385,63 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(Location::class.java)) return
 
         XposedBridge.hookAllMethods(Location::class.java, "getLatitude", beforeHookedMethod {
-            defaultProfile()?.let { result = it.latitude }
+            resolveProfile()?.let { result = it.latitude }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getLongitude", beforeHookedMethod {
-            defaultProfile()?.let { result = it.longitude }
+            resolveProfile()?.let { result = it.longitude }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getAltitude", beforeHookedMethod {
-            defaultProfile()?.let { result = it.altitude }
+            resolveProfile()?.let { result = it.altitude }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getAccuracy", beforeHookedMethod {
-            defaultProfile()?.let { result = it.accuracy }
+            resolveProfile()?.let { result = it.accuracy }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getSpeed", beforeHookedMethod {
-            defaultProfile()?.let { result = it.speed }
+            resolveProfile()?.let { result = it.speed }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getBearing", beforeHookedMethod {
-            defaultProfile()?.let { result = it.bearing }
+            resolveProfile()?.let { result = it.bearing }
         })
         XposedBridge.hookAllMethods(Location::class.java, "getProvider", beforeHookedMethod {
-            if (defaultProfile() != null) result = LocationManager.GPS_PROVIDER
+            if (resolveProfile() != null) result = LocationManager.GPS_PROVIDER
         })
         XposedBridge.hookAllMethods(Location::class.java, "getTime", beforeHookedMethod {
-            if (defaultProfile() != null) result = System.currentTimeMillis()
+            if (resolveProfile() != null) result = System.currentTimeMillis()
         })
         XposedBridge.hookAllMethods(Location::class.java, "getElapsedRealtimeNanos", beforeHookedMethod {
-            if (defaultProfile() != null) result = SystemClock.elapsedRealtimeNanos()
+            if (resolveProfile() != null) result = SystemClock.elapsedRealtimeNanos()
         })
 
         runCatching {
             XposedBridge.hookAllMethods(Location::class.java, "isFromMockProvider", beforeHookedMethod {
-                if (defaultProfile() != null) result = false
+                if (resolveProfile() != null) result = false
             })
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             runCatching {
                 XposedBridge.hookAllMethods(Location::class.java, "isMock", beforeHookedMethod {
-                    if (defaultProfile() != null) result = false
+                    if (resolveProfile() != null) result = false
+                })
+            }
+        }
+        
+        // 关键修复：Hook writeToParcel 确保跨进程传输前数据已被修改
+        XposedBridge.hookAllMethods(Location::class.java, "writeToParcel", beforeHookedMethod {
+            val profile = resolveProfile() ?: return@beforeHookedMethod
+            (thisObject as Location).spoofInPlace(profile)
+        })
+
+        runCatching {
+            val creator = XposedHelpers.getStaticObjectField(Location::class.java, "CREATOR")
+            if (creator != null && hookedClasses.add(creator.javaClass)) {
+                XposedBridge.hookAllMethods(creator.javaClass, "createFromParcel", afterHookedMethod {
+                    val profile = resolveProfile() ?: return@afterHookedMethod
+                    (result as? Location)?.spoofInPlace(profile)
                 })
             }
         }
 
-        HookLog.i(HookLog.Module.LOCATION, "hooked Location accessors")
+        HookLog.i(HookLog.Module.LOCATION, "hooked Location accessors and CREATOR")
     }
 
     private fun hookLocationManagerService(classLoader: ClassLoader) {
@@ -425,6 +596,47 @@ class FuckLocation : BaseHookModule(
             classLoader
         ) ?: return
         hookLocationResultClass(resultClass)
+
+        XposedBridge.hookAllMethods(resultClass, "extractResult", afterHookedMethod {
+            val profile = resolveProfile() ?: return@afterHookedMethod
+            result = rewriteLocationContainer(result, profile)
+        })
+    }
+
+    private fun hookGoogleLocationCallbacks(classLoader: ClassLoader) {
+        val callbackClass = XposedHelpers.findClassIfExists(
+            "com.google.android.gms.location.LocationCallback",
+            classLoader
+        )
+        if (callbackClass != null && hookedClasses.add(callbackClass)) {
+            XposedBridge.hookAllMethods(callbackClass, "onLocationResult", beforeHookedMethod {
+                val profile = profileForReceiver(thisObject) ?: resolveProfile() ?: return@beforeHookedMethod
+                args[0] = rewriteLocationContainer(args[0], profile)
+            })
+        }
+
+        val listenerClass = XposedHelpers.findClassIfExists(
+            "com.google.android.gms.location.LocationListener",
+            classLoader
+        )
+        if (listenerClass != null && hookedClasses.add(listenerClass)) {
+            XposedBridge.hookAllMethods(listenerClass, "onLocationChanged", beforeHookedMethod {
+                val profile = profileForReceiver(thisObject) ?: resolveProfile() ?: return@beforeHookedMethod
+                if (args[0] is Location) {
+                    args[0] = (args[0] as Location).spoofed(profile)
+                }
+            })
+        }
+
+        val availabilityClass = XposedHelpers.findClassIfExists(
+            "com.google.android.gms.location.LocationAvailability",
+            classLoader
+        )
+        if (availabilityClass != null && hookedClasses.add(availabilityClass)) {
+            XposedBridge.hookAllMethods(availabilityClass, "isLocationAvailable", beforeHookedMethod {
+                if (resolveProfile() != null) result = true
+            })
+        }
     }
 
     private fun hookGoogleFusedClient(classLoader: ClassLoader) {
@@ -443,27 +655,112 @@ class FuckLocation : BaseHookModule(
         HookLog.i(HookLog.Module.LOCATION, "hooked Google FusedLocationProviderClient")
     }
 
+    private fun hookGmsInternalLocationService(classLoader: ClassLoader) {
+        // GMS location service implementation and common internal classes
+        val serviceClasses = listOf(
+            "com.google.android.gms.location.internal.zzas",
+            "com.google.android.gms.location.internal.zzat",
+            "com.google.android.gms.location.internal.zzau",
+            "com.google.android.gms.location.internal.LocationReceiver",
+            "com.google.android.gms.location.internal.zzm",
+            "com.google.android.gms.location.internal.GoogleLocationManagerService",
+            "com.google.android.gms.location.internal.LocationRequestInternal",
+            "com.google.android.gms.location.internal.LocationRequestUpdateData"
+        )
+        
+        serviceClasses.forEach { className ->
+            val clazz = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
+            if (!hookedClasses.add(clazz)) return@forEach
+            
+            clazz.declaredMethods.forEach { method ->
+                // Hook methods that handle LocationResult or Location
+                if (method.parameterTypes.any { it.name.endsWith(".LocationResult") || it == Location::class.java }) {
+                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                        val profile = profileForReceiver(thisObject) ?: profileForArgs(args) ?: resolveProfile() ?: return@beforeHookedMethod
+                        args.forEachIndexed { index, arg ->
+                            val rewritten = rewriteLocationContainer(arg, profile)
+                            if (rewritten != null && rewritten !== arg) {
+                                args[index] = rewritten
+                                HookLog.d(HookLog.Module.LOCATION, "spoofed GMS internal method ${method.name} arg $index")
+                            }
+                        }
+                    })
+                }
+            }
+
+            if (className.endsWith("LocationRequestInternal")) {
+                XposedBridge.hookAllMethods(clazz, "writeToParcel", beforeHookedMethod {
+                    val profile = profileForReceiver(thisObject) ?: resolveProfile() ?: return@beforeHookedMethod
+                    val locationRequest = getFieldValue(thisObject, "a") as? Location
+                    if (locationRequest != null) {
+                        locationRequest.spoofInPlace(profile)
+                    }
+                })
+            }
+        }
+        
+        // Hook FusedLocationProviderApi implementations
+        val apiImpls = listOf(
+            "com.google.android.gms.location.internal.zzv",
+            "com.google.android.gms.location.internal.zzay",
+            "com.google.android.gms.location.internal.zzbc"
+        )
+        apiImpls.forEach { className ->
+            val clazz = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
+            if (!hookedClasses.add(clazz)) return@forEach
+            
+            XposedBridge.hookAllMethods(clazz, "getLastLocation", afterHookedMethod {
+                val profile = profileForArgs(args) ?: resolveProfile() ?: return@afterHookedMethod
+                result = rewriteLocationContainer(result, profile)
+                if (result != null) {
+                    HookLog.d(HookLog.Module.LOCATION, "spoofed ${clazz.name}.getLastLocation result")
+                }
+            })
+
+            XposedBridge.hookAllMethods(clazz, "requestLocationUpdates", beforeHookedMethod {
+                val profile = profileForArgs(args) ?: resolveProfile() ?: return@beforeHookedMethod
+                args.forEachIndexed { index, arg ->
+                    val rewritten = rewriteLocationContainer(arg, profile)
+                    if (rewritten != null && rewritten !== arg) {
+                        args[index] = rewritten
+                        HookLog.d(HookLog.Module.LOCATION, "spoofed ${clazz.name}.requestLocationUpdates arg $index")
+                    }
+                }
+            })
+        }
+    }
+
     private fun hookLocationResultClass(resultClass: Class<*>) {
         if (!hookedClasses.add(resultClass)) return
 
         listOf("asList", "getLocations").forEach { methodName ->
             XposedBridge.hookAllMethods(resultClass, methodName, afterHookedMethod {
-                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                val profile = resolveProfile() ?: return@afterHookedMethod
                 result = rewriteLocationContainer(result, profile)
             })
         }
 
         XposedBridge.hookAllMethods(resultClass, "getLastLocation", afterHookedMethod {
-            val profile = globalRewriteProfile() ?: return@afterHookedMethod
+            val profile = resolveProfile() ?: return@afterHookedMethod
             if (result is Location) {
                 result = (result as Location).spoofed(profile)
             }
         })
 
         XposedBridge.hookAllMethods(resultClass, "writeToParcel", beforeHookedMethod {
-            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+            val profile = resolveProfile() ?: return@beforeHookedMethod
             rewriteLocationResult(thisObject, profile)
         })
+
+        runCatching {
+            val creator = XposedHelpers.getStaticObjectField(resultClass, "CREATOR")
+            if (creator != null && hookedClasses.add(creator.javaClass)) {
+                XposedBridge.hookAllMethods(creator.javaClass, "createFromParcel", afterHookedMethod {
+                    val profile = resolveProfile() ?: return@afterHookedMethod
+                    rewriteLocationContainer(result, profile)
+                })
+            }
+        }
 
         HookLog.i(HookLog.Module.LOCATION, "hooked LocationResult ${resultClass.name}")
     }
@@ -474,20 +771,20 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(taskClass)) return
 
         XposedBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
-            val profile = globalRewriteProfile() ?: return@afterHookedMethod
+            val profile = resolveProfile() ?: return@afterHookedMethod
             result = rewriteLocationContainer(result, profile)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
             XposedBridge.hookAllMethods(taskClass, methodName, hookedMethod(
                 before = {
-                    if (globalRewriteProfile() == null) return@hookedMethod
+                    if (resolveProfile() == null) return@hookedMethod
                     args.forEach { arg ->
                         hookGoogleTaskListener(arg)
                     }
                 },
                 after = {
-                    if (globalRewriteProfile() == null) return@hookedMethod
+                    if (resolveProfile() == null) return@hookedMethod
                     hookConcreteGoogleTask(thisObject)
                     hookConcreteGoogleTask(result)
                 }
@@ -504,13 +801,13 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(taskClass)) return
 
         XposedBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
-            val profile = globalRewriteProfile() ?: return@afterHookedMethod
+            val profile = resolveProfile() ?: return@afterHookedMethod
             result = rewriteLocationContainer(result, profile)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
             XposedBridge.hookAllMethods(taskClass, methodName, beforeHookedMethod {
-                if (globalRewriteProfile() == null) return@beforeHookedMethod
+                if (resolveProfile() == null) return@beforeHookedMethod
                 args.forEach { arg ->
                     hookGoogleTaskListener(arg)
                 }
@@ -531,14 +828,14 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(listenerClass)) return
 
         XposedBridge.hookAllMethods(listenerClass, "onSuccess", beforeHookedMethod {
-            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+            val profile = resolveProfile() ?: return@beforeHookedMethod
             args.forEachIndexed { index, arg ->
                 args[index] = rewriteLocationContainer(arg, profile)
             }
         })
 
         XposedBridge.hookAllMethods(listenerClass, "onComplete", beforeHookedMethod {
-            if (globalRewriteProfile() == null) return@beforeHookedMethod
+            if (resolveProfile() == null) return@beforeHookedMethod
             args.forEach { arg ->
                 hookConcreteGoogleTask(arg)
             }
@@ -587,34 +884,107 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun rewriteLocationResult(locationResult: Any, profile: LocationProfile): Boolean {
-        val locationsField = XposedHelpers.findFieldIfExists(locationResult.javaClass, "mLocations") ?: return false
-        locationsField.isAccessible = true
-        val original = locationsField.get(locationResult)
-        val rewritten = rewriteLocationContainer(original, profile)
-        if (rewritten === original) return false
-        locationsField.set(locationResult, rewritten)
-        return true
+        val clazz = locationResult.javaClass
+        // 尝试常见的字段名
+        val fields = listOf("mLocations", "zza", "zzb", "a", "b")
+        for (fieldName in fields) {
+            val field = XposedHelpers.findFieldIfExists(clazz, fieldName) ?: continue
+            field.isAccessible = true
+            val value = field.get(locationResult)
+            if (value is List<*> || value is Array<*>) {
+                val rewritten = rewriteLocationContainer(value, profile)
+                if (rewritten != null) {
+                    field.set(locationResult, rewritten)
+                    return true
+                }
+            }
+        }
+        
+        // 如果都没找到，遍历所有字段
+        clazz.declaredFields.forEach { field ->
+            runCatching {
+                field.isAccessible = true
+                val value = field.get(locationResult)
+                if (value is List<*> || value is Array<*>) {
+                    val rewritten = rewriteLocationContainer(value, profile)
+                    if (rewritten != null) {
+                        field.set(locationResult, rewritten)
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     private fun rewriteLocationContainer(value: Any?, profile: LocationProfile): Any? {
+        if (value == null) return null
         return when (value) {
-            is Location -> value.spoofed(profile)
+            is Location -> {
+                value.spoofInPlace(profile)
+                value
+            }
             is Array<*> -> {
-                value.forEachIndexed { index, item ->
+                value.forEach { item ->
                     if (item is Location) {
-                        @Suppress("UNCHECKED_CAST")
-                        (value as Array<Any?>)[index] = item.spoofed(profile)
+                        item.spoofInPlace(profile)
                     }
                 }
                 value
             }
-            is List<*> -> value.map { rewriteLocationContainer(it, profile) }
-            else -> value
+            is List<*> -> {
+                value.forEach { item ->
+                    if (item is Location) {
+                        item.spoofInPlace(profile)
+                    }
+                }
+                value
+            }
+            else -> {
+                val className = value.javaClass.name
+                if (className.endsWith(".LocationResult")) {
+                    rewriteLocationResult(value, profile)
+                }
+                value
+            }
         }
     }
 
     private fun Location.spoofed(profile: LocationProfile): Location {
         return fakeLocation(profile, provider ?: LocationManager.GPS_PROVIDER, this)
+    }
+
+    private fun Location.spoofInPlace(profile: LocationProfile) {
+        val now = System.currentTimeMillis()
+        val elapsed = SystemClock.elapsedRealtimeNanos()
+
+        latitude = profile.latitude
+        longitude = profile.longitude
+        altitude = profile.altitude
+        speed = profile.speed
+        bearing = profile.bearing
+        accuracy = profile.accuracy
+        time = now
+        elapsedRealtimeNanos = elapsed
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            verticalAccuracyMeters = MOCK_VERTICAL_ACCURACY
+            speedAccuracyMetersPerSecond = MOCK_SPEED_ACCURACY
+            bearingAccuracyDegrees = MOCK_BEARING_ACCURACY
+        }
+
+        runCatching {
+            XposedHelpers.callMethod(this, "setIsFromMockProvider", false)
+        }
+
+        val extras = Bundle(extras ?: Bundle())
+        listOf("mockLocation", "is_mock", "portal.enable").forEach(extras::remove)
+        extras.putBoolean("mockLocation", false)
+        extras.putInt("satellites", profile.satellites)
+        extras.putInt("visible_satellites", (profile.satellites + 4).coerceAtLeast(profile.satellites))
+        extras.putFloat("hdop", MOCK_HDOP)
+        extras.putDouble("altitude", profile.altitude)
+        this.extras = extras
     }
 
     private fun fakeLocation(
@@ -701,6 +1071,26 @@ class FuckLocation : BaseHookModule(
         directPackageNameFromObject(value)?.let { return it }
         packageNameFromWorkSource(value)?.let { return it }
 
+        val className = value.javaClass.name
+        if (className == "com.google.android.gms.common.internal.ClientIdentity") {
+            (getFieldValue(value, "b") as? String)?.takeIf { it.isLikelyPackageName() }?.let { return it }
+        }
+
+        if (className == "com.google.android.gms.location.internal.LocationRequestInternal") {
+            // LocationRequestInternal usually contains a list of ClientIdentities
+            listOf("mClientIdentities", "clients", "zzb").forEach { fieldName ->
+                val clients = getFieldValue(value, fieldName) as? List<*>
+                clients?.forEach { client ->
+                    packageNameFromObject(client)?.let { return it }
+                }
+            }
+        }
+
+        if (className == "com.google.android.gms.location.internal.LocationRequestUpdateData") {
+            packageNameFromObject(getFieldValue(value, "b"))?.let { return it } // LocationRequestInternal
+            (getFieldValue(value, "g") as? String)?.takeIf { it.isLikelyPackageName() }?.let { return it }
+        }
+
         listOf(
             "mCallerIdentity",
             "mIdentity",
@@ -708,17 +1098,20 @@ class FuckLocation : BaseHookModule(
             "mAttributionSource",
             "attributionSource",
             "mWorkSource",
-            "workSource"
+            "workSource",
+            "zza", "zzb", "zzc"
         ).forEach { fieldName ->
             val nested = getFieldValue(value, fieldName)
-            directPackageNameFromObject(nested)?.let { return it }
-            packageNameFromWorkSource(nested)?.let { return it }
+            if (nested != null && nested !== value) {
+                packageNameFromObject(nested)?.let { return it }
+            }
         }
 
         listOf("getCallerIdentity", "getIdentity", "getAttributionSource", "getWorkSource").forEach { methodName ->
             val nested = callNoArg(value, methodName)
-            directPackageNameFromObject(nested)?.let { return it }
-            packageNameFromWorkSource(nested)?.let { return it }
+            if (nested != null && nested !== value) {
+                packageNameFromObject(nested)?.let { return it }
+            }
         }
 
         return null
@@ -728,15 +1121,15 @@ class FuckLocation : BaseHookModule(
         value ?: return null
         if (value is String) return value.takeIf { it.isLikelyPackageName() }
 
-        listOf("mPackageName", "packageName", "mPackage", "package").forEach { fieldName ->
+        listOf("mPackageName", "packageName", "mPackage", "package", "zza", "zzb", "zzc").forEach { fieldName ->
             (getFieldValue(value, fieldName) as? String)
-                ?.takeIf { it.isLikelyPackageName() }
+                ?.takeIf { it.isLikelyPackageName() && it != "com.google.android.gms" }
                 ?.let { return it }
         }
 
         listOf("getPackageName", "getPackage").forEach { methodName ->
             (callNoArg(value, methodName) as? String)
-                ?.takeIf { it.isLikelyPackageName() }
+                ?.takeIf { it.isLikelyPackageName() && it != "com.google.android.gms" }
                 ?.let { return it }
         }
 

@@ -776,6 +776,7 @@ class SelfCheckActivity : AppCompatActivity() {
             values.add(formatLocationProbe(getString(R.string.self_check_location_fused_realtime), fusedRealtime))
 
             val hasLocation = values.any { !it.contains(getString(R.string.self_check_location_no_data)) }
+            Log.d(PHONE_DIAG_TAG, "Location check: \n" + values.joinToString("\n---\n"))
             CheckResult(
                 if (hasLocation) CheckState.VISIBLE else CheckState.BLOCKED,
                 if (hasLocation) getString(R.string.self_check_status_visible) else getString(R.string.self_check_status_not_visible),
