@@ -25,6 +25,7 @@ object HookLogSettings {
         "settings",
         "sim",
         "wifi",
+        "bluetooth",
         "unique_id",
         "notify"
     )

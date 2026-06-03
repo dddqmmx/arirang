@@ -59,6 +59,7 @@
     <string name="log_module_settings">设置提供器</string>
     <string name="log_module_sim">SIM</string>
     <string name="log_module_wifi">Wi-Fi</string>
+    <string name="log_module_bluetooth">蓝牙</string>
     <string name="log_module_unique_id">唯一标识</string>
     <string name="log_module_notify">Hook 服务桥接</string>
 

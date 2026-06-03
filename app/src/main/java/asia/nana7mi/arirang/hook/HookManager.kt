@@ -9,6 +9,7 @@ class HookManager : IXposedHookLoadPackage {
         FuckClipboard(),
         FuckSim(),
         FuckWifi(),
+        FuckBluetooth(),
         FuckLocation(),
         FuckSettingsProvider(),
         FuckGms(),

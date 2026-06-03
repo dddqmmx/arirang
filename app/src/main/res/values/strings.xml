@@ -59,6 +59,7 @@
     <string name="log_module_settings">Settings provider</string>
     <string name="log_module_sim">SIM</string>
     <string name="log_module_wifi">Wi-Fi</string>
+    <string name="log_module_bluetooth">Bluetooth</string>
     <string name="log_module_unique_id">Unique identifiers</string>
     <string name="log_module_notify">Hook service bridge</string>
 

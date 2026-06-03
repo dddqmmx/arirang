@@ -17,6 +17,7 @@ object HookLog {
         SETTINGS("settings"),
         SIM("sim"),
         WIFI("wifi"),
+        BLUETOOTH("bluetooth"),
         UNIQUE_ID("unique_id"),
         NOTIFY("notify")
     }

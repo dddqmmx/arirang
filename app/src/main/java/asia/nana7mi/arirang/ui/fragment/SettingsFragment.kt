@@ -362,6 +362,7 @@ private fun logModuleLabelRes(key: String): Int {
         "settings" -> R.string.log_module_settings
         "sim" -> R.string.log_module_sim
         "wifi" -> R.string.log_module_wifi
+        "bluetooth" -> R.string.log_module_bluetooth
         "unique_id" -> R.string.log_module_unique_id
         "notify" -> R.string.log_module_notify
         else -> R.string.log_settings_title

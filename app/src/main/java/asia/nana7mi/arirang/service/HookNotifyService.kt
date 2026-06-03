@@ -13,6 +13,7 @@ import android.os.Process
 import android.os.ResultReceiver
 import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
 import asia.nana7mi.arirang.data.datastore.ClipboardPromptPrefs
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
@@ -64,6 +65,7 @@ class HookNotifyService : Service() {
         private const val CONFIG_UNIQUE_IDENTIFIER = "unique_identifier"
         private const val CONFIG_HOOK_LOG = "hook_log"
         private const val CONFIG_WIFI = "wifi"
+        private const val CONFIG_BLUETOOTH = "bluetooth"
         private const val CONFIG_LOCATION = "location"
 
         private val TRUSTED_CALLER_PACKAGES = setOf(
@@ -126,6 +128,7 @@ class HookNotifyService : Service() {
         ),
         CONFIG_HOOK_LOG to HookConfigSource(HookLogSettings::lastModified, HookLogSettings::buildHookSnapshot),
         CONFIG_WIFI to HookConfigSource(WifiConfigPrefs::lastModified, WifiConfigPrefs::buildHookSnapshot),
+        CONFIG_BLUETOOTH to HookConfigSource(BluetoothConfigPrefs::lastModified, BluetoothConfigPrefs::buildHookSnapshot),
         CONFIG_LOCATION to HookConfigSource(LocationConfigPrefs::lastModified, LocationConfigPrefs::buildHookSnapshot)
     )
 
