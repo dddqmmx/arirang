@@ -884,37 +884,35 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun rewriteLocationResult(locationResult: Any, profile: LocationProfile): Boolean {
-        val clazz = locationResult.javaClass
-        // 尝试常见的字段名
-        val fields = listOf("mLocations", "zza", "zzb", "a", "b")
-        for (fieldName in fields) {
-            val field = XposedHelpers.findFieldIfExists(clazz, fieldName) ?: continue
-            field.isAccessible = true
-            val value = field.get(locationResult)
-            if (value is List<*> || value is Array<*>) {
-                val rewritten = rewriteLocationContainer(value, profile)
-                if (rewritten != null) {
-                    field.set(locationResult, rewritten)
-                    return true
-                }
+        // 首选稳定的公开 API：LocationResult.getLocations() 返回的就是其内部、且会被 writeToParcel
+        // 写出的同一批 Location 实例，就地改写即可，无需猜测随版本变化的混淆字段名。
+        runCatching { XposedHelpers.callMethod(locationResult, "getLocations") }
+            .getOrNull()
+            ?.takeIf { it.containsLocation() }
+            ?.let {
+                rewriteLocationContainer(it, profile)
+                return true
             }
-        }
-        
-        // 如果都没找到，遍历所有字段
-        clazz.declaredFields.forEach { field ->
+
+        // 回退：按「类型」而非「名字」扫描——任何持有 Location 的 List/Array 字段都就地改写。
+        var changed = false
+        locationResult.javaClass.declaredFields.forEach { field ->
             runCatching {
                 field.isAccessible = true
                 val value = field.get(locationResult)
-                if (value is List<*> || value is Array<*>) {
-                    val rewritten = rewriteLocationContainer(value, profile)
-                    if (rewritten != null) {
-                        field.set(locationResult, rewritten)
-                        return true
-                    }
+                if (value.containsLocation()) {
+                    rewriteLocationContainer(value, profile)
+                    changed = true
                 }
             }
         }
-        return false
+        return changed
+    }
+
+    private fun Any?.containsLocation(): Boolean = when (this) {
+        is List<*> -> any { it is Location }
+        is Array<*> -> any { it is Location }
+        else -> false
     }
 
     private fun rewriteLocationContainer(value: Any?, profile: LocationProfile): Any? {
