@@ -184,6 +184,35 @@ class BluetoothConfigActivity : ComponentActivity() {
                 }
 
                 item {
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.bluetooth_field_local_name),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = stringResource(R.string.bluetooth_field_local_name_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            BluetoothTextField(
+                                label = stringResource(R.string.bluetooth_field_local_name),
+                                value = config.deviceName,
+                                onValueChange = { config = config.copy(deviceName = it) }
+                            )
+                        }
+                    }
+                }
+
+                item {
                     ExpandableSectionCard(
                         title = stringResource(R.string.bluetooth_section_connected),
                         expanded = connectedExpanded,

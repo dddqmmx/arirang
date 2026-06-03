@@ -62,6 +62,7 @@
     <string name="self_check_bluetooth_permission_hint">Grant nearby device permission to check whether paired Bluetooth devices are hidden.</string>
     <string name="self_check_bluetooth_not_supported">This device does not report a Bluetooth adapter.</string>
     <string name="self_check_unknown_name">Unknown</string>
+    <string name="self_check_bluetooth_name">Device name: %1$s</string>
     <string name="self_check_wifi_current">Current network: %1$s</string>
     <string name="self_check_location_native_cache">Native Android API (cache)</string>
     <string name="self_check_location_native_realtime">Native Android API (real-time)</string>

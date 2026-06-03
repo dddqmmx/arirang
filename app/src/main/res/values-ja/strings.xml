@@ -162,6 +162,27 @@
     <string name="wifi_scan_result_title">周辺 Wi-Fi %1$d</string>
     <string name="wifi_apply_defaults">既定値を適用</string>
 
+    <string name="bluetooth_config_title">Bluetooth 情報</string>
+    <string name="bluetooth_hook_enabled">Hook を有効化</string>
+    <string name="bluetooth_hook_enabled_summary">アプリに返される接続済み Bluetooth デバイスと周辺スキャン結果を書き換えます。</string>
+    <string name="bluetooth_field_local_name">デバイス名</string>
+    <string name="bluetooth_field_local_name_summary">他人に表示されるこのデバイスの Bluetooth 名を設定します。</string>
+    <string name="bluetooth_section_connected">接続済みデバイス</string>
+    <string name="bluetooth_section_scan_result">周辺デバイス</string>
+    <string name="bluetooth_field_name">デバイス名</string>
+    <string name="bluetooth_field_address">MAC アドレス</string>
+    <string name="bluetooth_hide_all_connected">接続済みデバイスをすべて非表示</string>
+    <string name="bluetooth_hide_all_connected_summary">Hook 対象アプリへ空の接続済みデバイスリストを返します。</string>
+    <string name="bluetooth_hide_all_scan_results">周辺デバイスをすべて非表示</string>
+    <string name="bluetooth_hide_all_scan_results_summary">Hook 対象アプリへ空のスキャンリストを返します。</string>
+    <string name="bluetooth_add_connected_device">接続済みデバイスを追加</string>
+    <string name="bluetooth_remove_connected_device">接続済みデバイスを削除</string>
+    <string name="bluetooth_connected_device_title">接続済みデバイス %1$d</string>
+    <string name="bluetooth_add_scan_result">周辺デバイスを追加</string>
+    <string name="bluetooth_remove_scan_result">周辺デバイスを削除</string>
+    <string name="bluetooth_scan_result_title">周辺デバイス %1$d</string>
+    <string name="bluetooth_apply_defaults">既定値を適用</string>
+
     <!-- InitActivity Adaptation -->
     <string name="init_select_language">言語を選択</string>
     <string name="init_select_region">地域を選択</string>

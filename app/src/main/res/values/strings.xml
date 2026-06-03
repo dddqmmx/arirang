@@ -166,6 +166,8 @@
     <string name="bluetooth_config_title">Bluetooth Information</string>
     <string name="bluetooth_hook_enabled">Enable hook</string>
     <string name="bluetooth_hook_enabled_summary">Rewrites the connected Bluetooth devices and nearby scan results returned to apps.</string>
+    <string name="bluetooth_field_local_name">Device Name</string>
+    <string name="bluetooth_field_local_name_summary">Sets the name of this device visible to other Bluetooth devices.</string>
     <string name="bluetooth_section_connected">Connected Devices</string>
     <string name="bluetooth_section_scan_result">Nearby Devices</string>
     <string name="bluetooth_field_name">Device Name</string>

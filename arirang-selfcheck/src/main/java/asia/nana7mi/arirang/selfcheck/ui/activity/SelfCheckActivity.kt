@@ -934,16 +934,22 @@ class SelfCheckActivity : AppCompatActivity() {
                 )
             }
 
+            val deviceName = adapter.name ?: getString(R.string.self_check_unknown_name)
             val bondedDevices = adapter.bondedDevices.orEmpty()
             val samples = bondedDevices.take(8).joinToString("\n") { device ->
                 val name = device.name ?: getString(R.string.self_check_unknown_name)
                 "$name\n${device.address}"
             }
 
+            val content = listOfNotNull(
+                getString(R.string.self_check_bluetooth_name, deviceName),
+                samples.takeIf { it.isNotBlank() }
+            ).joinToString("\n\n")
+
             CheckResult(
-                if (bondedDevices.isEmpty()) CheckState.BLOCKED else CheckState.VISIBLE,
+                CheckState.VISIBLE,
                 resources.getQuantityString(R.plurals.self_check_bluetooth_status, bondedDevices.size, bondedDevices.size),
-                if (samples.isBlank()) getString(R.string.self_check_bluetooth_hidden) else samples
+                content.ifBlank { getString(R.string.self_check_bluetooth_hidden) }
             )
         } catch (e: Exception) {
             CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())

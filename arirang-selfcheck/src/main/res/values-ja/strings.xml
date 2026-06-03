@@ -52,6 +52,7 @@
     <string name="self_check_bluetooth_permission_hint">付近のデバイス権限を許可すると、ペアリング済みBluetoothデバイスが非表示になっているか確認できます。</string>
     <string name="self_check_bluetooth_not_supported">この端末はBluetoothアダプターを報告していません。</string>
     <string name="self_check_unknown_name">不明</string>
+    <string name="self_check_bluetooth_name">デバイス名: %1$s</string>
     <string name="self_check_wifi_current">現在のネットワーク: %1$s</string>
     <string name="self_check_location_native_cache">ネイティブ Android API（キャッシュ）</string>
     <string name="self_check_location_native_realtime">ネイティブ Android API（リアルタイム）</string>

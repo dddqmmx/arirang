@@ -14,6 +14,7 @@ object BluetoothConfigPrefs {
 
     const val KEY_ENABLED = "enabled"
     const val KEY_LAST_MODIFIED = "last_modified"
+    const val KEY_DEVICE_NAME = "device_name"
     const val KEY_CONNECTED_DEVICES = "connected_devices"
     const val KEY_HIDE_CONNECTED_DEVICES = "hide_connected_devices"
     const val KEY_HIDE_SCAN_RESULTS = "hide_scan_results"
@@ -31,6 +32,7 @@ object BluetoothConfigPrefs {
 
     data class Config(
         val enabled: Boolean = false,
+        val deviceName: String = "Arirang",
         val connectedDevices: List<Device> = listOf(Device()),
         val hideConnectedDevices: Boolean = false,
         val hideScanResults: Boolean = false,
@@ -43,6 +45,7 @@ object BluetoothConfigPrefs {
         val scanResults = parseDevices(prefs.getString(KEY_SCAN_RESULTS, null))
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
+            deviceName = prefs.getString(KEY_DEVICE_NAME, "Arirang") ?: "Arirang",
             connectedDevices = connectedDevices,
             hideConnectedDevices = prefs.getBoolean(KEY_HIDE_CONNECTED_DEVICES, false),
             hideScanResults = prefs.getBoolean(KEY_HIDE_SCAN_RESULTS, false),
@@ -54,6 +57,7 @@ object BluetoothConfigPrefs {
         prefs(context).edit(commit = true) {
             putBoolean(KEY_ENABLED, config.enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
+            putString(KEY_DEVICE_NAME, config.deviceName)
             putString(KEY_CONNECTED_DEVICES, gson.toJson(config.connectedDevices))
             putBoolean(KEY_HIDE_CONNECTED_DEVICES, config.hideConnectedDevices)
             putBoolean(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
@@ -89,6 +93,7 @@ object BluetoothConfigPrefs {
         return JSONObject()
             .put(KEY_ENABLED, config.enabled)
             .put(KEY_LAST_MODIFIED, lastModified(context))
+            .put(KEY_DEVICE_NAME, config.deviceName)
             .put(KEY_CONNECTED_DEVICES, connectedDevices)
             .put(KEY_HIDE_CONNECTED_DEVICES, config.hideConnectedDevices)
             .put(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)

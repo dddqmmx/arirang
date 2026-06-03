@@ -52,6 +52,7 @@
     <string name="self_check_bluetooth_permission_hint">授予附近设备权限后，可检查已配对蓝牙设备是否已被隐藏。</string>
     <string name="self_check_bluetooth_not_supported">这台设备没有报告蓝牙适配器。</string>
     <string name="self_check_unknown_name">未知</string>
+    <string name="self_check_bluetooth_name">设备名称：%1$s</string>
     <string name="self_check_wifi_current">当前网络：%1$s</string>
     <string name="self_check_location_native_cache">原生 Android API（缓存）</string>
     <string name="self_check_location_native_realtime">原生 Android API（实时）</string>
