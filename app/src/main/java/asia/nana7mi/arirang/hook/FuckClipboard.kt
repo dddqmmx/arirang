@@ -31,7 +31,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
             if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
 
-            val allowed = HookNotifyClient.requestClipboardReadAccess(callingPackage, uid, userId)
+            val allowed = ArirangClient.requestClipboardReadAccess(callingPackage, uid, userId)
             if (!allowed) {
                 HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
                 result = null

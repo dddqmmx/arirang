@@ -33,7 +33,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Arirang">
         <service
-            android:name=".service.HookNotifyService"
+            android:name=".service.ArirangService"
             android:exported="true"
             android:foregroundServiceType="specialUse">
             <!-- Android 14+ 要求对 specialUse 进行说明 -->

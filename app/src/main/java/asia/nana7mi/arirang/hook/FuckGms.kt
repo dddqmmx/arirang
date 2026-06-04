@@ -51,7 +51,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
             val context = gmsContext
-            HookNotifyClient.readConfigSnapshot(
+            ArirangClient.readConfigSnapshot(
                 configName = "unique_identifier",
                 force = force,
                 allowBind = context != null,
@@ -82,7 +82,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
         XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
             val app = thisObject as? Application ?: return@afterHookedMethod
             gmsContext = app.applicationContext
-            HookNotifyClient.autoBindCurrentUser(app)
+            ArirangClient.autoBindCurrentUser(app)
         })
     }
 

@@ -13,15 +13,14 @@ import android.os.Looper
 import android.os.SystemClock
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
-import asia.nana7mi.arirang.service.HookNotifyService
-import de.robv.android.xposed.XposedBridge
+import asia.nana7mi.arirang.service.ArirangService
 import de.robv.android.xposed.XposedHelpers
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * HookNotifyClient
+ * ArirangClient
  *
  * 运行环境：system_server
  * 作用：
@@ -35,10 +34,10 @@ import java.util.concurrent.TimeUnit
  * - 防止并发重复 bind
  * - 可配置 fail-open 策略（服务不可用时是否默认放行）
  */
-object HookNotifyClient {
+object ArirangClient {
 
     /** 日志 TAG */
-    private const val TAG = "HookNotifyClient"
+    private const val TAG = "ArirangClient"
 
     /** 目标服务所在包名 */
     private const val TARGET_PKG = BuildConfig.APPLICATION_ID
@@ -351,7 +350,7 @@ object HookNotifyClient {
         unstopPackage()
 
         val intent = Intent().apply {
-            component = ComponentName(TARGET_PKG, HookNotifyService::class.java.name)
+            component = ComponentName(TARGET_PKG, ArirangService::class.java.name)
             // 🟢 核心修复：包含处于停止状态的包
             addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
             // 增加前台优先级，确保快速启动
@@ -413,7 +412,7 @@ object HookNotifyClient {
         }
 
         val intent = Intent().apply {
-            component = ComponentName(TARGET_PKG, HookNotifyService::class.java.name)
+            component = ComponentName(TARGET_PKG, ArirangService::class.java.name)
             addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
         }
 

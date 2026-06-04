@@ -53,7 +53,7 @@ class FuckBluetooth : BaseHookModule(
         defaultValue = BluetoothConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
-            HookNotifyClient.readConfigSnapshot(
+            ArirangClient.readConfigSnapshot(
                 configName = "bluetooth",
                 force = force,
                 allowBind = true,

@@ -27,9 +27,9 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                 afterHookedMethod {
                     HookLog.i(HookLog.Module.CORE, "AMS systemReady, starting auto-bind to HookNotifyService")
 
-                    val ctx = HookNotifyClient.getSystemContext()
+                    val ctx = ArirangClient.getSystemContext()
                     if (ctx != null) {
-                        HookNotifyClient.autoBind(ctx)
+                        ArirangClient.autoBind(ctx)
 
                         val filter = IntentFilter().apply {
                             addAction(Intent.ACTION_PACKAGE_REPLACED)
@@ -44,7 +44,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                                 val pkgName = intent.data?.schemeSpecificPart
                                 if (pkgName == BuildConfig.APPLICATION_ID) {
                                     HookLog.i(HookLog.Module.CORE, "package $pkgName updated/restarted, trying to bind service")
-                                    HookNotifyClient.autoBind(context)
+                                    ArirangClient.autoBind(context)
                                 }
                             }
                         }, filter, null, null)

@@ -99,7 +99,7 @@ class FuckLocation : BaseHookModule(
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
             val context = gmsContext
-            HookNotifyClient.readConfigSnapshot(
+            ArirangClient.readConfigSnapshot(
                 configName = "location",
                 force = force,
                 allowBind = true,
@@ -155,7 +155,7 @@ class FuckLocation : BaseHookModule(
         XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
             val app = thisObject as? Application ?: return@afterHookedMethod
             gmsContext = app.applicationContext
-            HookNotifyClient.autoBindCurrentUser(app)
+            ArirangClient.autoBindCurrentUser(app)
         })
     }
 
@@ -1055,7 +1055,7 @@ class FuckLocation : BaseHookModule(
     private fun packageNameForUid(uid: Int): String? {
         if (uid <= 0) return null
         return runCatching {
-            HookNotifyClient.getSystemContext()
+            ArirangClient.getSystemContext()
                 ?.packageManager
                 ?.getPackagesForUid(uid)
                 ?.firstOrNull()

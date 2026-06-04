@@ -61,7 +61,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         val context = runCatching {
             XposedHelpers.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
-        val snapshot = HookNotifyClient.readConfigSnapshot(
+        val snapshot = ArirangClient.readConfigSnapshot(
             configName = "unique_identifier",
             allowBind = true,
             bindContext = context,

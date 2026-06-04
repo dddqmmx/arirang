@@ -106,7 +106,7 @@ object HookLog {
     }
 
     private fun hookLogSnapshotJson(): JSONObject? {
-        HookNotifyClient.readConfigSnapshot(
+        ArirangClient.readConfigSnapshot(
             configName = "hook_log",
             allowBind = true,
             logName = "hook log"

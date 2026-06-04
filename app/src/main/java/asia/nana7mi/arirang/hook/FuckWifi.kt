@@ -2,7 +2,6 @@ package asia.nana7mi.arirang.hook
 
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
-import android.os.SystemClock
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -53,7 +52,7 @@ class FuckWifi : BaseHookModule(
         defaultValue = WifiConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
-            HookNotifyClient.readConfigSnapshot(
+            ArirangClient.readConfigSnapshot(
                 configName = "wifi",
                 force = force,
                 allowBind = true,

@@ -230,7 +230,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
             val app = thisObject as? android.app.Application ?: return@afterHookedMethod
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                HookNotifyClient.autoBindCurrentUser(app)
+                ArirangClient.autoBindCurrentUser(app)
                 currentHookConfig(force = true)
                 writeProofTelephonyProperties()
             }, 5_000L)
@@ -1786,7 +1786,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private fun readHookNotifyValues(force: Boolean = false): Map<String, String>? {
         if (!preferHookNotifyConfig) return null
-        return HookNotifyClient.readConfigSnapshot(
+        return ArirangClient.readConfigSnapshot(
             configName = "sim",
             force = force,
             logName = "SIM"
@@ -1804,7 +1804,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun readUniqueIdentifierConfig(force: Boolean = false): UniqueIdentifierConfig {
-        val hookNotifyValues = HookNotifyClient.readConfigSnapshot(
+        val hookNotifyValues = ArirangClient.readConfigSnapshot(
             configName = "unique_identifier",
             force = force,
             logName = "unique identifier"

@@ -32,19 +32,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * HookNotifyService 是一个后台 Service，用于处理应用对剪贴板访问的请求。
- * 它提供 IPC 接口，允许其他应用通过 AIDL 调用 requestClipboardRead 来获取用户允许或拒绝的结果。
- *
- * 核心逻辑：
- * 1. 支持 Always Allow / Always Deny 策略。
- * 2. 支持弹出确认对话框让用户决定。
- * 3. 请求有超时机制，防止 UI 未响应导致阻塞。
- * 4. 并发请求通过 ConcurrentHashMap 管理，避免过载。
+ * ArirangService 是一个后台 Service
  */
-class HookNotifyService : Service() {
+class ArirangService : Service() {
 
     companion object {
-        private const val TAG = "HookNotifyService"
+        private const val TAG = "ArirangService"
         private const val PER_USER_RANGE = 100_000
 
         // 内部决策值：允许或拒绝
@@ -251,7 +244,7 @@ class HookNotifyService : Service() {
                 Log.w(TAG, "Rejected config version request from uid=$callingUid config=$configName")
                 return 0L
             }
-            return hookConfigSources[configName]?.lastModified?.invoke(this@HookNotifyService) ?: 0L
+            return hookConfigSources[configName]?.lastModified?.invoke(this@ArirangService) ?: 0L
         }
 
         override fun readConfigSnapshot(configName: String): String {
@@ -260,7 +253,7 @@ class HookNotifyService : Service() {
                 Log.w(TAG, "Rejected config snapshot request from uid=$callingUid config=$configName")
                 return ""
             }
-            return hookConfigSources[configName]?.snapshot?.invoke(this@HookNotifyService).orEmpty()
+            return hookConfigSources[configName]?.snapshot?.invoke(this@ArirangService).orEmpty()
         }
     }
 
@@ -391,19 +384,19 @@ class HookNotifyService : Service() {
      */
     private fun loadPolicy() {
         serviceScope.launch {
-            ClipboardPromptPrefs.getAllAppPoliciesFlow(this@HookNotifyService).collect { policies ->
+            ClipboardPromptPrefs.getAllAppPoliciesFlow(this@ArirangService).collect { policies ->
                 synchronized(policyLock) {
                     appPolicies = policies
                 }
             }
         }
         serviceScope.launch {
-            ClipboardPromptPrefs.isFeatureEnabledFlow(this@HookNotifyService).collect { enabled ->
+            ClipboardPromptPrefs.isFeatureEnabledFlow(this@ArirangService).collect { enabled ->
                 isFeatureEnabled = enabled
             }
         }
         serviceScope.launch {
-            ClipboardPromptPrefs.getDefaultPolicyFlow(this@HookNotifyService).collect { policy ->
+            ClipboardPromptPrefs.getDefaultPolicyFlow(this@ArirangService).collect { policy ->
                 defaultPolicy = policy
             }
         }
@@ -440,7 +433,7 @@ class HookNotifyService : Service() {
      */
     private fun persistPolicyLocked(userId: Int, pkgName: String, policy: ClipboardPromptPrefs.Policy) {
         serviceScope.launch {
-            ClipboardPromptPrefs.setAppPolicyForUser(this@HookNotifyService, userId, pkgName, policy)
+            ClipboardPromptPrefs.setAppPolicyForUser(this@ArirangService, userId, pkgName, policy)
         }
     }
 

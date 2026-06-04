@@ -13,7 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.hook.IHookNotify
-import asia.nana7mi.arirang.service.HookNotifyService
+import asia.nana7mi.arirang.service.ArirangService
 import kotlin.concurrent.thread
 
 class TestActivity : AppCompatActivity() {
@@ -55,7 +55,7 @@ class TestActivity : AppCompatActivity() {
         }
 
         // Bind service automatically on create
-        val intent = Intent(this, HookNotifyService::class.java)
+        val intent = Intent(this, ArirangService::class.java)
         bindService(intent, conn, BIND_AUTO_CREATE)
     }
 
@@ -78,7 +78,7 @@ class TestActivity : AppCompatActivity() {
             }
         } else {
             Toast.makeText(this, R.string.service_not_connected, Toast.LENGTH_SHORT).show()
-            val intent = Intent(this, HookNotifyService::class.java)
+            val intent = Intent(this, ArirangService::class.java)
             bindService(intent, conn, BIND_AUTO_CREATE)
         }
     }
