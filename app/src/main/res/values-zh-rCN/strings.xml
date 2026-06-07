@@ -26,8 +26,8 @@
     <string name="feature_sensor_info">传感器信息</string>
     <string name="feature_contacts">联系人</string>
     <string name="feature_app_list">应用列表</string>
-    <string name="feature_wifi_list">Wi-Fi列表</string>
-    <string name="feature_bluetooth_list">蓝牙列表</string>
+    <string name="feature_wifi_list">Wi-Fi</string>
+    <string name="feature_bluetooth_list">蓝牙</string>
 
     <string name="feature_background_network">后台联网</string>
     <string name="feature_force_proxy">强制代理</string>

@@ -12,19 +12,19 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import asia.nana7mi.arirang.R
-import asia.nana7mi.arirang.hook.IHookNotify
+import asia.nana7mi.arirang.hook.IArirangService
 import asia.nana7mi.arirang.service.ArirangService
 import kotlin.concurrent.thread
 
 class TestActivity : AppCompatActivity() {
 
-    private var hookNotify: IHookNotify? = null
+    private var hookNotify: IArirangService? = null
     private lateinit var tvResult: TextView
     private val handler = Handler(Looper.getMainLooper())
 
     private val conn = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            hookNotify = IHookNotify.Stub.asInterface(service)
+            hookNotify = IArirangService.Stub.asInterface(service)
             Toast.makeText(this@TestActivity, R.string.service_connected, Toast.LENGTH_SHORT).show()
         }
 
@@ -64,7 +64,7 @@ class TestActivity : AppCompatActivity() {
         if (notify != null) {
             thread {
                 try {
-                    // This is a blocking call if it goes to HookNotifyService which waits for latch
+                    // This is a blocking call if it goes to ArirangService which waits for latch
                     val decision = notify.requestClipboardRead(packageName, 10000, 0, 15000L)
                     val resultResId = if (decision == 1) {
                         R.string.result_allow

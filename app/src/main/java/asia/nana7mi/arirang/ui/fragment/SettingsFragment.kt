@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Language
@@ -185,7 +187,10 @@ private fun HookLogDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.log_settings_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 modules.forEach { module ->
                     var enabled by remember(module.key) {
                         mutableStateOf(HookLogSettings.isEnabled(context, module.key))
@@ -319,7 +324,10 @@ private fun RegionDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.init_select_region)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 regionNames.zip(regionCodes).forEach { (name, code) ->
                     Row(
                         modifier = Modifier

@@ -84,7 +84,9 @@ object HookLog {
             resolvingConfig.set(true)
             try {
                 val updated = buildMap {
-                    val json = hookLogSnapshotJson()
+                    val json = runCatching { hookLogSnapshotJson() }.onFailure {
+                        XposedBridge.log("Arirang/HookLog/E: failed to read hook log snapshot: ${it.message}")
+                    }.getOrNull()
                     readSwitch("all")?.let { put("all", it) }
                     readSwitch("debug")?.let { put("debug", it) }
                     Module.entries.forEach { module ->

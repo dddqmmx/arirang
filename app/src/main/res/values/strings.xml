@@ -26,8 +26,8 @@
     <string name="feature_sensor_info">Sensor Info</string>
     <string name="feature_contacts">Contacts</string>
     <string name="feature_app_list">App List</string>
-    <string name="feature_wifi_list">Wi-Fi List</string>
-    <string name="feature_bluetooth_list">Bluetooth List</string>
+    <string name="feature_wifi_list">Wi-Fi</string>
+    <string name="feature_bluetooth_list">Bluetooth</string>
 
     <string name="feature_background_network">Background Network</string>
     <string name="feature_force_proxy">Force Proxy</string>

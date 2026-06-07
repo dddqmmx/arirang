@@ -9,7 +9,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
 // through the normal Settings.Secure path instead of per-app hooks.
-class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.providers.settings")) {
+class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.providers.settings", "org.derpfest.settingsstorage")) {
 
     private companion object {
         private const val KEY_ENABLED = "enabled"
@@ -17,22 +17,33 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
     }
 
     override fun isEnabled(): Boolean {
-        return readAndroidIdFromConfig(null) != null
+        return true
     }
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         val classLoader = lpparam.classLoader
-        if (lpparam.packageName != "com.android.providers.settings") return
+        
+        // Target any settings provider
+        val isSettingsProvider = lpparam.packageName.contains("providers.settings") || 
+                                 lpparam.packageName.contains("settingsstorage")
+
+        if (!isSettingsProvider) return
+
+        HookLog.i(HookLog.Module.SETTINGS, "Installing settings hook for ${lpparam.packageName}")
 
         try {
-            val lmsClass = XposedHelpers.findClass(
+            val lmsClass = XposedHelpers.findClassIfExists(
                 "com.android.providers.settings.SettingsProvider",
                 classLoader
-            )
+            ) ?: XposedHelpers.findClassIfExists(
+                "org.derpfest.settingsstorage.SettingsProvider", // Speculative
+                classLoader
+            ) ?: return
+
             hookCall(lmsClass)
 
         } catch (t: Throwable) {
-            HookLog.e(HookLog.Module.SETTINGS, "hook failed", t)
+            HookLog.e(HookLog.Module.SETTINGS, "hook failed for ${lpparam.packageName}", t)
         }
     }
 
@@ -45,13 +56,47 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
             beforeHookedMethod {
                 val method = args[0] as? String
                 val request = args[1] as? String
-                val callMethodGetSecureField = XposedHelpers.findField(Settings::class.java, "CALL_METHOD_GET_SECURE")
-                val callMethodGetSecure = callMethodGetSecureField.get(null) as String
+                
+                // Diagnostic: Log all interesting requests
+                if (request?.contains("blue", ignoreCase = true) == true || 
+                    request?.contains("name", ignoreCase = true) == true ||
+                    request?.contains("device", ignoreCase = true) == true) {
+                    HookLog.i(HookLog.Module.SETTINGS, "Settings call: method=$method, request=$request")
+                }
+
+                // Handle Android ID (Secure)
+                val callMethodGetSecure = runCatching {
+                    XposedHelpers.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_SECURE") as String
+                }.getOrNull() ?: "get_secure"
+
                 if (method == callMethodGetSecure && request == Settings.Secure.ANDROID_ID) {
                     val androidId = readAndroidIdFromConfig(thisObject) ?: return@beforeHookedMethod
                     val bundle = Bundle()
                     bundle.putString(Settings.NameValueTable.VALUE, androidId)
                     result = bundle
+                    return@beforeHookedMethod
+                }
+
+                if (method == callMethodGetSecure && request == "bluetooth_name") {
+                    val bluetoothName = readBluetoothNameFromConfig(thisObject) ?: return@beforeHookedMethod
+                    val bundle = Bundle()
+                    bundle.putString(Settings.NameValueTable.VALUE, bluetoothName)
+                    result = bundle
+                    HookLog.i(HookLog.Module.SETTINGS, "spoof Settings.Secure.bluetooth_name -> $bluetoothName")
+                    return@beforeHookedMethod
+                }
+
+                // Handle Bluetooth Name (Global)
+                val callMethodGetGlobal = runCatching {
+                    XposedHelpers.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_GLOBAL") as String
+                }.getOrNull() ?: "get_global"
+
+                if (method == callMethodGetGlobal && (request == "bluetooth_name" || request == "device_name")) {
+                    val bluetoothName = readBluetoothNameFromConfig(thisObject) ?: return@beforeHookedMethod
+                    val bundle = Bundle()
+                    bundle.putString(Settings.NameValueTable.VALUE, bluetoothName)
+                    result = bundle
+                    HookLog.i(HookLog.Module.SETTINGS, "spoof Settings.Global.$request -> $bluetoothName")
                 }
             }
         )
@@ -78,6 +123,29 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
         if (!values[KEY_ENABLED]?.toBooleanStrictOrNull().orFalse()) return null
         return values[KEY_ANDROID_ID]?.takeIf { it.isNotBlank() }
+    }
+
+    private fun readBluetoothNameFromConfig(settingsProvider: Any?): String? {
+        val context = runCatching {
+            XposedHelpers.callMethod(settingsProvider, "getContext") as? Context
+        }.getOrNull()
+        val snapshot = ArirangClient.readConfigSnapshot(
+            configName = "bluetooth",
+            allowBind = true,
+            bindContext = context,
+            logName = "Bluetooth"
+        )
+        val values = snapshot
+            ?.let { HookConfigFile.readSnapshotValues(it, HookLog.Module.SETTINGS, "Bluetooth") }
+            ?: HookConfigFile.readSharedPrefsValues(
+                prefsName = "bluetooth_config",
+                logModule = HookLog.Module.SETTINGS,
+                logName = "Bluetooth"
+            )
+            ?: return null
+
+        if (!values["enabled"]?.toBooleanStrictOrNull().orFalse()) return null
+        return values["device_name"]?.takeIf { it.isNotBlank() }
     }
 
     private fun Boolean?.orFalse(): Boolean {

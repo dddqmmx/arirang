@@ -10,6 +10,7 @@ import android.os.DeadObjectException
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.Process
 import android.os.SystemClock
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
@@ -71,7 +72,7 @@ object ArirangClient {
      * @Volatile 保证多线程可见性
      */
     @Volatile
-    private var sService: IHookNotify? = null
+    private var sService: IArirangService? = null
 
     /**
      * 是否正在进行 bind 操作
@@ -145,7 +146,7 @@ object ArirangClient {
             HookLog.i(HookLog.Module.NOTIFY, "onServiceConnected $name")
             try {
                 // 将 IBinder 转换为 AIDL 接口
-                sService = IHookNotify.Stub.asInterface(service)
+                sService = IArirangService.Stub.asInterface(service)
                 // 连接成功，移除潜在的重连任务
                 handler.removeCallbacks(reconnectRunnable)
             } catch (t: Throwable) {
@@ -291,13 +292,23 @@ object ArirangClient {
             return cachedSnapshot
         }
 
+        // system 绑定路径（bindServiceAsUser(SYSTEM) + unstopPackage）依赖
+        // system_server 的权限，只有在 system_server 进程中才可用。在独立宿主
+        // 进程（如 com.android.bluetooth）里这些特权调用会失败，导致永远绑不上
+        // 服务、读不到配置。此时必须退化为普通的 current-user 绑定。
+        val useCurrentUser = bindCurrentUser || !isSystemServer()
+
         val service = if (allowBind) {
-            val ctx = bindContext ?: getSystemContext()
+            // 非 system_server 进程优先用宿主自身的 Application Context 绑定，
+            // 这样 bindService 归属正确；system_server 仍用 system context。
+            val ctx = bindContext
+                ?: (if (useCurrentUser) hostAppContext() else null)
+                ?: getSystemContext()
             if (ctx == null) {
                 HookLog.i(HookLog.Module.NOTIFY, "read $logName config snapshot: no context")
                 return cachedSnapshot
             }
-            if (bindCurrentUser) {
+            if (useCurrentUser) {
                 getOrBindServiceCurrentUser(ctx)
             } else {
                 getOrBindService(ctx)
@@ -481,7 +492,7 @@ object ArirangClient {
      * - 触发 bind
      * - 最多等待 BIND_WAIT_MS
      */
-    private fun getOrBindService(ctx: Context): IHookNotify? {
+    private fun getOrBindService(ctx: Context): IArirangService? {
 
         // 快速路径
         sService?.let { return it }
@@ -498,7 +509,7 @@ object ArirangClient {
         return sService
     }
 
-    private fun getOrBindServiceCurrentUser(ctx: Context): IHookNotify? {
+    private fun getOrBindServiceCurrentUser(ctx: Context): IArirangService? {
         sService?.let { return it }
 
         ensureBoundCurrentUser(ctx)
@@ -520,6 +531,31 @@ object ArirangClient {
      *
      * @return system Context 或 null
      */
+    /**
+     * 当前进程是否为 system_server。
+     *
+     * system_server 以 SYSTEM_UID(1000) 运行；其它被注入的宿主进程（如
+     * com.android.bluetooth、com.android.phone）则使用各自独立的 UID。
+     * 用于决定 bind 时走特权的 system 路径还是普通的 current-user 路径。
+     */
+    private fun isSystemServer(): Boolean = Process.myUid() == Process.SYSTEM_UID
+
+    /**
+     * 当前被注入宿主进程的 Application Context（可能为空）。
+     *
+     * 用于非 system_server 进程绑定服务，避免使用框架 system context 导致
+     * bindService 归属异常。
+     */
+    @SuppressLint("PrivateApi")
+    private fun hostAppContext(): Context? {
+        return runCatching {
+            val atClass = Class.forName("android.app.ActivityThread")
+            val at = XposedHelpers.callStaticMethod(atClass, "currentActivityThread")
+                ?: return null
+            XposedHelpers.callMethod(at, "getApplication") as? Context
+        }.getOrNull()
+    }
+
     @SuppressLint("PrivateApi")
     fun getSystemContext(): Context? {
         return try {

@@ -5,6 +5,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Binder
+import android.os.Binder.getCallingUid
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -20,7 +21,8 @@ import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
-import asia.nana7mi.arirang.hook.IHookNotify
+import asia.nana7mi.arirang.hook.IArirangService
+import asia.nana7mi.arirang.model.ClipboardAccessDecision
 import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,16 +42,6 @@ class ArirangService : Service() {
         private const val TAG = "ArirangService"
         private const val PER_USER_RANGE = 100_000
 
-        // 内部决策值：允许或拒绝
-        private const val DECISION_DENY = 0
-        private const val DECISION_ALLOW = 1
-
-        // UI 返回结果码
-        private const val UI_RESULT_DENY_ONCE = 0       // 本次拒绝
-        private const val UI_RESULT_ALLOW_ONCE = 1      // 本次允许
-        private const val UI_RESULT_ALLOW_ALWAYS = 2    // 永久允许
-        private const val UI_RESULT_DENY_ALWAYS = 3     // 永久拒绝
-
         private const val DEFAULT_TIMEOUT_MS = 2500L    // 默认超时 2.5 秒
         private const val MAX_TIMEOUT_MS = 3000L        // 最大超时 3 秒
         private const val MAX_PENDING_REQUESTS = 8      // 最大同时等待请求数
@@ -68,6 +60,7 @@ class ArirangService : Service() {
             "com.android.networkstack",
             "com.android.networkstack.inprocess",
             "com.android.wifi",
+            "com.android.bluetooth",
             BuildConfig.APPLICATION_ID
         )
     }
@@ -126,10 +119,10 @@ class ArirangService : Service() {
     )
 
     /**
-     * Binder 对象，实现 AIDL 接口 IHookNotify
+     * Binder 对象，实现 AIDL 接口 IArirangService
      * 提供给其他进程调用
      */
-    private val binder = object : IHookNotify.Stub() {
+    private val binder = object : IArirangService.Stub() {
 
         /**
          * 请求读取剪贴板
@@ -140,36 +133,40 @@ class ArirangService : Service() {
          * @return DECISION_ALLOW 或 DECISION_DENY
          */
         override fun requestClipboardRead(pkgName: String, uid: Int, userId: Int, timeoutMs: Long): Int {
+            return handleClipboardRequest(pkgName, uid, userId, timeoutMs).value
+        }
+
+        fun handleClipboardRequest(pkgName: String, uid: Int, userId: Int, timeoutMs: Long): ClipboardAccessDecision {
             val normalizedPkgName = pkgName.trim()
-            val callingUid = Binder.getCallingUid()
+            val callingUid = getCallingUid()
             if (!isTrustedCaller(callingUid) ||
                 !isAuthorizedPackageForCaller(callingUid, normalizedPkgName) ||
                 !isPackageOwnedByUid(uid, normalizedPkgName)
             ) {
                 Log.w(TAG, "Rejected clipboard decision request from uid=$callingUid for pkg=$pkgName")
-                return DECISION_DENY
+                return ClipboardAccessDecision.ALLOW
             }
 
             if (userId != serviceUserId) {
                 Log.w(TAG, "Rejected cross-user clipboard request for pkg=$normalizedPkgName callerUser=$userId serviceUser=$serviceUserId")
-                return DECISION_DENY
+                return ClipboardAccessDecision.DENY
             }
 
-            if (!isFeatureEnabled) return DECISION_ALLOW
+            if (!isFeatureEnabled) return ClipboardAccessDecision.ALLOW
 
             val policyKey = ClipboardPromptPrefs.scopedPolicyId(userId, normalizedPkgName)
             val policy = synchronized(policyLock) { appPolicies[policyKey] } ?: defaultPolicy
 
-            if (policy == ClipboardPromptPrefs.Policy.ALLOW) return DECISION_ALLOW
-            if (policy == ClipboardPromptPrefs.Policy.DENY) return DECISION_DENY
+            if (policy == ClipboardPromptPrefs.Policy.ALLOW) return ClipboardAccessDecision.ALLOW
+            if (policy == ClipboardPromptPrefs.Policy.DENY) return ClipboardAccessDecision.DENY
 
             // 如果处于锁屏状态，直接拒绝
             if (keyguardManager?.isKeyguardLocked == true) {
-                return DECISION_DENY
+                return ClipboardAccessDecision.DENY
             }
 
             // 超过最大待处理请求数则直接拒绝
-            if (pendingRequests.size >= MAX_PENDING_REQUESTS) return DECISION_DENY
+            if (pendingRequests.size >= MAX_PENDING_REQUESTS) return ClipboardAccessDecision.DENY
 
             // 为本次请求生成唯一 ID，并存储 PendingRequest 对象
             val requestId = requestIdGenerator.getAndIncrement()
@@ -196,16 +193,16 @@ class ArirangService : Service() {
                     // 超时未决策，标记并安排清理
                     pending.timedOut = true
                     scheduleCleanup(requestId)
-                    DECISION_DENY
+                    ClipboardAccessDecision.DENY
                 } else {
                     // 移除请求并返回用户决策
                     pendingRequests.remove(requestId)
-                    pending.decision ?: DECISION_DENY
+                    pending.decision?.let { ClipboardAccessDecision.fromInt(it) } ?: ClipboardAccessDecision.DENY
                 }
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
                 pendingRequests.remove(requestId)
-                DECISION_DENY
+                ClipboardAccessDecision.DENY
             }
         }
 
@@ -218,7 +215,7 @@ class ArirangService : Service() {
          */
         override fun onPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {
             val normalizedPkgName = pkgName.trim()
-            val callingUid = Binder.getCallingUid()
+            val callingUid = getCallingUid()
             if (!isTrustedCaller(callingUid) ||
                 !isAuthorizedPackageForCaller(callingUid, normalizedPkgName) ||
                 !isPackageOwnedByUid(uid, normalizedPkgName)
@@ -239,7 +236,7 @@ class ArirangService : Service() {
         }
 
         override fun readConfigVersion(configName: String): Long {
-            val callingUid = Binder.getCallingUid()
+            val callingUid = getCallingUid()
             if (!isTrustedCaller(callingUid)) {
                 Log.w(TAG, "Rejected config version request from uid=$callingUid config=$configName")
                 return 0L
@@ -248,7 +245,7 @@ class ArirangService : Service() {
         }
 
         override fun readConfigSnapshot(configName: String): String {
-            val callingUid = Binder.getCallingUid()
+            val callingUid = getCallingUid()
             if (!isTrustedCaller(callingUid)) {
                 Log.w(TAG, "Rejected config snapshot request from uid=$callingUid config=$configName")
                 return ""
@@ -269,14 +266,8 @@ class ArirangService : Service() {
         return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent): IBinder? {
-        val callingUid = Binder.getCallingUid()
-        return if (isTrustedCaller(callingUid)) {
-            binder
-        } else {
-            Log.w(TAG, "Rejected bind from uid=$callingUid")
-            null
-        }
+    override fun onBind(intent: Intent): IBinder {
+        return binder
     }
 
     private fun isTrustedCaller(callingUid: Int): Boolean {
@@ -328,7 +319,7 @@ class ArirangService : Service() {
             startActivity(intent, options.toBundle())
         } catch (_: Exception) {
             // 如果无法启动 Activity，默认拒绝
-            receiver?.send(UI_RESULT_DENY_ONCE, Bundle.EMPTY)
+            receiver?.send(ConfirmDialogActivity.RESULT_DENY_ONCE, Bundle.EMPTY)
         }
     }
 
@@ -344,14 +335,14 @@ class ArirangService : Service() {
             override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
                 // 更新永久允许/拒绝策略
                 when (resultCode) {
-                    UI_RESULT_ALLOW_ALWAYS -> setAlwaysAllowed(userId, pkgName)
-                    UI_RESULT_DENY_ALWAYS -> setAlwaysDenied(userId, pkgName)
+                    ConfirmDialogActivity.RESULT_ALLOW_ALWAYS -> setAlwaysAllowed(userId, pkgName)
+                    ConfirmDialogActivity.RESULT_DENY_ALWAYS -> setAlwaysDenied(userId, pkgName)
                 }
 
                 // 转换成内部决策值
                 val resolvedDecision = when (resultCode) {
-                    UI_RESULT_ALLOW_ONCE, UI_RESULT_ALLOW_ALWAYS -> DECISION_ALLOW
-                    else -> DECISION_DENY
+                    ConfirmDialogActivity.RESULT_ALLOW_ONCE, ConfirmDialogActivity.RESULT_ALLOW_ALWAYS -> ClipboardAccessDecision.ALLOW.value
+                    else -> ClipboardAccessDecision.DENY.value
                 }
 
                 // 获取 PendingRequest 并设置结果

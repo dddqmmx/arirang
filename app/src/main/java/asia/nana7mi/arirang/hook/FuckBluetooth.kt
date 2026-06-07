@@ -14,8 +14,11 @@ import java.util.WeakHashMap
  * Feasibility hook for rewriting the local Bluetooth device identity and the
  * bonded (connected) device list returned to applications.
  *
- * Hook points are based on the AOSP Bluetooth stack:
- * - AdapterService.getName()     -> returns the local adapter name
+ * Hook points are based on the actual on-device Bluetooth stack (verified against
+ * the decompiled APK, Android 16):
+ * - AdapterProperties.getName()  -> the single leaf for the local adapter name.
+ *     AdapterService.getName() and getNameLengthForAdvertise() both delegate here,
+ *     so hooking this one method covers BluetoothAdapter.getName() for every app.
  * - AdapterService.getAddress()  -> returns the local adapter MAC address
  * - AdapterService.getBondedDevices() -> returns the set of paired devices
  * - AdapterService.getRemoteName(BluetoothDevice) -> resolves a remote name
@@ -30,7 +33,7 @@ import java.util.WeakHashMap
  * effects.
  */
 class FuckBluetooth : BaseHookModule(
-    targetPackages = setOf("com.android.bluetooth")
+    targetPackages = setOf("com.android.bluetooth", "com.google.android.bluetooth")
 ) {
 
     private data class BluetoothConfig(
@@ -64,7 +67,7 @@ class FuckBluetooth : BaseHookModule(
         readStoredConfig = ::readConfigFromPrefs
     )
 
-    private val hookedAdapterServiceClasses =
+    private val hookedClasses =
         Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
 
     /**
@@ -77,16 +80,22 @@ class FuckBluetooth : BaseHookModule(
     override fun isEnabled(): Boolean = currentConfig().enabled
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+        // matches() restricts loading to the Bluetooth stack process, so every app
+        // that talks to Bluetooth over Binder inherits the spoofed values without any
+        // per-app injection.
+        val classLoader = lpparam.classLoader
+
         runCatching {
             HookLog.i(
                 HookLog.Module.BLUETOOTH,
-                "installing Bluetooth hooks for ${lpparam.packageName} classLoader=${lpparam.classLoader}"
+                "installing Bluetooth hooks for package: ${lpparam.packageName}, process: ${lpparam.processName}"
             )
-            hookAdapterService(lpparam.classLoader)
-            HookLog.i(
-                HookLog.Module.BLUETOOTH,
-                "Bluetooth privacy hook installed for ${lpparam.packageName}"
-            )
+
+            hookAdapterService(classLoader)
+            hookAdapterProperties(classLoader)
+            hookScanController(classLoader)
+            hookGattService(classLoader)
+
         }.onFailure {
             HookLog.e(
                 HookLog.Module.BLUETOOTH,
@@ -98,94 +107,49 @@ class FuckBluetooth : BaseHookModule(
 
     // ------------------------------------------------------------------ hooks
 
-    private fun hookAdapterService(classLoader: ClassLoader) {
+    private fun hookAdapterService(classLoader: ClassLoader): Boolean {
         val serviceClass = XposedHelpers.findClassIfExists(
             ADAPTER_SERVICE_CLASS, classLoader
         ) ?: run {
-            HookLog.w(
-                HookLog.Module.BLUETOOTH,
-                "$ADAPTER_SERVICE_CLASS not found in $classLoader"
-            )
-            return
+            HookLog.w(HookLog.Module.BLUETOOTH, "Class not found: $ADAPTER_SERVICE_CLASS")
+            return false
         }
 
-        synchronized(hookedAdapterServiceClasses) {
-            if (!hookedAdapterServiceClasses.add(serviceClass)) {
-                HookLog.d(
-                    HookLog.Module.BLUETOOTH,
-                    "AdapterService already hooked: ${serviceClass.name}"
-                )
-                return
-            }
-        }
+        if (!hookedClasses.add(serviceClass)) return true
 
-        val candidates = serviceClass.declaredMethods
-        HookLog.i(
-            HookLog.Module.BLUETOOTH,
-            "AdapterService ${serviceClass.name} candidates=${
-                candidates.joinToString { it.signature(serviceClass) }
-            }"
-        )
+        HookLog.i(HookLog.Module.BLUETOOTH, "Found $ADAPTER_SERVICE_CLASS, hooking methods...")
 
-        var hookedGetName = 0
-        var hookedGetAddress = 0
-        var hookedGetBondedDevices = 0
-        var hookedGetRemoteName = 0
-
-        candidates.forEach { method ->
+        // The local adapter name is intentionally NOT hooked here. AdapterService.getName()
+        // and getNameLengthForAdvertise() both delegate to AdapterProperties.getName(), which
+        // is the single chokepoint hooked in hookAdapterProperties(). The methods below cover
+        // the separate address / bonded-device / remote-name features.
+        serviceClass.declaredMethods.forEach { method ->
             when {
-                method.name == "getName" &&
-                    method.parameterTypes.isEmpty() &&
-                    method.returnType == String::class.java -> {
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
-                        val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        HookLog.i(
-                            HookLog.Module.BLUETOOTH,
-                            "spoof getName via ${method.signature(serviceClass)}"
-                        )
-                        result = config.deviceName
-                    })
-                    hookedGetName++
-                }
-
                 method.name == "getAddress" &&
                     method.parameterTypes.isEmpty() &&
                     method.returnType == String::class.java -> {
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                    HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getAddress()")
+                    XposedBridge.hookMethod(method, afterHookedMethod {
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        HookLog.i(
-                            HookLog.Module.BLUETOOTH,
-                            "spoof getAddress via ${method.signature(serviceClass)}"
-                        )
+                        if (!config.enabled) return@afterHookedMethod
                         result = SPOOFED_LOCAL_MAC
                     })
-                    hookedGetAddress++
                 }
 
                 method.name == "getBondedDevices" &&
                     method.returnsListOfBluetoothDevice() -> {
+                    HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getBondedDevices()")
                     XposedBridge.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
                         if (config.hideConnectedDevices) {
-                            HookLog.i(
-                                HookLog.Module.BLUETOOTH,
-                                "hiding all bonded devices"
-                            )
                             result = emptyList<BluetoothDevice>()
                             return@beforeHookedMethod
                         }
-                        HookLog.i(
-                            HookLog.Module.BLUETOOTH,
-                            "spoof getBondedDevices via ${method.signature(serviceClass)}"
-                        )
                         refreshSpoofedDeviceMap(config)
                         result = config.connectedDevices
                             .mapNotNull { createFakeBluetoothDevice(it) }
                     })
-                    hookedGetBondedDevices++
                 }
 
                 method.name == "getRemoteName" &&
@@ -193,6 +157,7 @@ class FuckBluetooth : BaseHookModule(
                     BluetoothDevice::class.java.isAssignableFrom(
                         method.parameterTypes[0]
                     ) -> {
+                    HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getRemoteName()")
                     XposedBridge.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
@@ -202,23 +167,158 @@ class FuckBluetooth : BaseHookModule(
                             .getOrNull() ?: return@beforeHookedMethod
                         val spoofed = spoofedDeviceMap[address]
                             ?: return@beforeHookedMethod
-                        HookLog.i(
-                            HookLog.Module.BLUETOOTH,
-                            "spoof getRemoteName($address) -> ${spoofed.name}"
-                        )
                         result = spoofed.name
                     })
-                    hookedGetRemoteName++
                 }
             }
         }
+        return true
+    }
 
-        HookLog.i(
-            HookLog.Module.BLUETOOTH,
-            "hooked AdapterService ${serviceClass.name} " +
-                "getName=$hookedGetName getAddress=$hookedGetAddress " +
-                "bondedDevices=$hookedGetBondedDevices getRemoteName=$hookedGetRemoteName"
+    private fun hookAdapterProperties(classLoader: ClassLoader): Boolean {
+        val propertiesClass = XposedHelpers.findClassIfExists(
+            ADAPTER_PROPERTIES_CLASS, classLoader
+        ) ?: XposedHelpers.findClassIfExists(
+            "com.android.bluetooth.btservice.AdapterProperties", classLoader
+        ) ?: run {
+            HookLog.w(HookLog.Module.BLUETOOTH, "Class not found: $ADAPTER_PROPERTIES_CLASS")
+            return false
+        }
+
+        if (!hookedClasses.add(propertiesClass)) return true
+
+        HookLog.i(HookLog.Module.BLUETOOTH, "Found ${propertiesClass.name}, hooking methods...")
+        propertiesClass.declaredMethods.forEach { method ->
+            when {
+                // Single chokepoint for the local adapter name. AdapterService.getName() and
+                // getNameLengthForAdvertise() both route here (return mName), so every app
+                // reading BluetoothAdapter.getName() over Binder sees the spoofed value.
+                method.name == "getName" &&
+                    method.parameterTypes.isEmpty() &&
+                    method.returnType == String::class.java -> {
+                    HookLog.i(HookLog.Module.BLUETOOTH, "Hooking ${propertiesClass.name}.getName()")
+                    XposedBridge.hookMethod(method, afterHookedMethod {
+                        val config = currentConfig()
+                        val original = result as? String
+                        if (!config.enabled) {
+                            // Diagnostic: the hook fired, but config resolved to disabled.
+                            // If the bluetooth process cannot read the config, this is where
+                            // spoofing silently no-ops.
+                            HookLog.i(
+                                HookLog.Module.BLUETOOTH,
+                                "AdapterProperties.getName() hit but config.enabled=false (original=$original)"
+                            )
+                            return@afterHookedMethod
+                        }
+                        result = config.deviceName
+                        HookLog.i(
+                            HookLog.Module.BLUETOOTH,
+                            "AdapterProperties.getName(): $original -> ${config.deviceName}"
+                        )
+                    })
+                }
+
+                method.name == "getAddress" &&
+                    method.parameterTypes.isEmpty() &&
+                    method.returnType == ByteArray::class.java -> {
+                    HookLog.i(HookLog.Module.BLUETOOTH, "Hooking ${propertiesClass.name}.getAddress()")
+                    XposedBridge.hookMethod(method, afterHookedMethod {
+                        val config = currentConfig()
+                        if (!config.enabled) return@afterHookedMethod
+                        result = macToBytes(SPOOFED_LOCAL_MAC)
+                    })
+                }
+
+                method.name == "getBondedDevices" &&
+                    (method.returnType.isArray &&
+                    BluetoothDevice::class.java.isAssignableFrom(method.returnType.componentType)) ||
+                    method.returnsListOfBluetoothDevice() -> {
+                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                        val config = currentConfig()
+                        if (!config.enabled) return@beforeHookedMethod
+                        if (config.hideConnectedDevices) {
+                            result = if (method.returnType.isArray) {
+                                java.lang.reflect.Array.newInstance(BluetoothDevice::class.java, 0)
+                            } else {
+                                emptyList<BluetoothDevice>()
+                            }
+                            return@beforeHookedMethod
+                        }
+                        refreshSpoofedDeviceMap(config)
+                        val devices = config.connectedDevices.mapNotNull { createFakeBluetoothDevice(it) }
+                        if (method.returnType.isArray) {
+                            val array = java.lang.reflect.Array.newInstance(BluetoothDevice::class.java, devices.size)
+                            devices.forEachIndexed { index, device ->
+                                java.lang.reflect.Array.set(array, index, device)
+                            }
+                            result = array
+                        } else {
+                            result = devices
+                        }
+                    })
+                }
+            }
+        }
+        return true
+    }
+
+    private fun hookScanController(classLoader: ClassLoader): Boolean {
+        val names = listOf(
+            SCAN_CONTROLLER_CLASS,
+            "com.android.bluetooth.gatt.ScanController",
+            "com.android.bluetooth.le_scan.ScanController"
         )
+        var anyHooked = false
+        names.distinct().forEach { className ->
+            val scanControllerClass = XposedHelpers.findClassIfExists(className, classLoader)
+                ?: return@forEach
+
+            if (!hookedClasses.add(scanControllerClass)) {
+                anyHooked = true
+                return@forEach
+            }
+
+            scanControllerClass.declaredMethods.forEach { method ->
+                if ((method.name == "onScanResult" || method.name == "onScanResultInternal") &&
+                    method.parameterTypes.size >= 5) {
+                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                        val config = currentConfig()
+                        if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
+                        result = null
+                    })
+                }
+
+                if ((method.name == "onBatchScanReports" || method.name == "onBatchScanReportsInternal") &&
+                    method.parameterTypes.size >= 3) {
+                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                        val config = currentConfig()
+                        if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
+                        result = null
+                    })
+                }
+            }
+            anyHooked = true
+        }
+        return anyHooked
+    }
+
+    private fun hookGattService(classLoader: ClassLoader): Boolean {
+        val gattServiceClass = XposedHelpers.findClassIfExists(
+            GATT_SERVICE_CLASS, classLoader
+        ) ?: return false
+
+        if (!hookedClasses.add(gattServiceClass)) return true
+
+        gattServiceClass.declaredMethods.forEach { method ->
+            if (method.name == "onScanResult" && method.parameterTypes.size == 2) {
+                XposedBridge.hookMethod(method, beforeHookedMethod {
+                    val config = currentConfig()
+                    if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
+                    result = null
+                })
+            }
+        }
+        return true
     }
 
     // ---------------------------------------------------------- fake devices
@@ -342,19 +442,17 @@ class FuckBluetooth : BaseHookModule(
             .ifEmpty { listOf(Device()) }
     }
 
-    // ------------------------------------------------------------ utilities
-
-    private fun java.lang.reflect.Method.signature(
-        declaringClass: Class<*>
-    ): String {
-        return "${
-            returnType.name
-        } ${
-            declaringClass.name
-        }.$name(${
-            parameterTypes.joinToString { it.name }
-        })"
+    private fun macToBytes(mac: String): ByteArray {
+        val bytes = ByteArray(6)
+        val hex = mac.replace(":", "")
+        if (hex.length != 12) return bytes
+        for (i in 0 until 6) {
+            bytes[i] = hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+        return bytes
     }
+
+    // ------------------------------------------------------------ utilities
 
     // Matches List<BluetoothDevice> (and Set<BluetoothDevice> on older AOSP).
     // Java type erasure means we cannot introspect the generic parameter, so we
@@ -370,6 +468,13 @@ class FuckBluetooth : BaseHookModule(
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
         private const val ADAPTER_SERVICE_CLASS =
             "com.android.bluetooth.btservice.AdapterService"
+        private const val ADAPTER_PROPERTIES_CLASS =
+            "com.android.bluetooth.btservice.AdapterProperties"
+        private const val SCAN_CONTROLLER_CLASS =
+            "com.android.bluetooth.le_scan.ScanController"
+        private const val GATT_SERVICE_CLASS =
+            "com.android.bluetooth.gatt.GattService"
+
         private const val SPOOFED_LOCAL_MAC = "02:00:00:AA:BB:CC"
     }
 }

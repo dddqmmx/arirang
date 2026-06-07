@@ -1,6 +1,7 @@
 package asia.nana7mi.arirang.hook
 
 import de.robv.android.xposed.IXposedHookLoadPackage
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class HookManager : IXposedHookLoadPackage {
@@ -17,6 +18,7 @@ class HookManager : IXposedHookLoadPackage {
     )
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
+        XposedBridge.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName})")
         modules
             .filter { it.matches(lpparam.packageName) }
             .forEach { module ->
