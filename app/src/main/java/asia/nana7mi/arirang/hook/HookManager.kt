@@ -15,6 +15,7 @@ class HookManager : IXposedHookLoadPackage {
         FuckLocation(),
         FuckSettingsProvider(),
         FuckGms(),
+        FuckProcess(),
         XposedActivation()
     )
 
