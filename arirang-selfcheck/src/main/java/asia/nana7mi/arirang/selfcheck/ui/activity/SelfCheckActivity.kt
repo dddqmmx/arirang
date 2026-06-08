@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationManager
 import android.media.MediaDrm
@@ -43,7 +45,10 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
 import java.io.BufferedWriter
+import java.io.File
+import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.NetworkInterface
 import java.text.SimpleDateFormat
@@ -64,8 +69,13 @@ class SelfCheckActivity : AppCompatActivity() {
     private lateinit var scrollView: ScrollView
     private lateinit var uniqueSection: CheckSectionView
     private lateinit var buildSection: CheckSectionView
+    private lateinit var propsSection: CheckSectionView
+    private lateinit var rawFilesSection: CheckSectionView
     private lateinit var telephonySection: CheckSectionView
     private lateinit var simSection: CheckSectionView
+    private lateinit var drmSection: CheckSectionView
+    private lateinit var settingsSection: CheckSectionView
+    private lateinit var sensorsSection: CheckSectionView
     private lateinit var appsSection: CheckSectionView
     private lateinit var locationSection: CheckSectionView
     private lateinit var wifiSection: CheckSectionView
@@ -116,8 +126,13 @@ class SelfCheckActivity : AppCompatActivity() {
         scrollView = findViewById(R.id.selfCheckScrollView)
         uniqueSection = CheckSectionView(findViewById(R.id.uniqueSection))
         buildSection = CheckSectionView(findViewById(R.id.buildSection))
+        propsSection = CheckSectionView(findViewById(R.id.propsSection))
+        rawFilesSection = CheckSectionView(findViewById(R.id.rawFilesSection))
         telephonySection = CheckSectionView(findViewById(R.id.telephonySection))
         simSection = CheckSectionView(findViewById(R.id.simSection))
+        drmSection = CheckSectionView(findViewById(R.id.drmSection))
+        settingsSection = CheckSectionView(findViewById(R.id.settingsSection))
+        sensorsSection = CheckSectionView(findViewById(R.id.sensorsSection))
         appsSection = CheckSectionView(findViewById(R.id.appsSection))
         locationSection = CheckSectionView(findViewById(R.id.locationSection))
         wifiSection = CheckSectionView(findViewById(R.id.wifiSection))
@@ -127,8 +142,13 @@ class SelfCheckActivity : AppCompatActivity() {
 
         uniqueSection.bindTitle(getString(R.string.self_check_unique_title))
         buildSection.bindTitle(getString(R.string.self_check_build_title))
+        propsSection.bindTitle(getString(R.string.self_check_props_title))
+        rawFilesSection.bindTitle(getString(R.string.self_check_rawfiles_title))
         telephonySection.bindTitle(getString(R.string.self_check_telephony_title))
         simSection.bindTitle(getString(R.string.self_check_sim_title))
+        drmSection.bindTitle(getString(R.string.self_check_drm_title))
+        settingsSection.bindTitle(getString(R.string.self_check_settings_title))
+        sensorsSection.bindTitle(getString(R.string.self_check_sensors_title))
         appsSection.bindTitle(getString(R.string.self_check_apps_title))
         locationSection.bindTitle(getString(R.string.self_check_location_title))
         wifiSection.bindTitle(getString(R.string.self_check_wifi_title))
@@ -148,11 +168,26 @@ class SelfCheckActivity : AppCompatActivity() {
         findViewById<View>(R.id.navBuildChip).setOnClickListener {
             scrollToSection(buildSection.root)
         }
+        findViewById<View>(R.id.navPropsChip).setOnClickListener {
+            scrollToSection(propsSection.root)
+        }
+        findViewById<View>(R.id.navRawFilesChip).setOnClickListener {
+            scrollToSection(rawFilesSection.root)
+        }
         findViewById<View>(R.id.navTelephonyChip).setOnClickListener {
             scrollToSection(telephonySection.root)
         }
         findViewById<View>(R.id.navSimChip).setOnClickListener {
             scrollToSection(simSection.root)
+        }
+        findViewById<View>(R.id.navDrmChip).setOnClickListener {
+            scrollToSection(drmSection.root)
+        }
+        findViewById<View>(R.id.navSettingsChip).setOnClickListener {
+            scrollToSection(settingsSection.root)
+        }
+        findViewById<View>(R.id.navSensorsChip).setOnClickListener {
+            scrollToSection(sensorsSection.root)
         }
         findViewById<View>(R.id.navAppsChip).setOnClickListener {
             scrollToSection(appsSection.root)
@@ -214,8 +249,13 @@ class SelfCheckActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val unique = async(Dispatchers.IO) { readUniqueIdentifiers() }
             val build = async(Dispatchers.IO) { readBuildInfo() }
+            val props = async(Dispatchers.IO) { readSystemProperties() }
+            val rawFiles = async(Dispatchers.IO) { readRawKernelFiles() }
             val telephony = async(Dispatchers.IO) { readTelephonyInfo() }
             val sim = async(Dispatchers.IO) { readSimInfo() }
+            val drm = async(Dispatchers.IO) { readDrmInfo() }
+            val settings = async(Dispatchers.IO) { readSettingsTables() }
+            val sensors = async(Dispatchers.IO) { readSensors() }
             val apps = async(Dispatchers.IO) { readInstalledApps() }
             val location = async(Dispatchers.IO) { readLocationInfo() }
             val wifi = async(Dispatchers.IO) { readWifiInfo() }
@@ -226,8 +266,13 @@ class SelfCheckActivity : AppCompatActivity() {
             val results = listOf(
                 R.string.self_check_unique_title to unique.await(),
                 R.string.self_check_build_title to build.await(),
+                R.string.self_check_props_title to props.await(),
+                R.string.self_check_rawfiles_title to rawFiles.await(),
                 R.string.self_check_telephony_title to telephony.await(),
                 R.string.self_check_sim_title to sim.await(),
+                R.string.self_check_drm_title to drm.await(),
+                R.string.self_check_settings_title to settings.await(),
+                R.string.self_check_sensors_title to sensors.await(),
                 R.string.self_check_apps_title to apps.await(),
                 R.string.self_check_location_title to location.await(),
                 R.string.self_check_wifi_title to wifi.await(),
@@ -239,18 +284,28 @@ class SelfCheckActivity : AppCompatActivity() {
 
             uniqueSection.bindResult(results[0].second)
             buildSection.bindResult(results[1].second)
-            telephonySection.bindResult(results[2].second)
-            simSection.bindResult(results[3].second)
-            appsSection.bindResult(results[4].second)
-            locationSection.bindResult(results[5].second)
-            wifiSection.bindResult(results[6].second)
-            accountsSection.bindResult(results[7].second)
-            networkSection.bindResult(results[8].second)
-            bluetoothSection.bindResult(results[9].second)
+            propsSection.bindResult(results[2].second)
+            rawFilesSection.bindResult(results[3].second)
+            telephonySection.bindResult(results[4].second)
+            simSection.bindResult(results[5].second)
+            drmSection.bindResult(results[6].second)
+            settingsSection.bindResult(results[7].second)
+            sensorsSection.bindResult(results[8].second)
+            appsSection.bindResult(results[9].second)
+            locationSection.bindResult(results[10].second)
+            wifiSection.bindResult(results[11].second)
+            accountsSection.bindResult(results[12].second)
+            networkSection.bindResult(results[13].second)
+            bluetoothSection.bindResult(results[14].second)
 
             val visibleCount = results.count { it.second.state == CheckState.VISIBLE }
             val blockedCount = results.count { it.second.state == CheckState.BLOCKED }
-            summaryText.text = getString(R.string.self_check_summary_result, visibleCount, blockedCount)
+            val leakedCount = results.count { it.second.state == CheckState.LEAKED }
+            summaryText.text = if (leakedCount > 0) {
+                getString(R.string.self_check_summary_result_leak, visibleCount, blockedCount, leakedCount)
+            } else {
+                getString(R.string.self_check_summary_result, visibleCount, blockedCount)
+            }
             runButton.isEnabled = true
             runButton.setText(R.string.self_check_run_again)
         }
@@ -313,8 +368,13 @@ class SelfCheckActivity : AppCompatActivity() {
         val loading = CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_checking), getString(R.string.self_check_waiting))
         uniqueSection.bindResult(loading)
         buildSection.bindResult(loading)
+        propsSection.bindResult(loading)
+        rawFilesSection.bindResult(loading)
         telephonySection.bindResult(loading)
         simSection.bindResult(loading)
+        drmSection.bindResult(loading)
+        settingsSection.bindResult(loading)
+        sensorsSection.bindResult(loading)
         appsSection.bindResult(loading)
         locationSection.bindResult(loading)
         wifiSection.bindResult(loading)
@@ -956,6 +1016,314 @@ class SelfCheckActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 多通道交叉读取系统属性：把 Java 框架值（Build 静态字段，在普通应用进程里已被 Zygisk
+     * 在 zygote 阶段改写）与 getprop 子进程、分区级 ro.product.* 属性这些"旁路通道"读到的值
+     * 逐项对比。任何不一致都说明 spoof 没盖住该通道，真实信息从旁路泄漏。
+     */
+    private fun readSystemProperties(): CheckResult {
+        val lines = mutableListOf<String>()
+        var leaked = false
+
+        data class PropProbe(val label: String, val frameworkValue: String?, val propKey: String)
+
+        val probes = listOf(
+            PropProbe("Brand", Build.BRAND, "ro.product.brand"),
+            PropProbe("Manufacturer", Build.MANUFACTURER, "ro.product.manufacturer"),
+            PropProbe("Model", Build.MODEL, "ro.product.model"),
+            PropProbe("Device", Build.DEVICE, "ro.product.device"),
+            PropProbe("Product", Build.PRODUCT, "ro.product.name"),
+            PropProbe("Board", Build.BOARD, "ro.product.board"),
+            PropProbe("Hardware", Build.HARDWARE, "ro.hardware"),
+            PropProbe("Fingerprint", Build.FINGERPRINT, "ro.build.fingerprint")
+        )
+
+        probes.forEach { probe ->
+            val getpropValue = runGetprop(probe.propKey)
+            val framework = probe.frameworkValue?.takeUnless { it.isBlank() || it == Build.UNKNOWN }
+            if (!getpropValue.isNullOrBlank()) {
+                val mismatch = framework != null && getpropValue != framework
+                if (mismatch) leaked = true
+                val marker = if (mismatch) " ${getString(R.string.self_check_channel_mismatch)}" else ""
+                lines.add("${probe.label}:$marker")
+                lines.add("  Build=${framework ?: "-"}")
+                lines.add("  getprop ${probe.propKey}=$getpropValue")
+            }
+        }
+
+        // 分区级属性：原生 spoofer 只改写裸 ro.product.brand 等，不覆盖各分区副本。
+        val partitionKeys = listOf(
+            "ro.product.vendor.model",
+            "ro.product.vendor.brand",
+            "ro.product.vendor.manufacturer",
+            "ro.product.system.model",
+            "ro.product.odm.model",
+            "ro.product.bootimage.brand",
+            "ro.bootimage.build.fingerprint",
+            "ro.vendor.build.fingerprint",
+            "ro.odm.build.fingerprint",
+            "ro.system.build.fingerprint"
+        )
+        val partitionLeaks = mutableListOf<String>()
+        partitionKeys.forEach { key ->
+            val value = runGetprop(key)
+            if (!value.isNullOrBlank()) {
+                val realBrand = Build.BRAND?.takeUnless { it.isBlank() }
+                val realModel = Build.MODEL?.takeUnless { it.isBlank() }
+                val divergent = (realBrand != null && key.endsWith("brand") && value != realBrand) ||
+                    (realModel != null && key.endsWith("model") && value != realModel) ||
+                    (key.endsWith("fingerprint") && Build.FINGERPRINT.isNotBlank() && value != Build.FINGERPRINT)
+                if (divergent) {
+                    leaked = true
+                    partitionLeaks.add("$key=$value ${getString(R.string.self_check_channel_mismatch)}")
+                } else {
+                    partitionLeaks.add("$key=$value")
+                }
+            }
+        }
+        if (partitionLeaks.isNotEmpty()) {
+            lines.add(getString(R.string.self_check_props_partition_label))
+            partitionLeaks.forEach { lines.add("  $it") }
+        }
+
+        // 序列号 / boot 标识：原生 spoofer 不替换 ro.serialno / ro.boot.serialno，仅设置 Build.SERIAL。
+        val serialKeys = listOf("ro.serialno", "ro.boot.serialno", "ro.boot.bootreason", "ro.boot.vbmeta.digest")
+        serialKeys.forEach { key ->
+            val value = runGetprop(key)
+            if (!value.isNullOrBlank()) {
+                val isSerial = key.endsWith("serialno")
+                if (isSerial) leaked = true
+                val marker = if (isSerial) " ${getString(R.string.self_check_channel_leak)}" else ""
+                lines.add("$key=${if (isSerial) value.maskMiddle() else value}$marker")
+            }
+        }
+
+        return when {
+            lines.isEmpty() -> CheckResult(
+                CheckState.BLOCKED,
+                getString(R.string.self_check_status_not_visible),
+                getString(R.string.self_check_props_hidden)
+            )
+            leaked -> CheckResult(
+                CheckState.LEAKED,
+                getString(R.string.self_check_status_leaked),
+                lines.joinToString("\n")
+            )
+            else -> CheckResult(
+                CheckState.VISIBLE,
+                getString(R.string.self_check_status_consistent),
+                lines.joinToString("\n")
+            )
+        }
+    }
+
+    /**
+     * 直接读取 /sys、/proc 下的内核文件，绕过所有 Java/Binder 层 hook：
+     * 网卡 MAC（/sys/class/net/<iface>/address）、CPU 序列号、boot_id 等。
+     * 这些通道暴露真实硬件标识即视为泄漏。
+     */
+    private fun readRawKernelFiles(): CheckResult {
+        val lines = mutableListOf<String>()
+        var leaked = false
+
+        val netDir = File("/sys/class/net")
+        val ifaces = runCatching { netDir.listFiles()?.map { it.name }?.sorted() }.getOrNull().orEmpty()
+        ifaces.forEach { iface ->
+            val mac = readRawFile("/sys/class/net/$iface/address")
+                ?.trim()
+                ?.takeUnless { it.isBlank() || it == "00:00:00:00:00:00" }
+            if (mac != null) {
+                val real = mac != "02:00:00:00:00:00" && !iface.startsWith("lo") && !iface.startsWith("dummy")
+                if (real) leaked = true
+                val marker = if (real) " ${getString(R.string.self_check_channel_leak)}" else ""
+                lines.add("/sys/class/net/$iface/address = $mac$marker")
+            }
+        }
+
+        readRawFile("/proc/sys/kernel/random/boot_id")?.trim()?.takeUnless { it.isBlank() }?.let {
+            lines.add("/proc/sys/kernel/random/boot_id = $it")
+        }
+
+        runCatching {
+            File("/proc/cpuinfo").bufferedReader().useLines { seq ->
+                seq.filter { line ->
+                    val lower = line.lowercase(Locale.ROOT)
+                    lower.startsWith("serial") || lower.startsWith("hardware")
+                }.take(4).toList()
+            }
+        }.getOrNull().orEmpty().forEach { line ->
+            val value = line.substringAfter(':', "").trim()
+            if (value.isNotBlank()) {
+                val isSerial = line.lowercase(Locale.ROOT).startsWith("serial")
+                if (isSerial) leaked = true
+                val marker = if (isSerial) " ${getString(R.string.self_check_channel_leak)}" else ""
+                lines.add("/proc/cpuinfo ${line.trim()}$marker")
+            }
+        }
+
+        readRawFile("/sys/devices/soc0/serial_number")?.trim()?.takeUnless { it.isBlank() }?.let {
+            leaked = true
+            lines.add("/sys/devices/soc0/serial_number = ${it.maskMiddle()} ${getString(R.string.self_check_channel_leak)}")
+        }
+
+        return when {
+            lines.isEmpty() -> CheckResult(
+                CheckState.BLOCKED,
+                getString(R.string.self_check_status_not_visible),
+                getString(R.string.self_check_rawfiles_hidden)
+            )
+            leaked -> CheckResult(
+                CheckState.LEAKED,
+                getString(R.string.self_check_status_leaked),
+                lines.joinToString("\n")
+            )
+            else -> CheckResult(
+                CheckState.VISIBLE,
+                getString(R.string.self_check_status_visible),
+                lines.joinToString("\n")
+            )
+        }
+    }
+
+    /**
+     * 对多个 MediaDrm UUID 探测 deviceUniqueId / 厂商信息。原生 DRM hook 只覆盖 Widevine
+     * 的 deviceUniqueId，其它 scheme（ClearKey/PlayReady）或其它属性可能暴露真实设备标识。
+     */
+    private fun readDrmInfo(): CheckResult {
+        data class Scheme(val name: String, val uuid: UUID, val spoofed: Boolean)
+
+        val schemes = listOf(
+            // Widevine edef8ba9-79d6-4ace-a3c8-27dcd51d21ed —— 原生 DRM hook 已覆盖
+            Scheme("Widevine", UUID(-0x121074568629b532L, -0x5c37d8232ae2de13L), spoofed = true),
+            // PlayReady 9a04f079-9840-4286-ab92-e65be0885f95
+            Scheme("PlayReady", UUID(0x9a04f07998404286uL.toLong(), 0xab92e65be0885f95uL.toLong()), spoofed = false),
+            // ClearKey e2719d58-a985-b3c9-781a-b030af78d30e
+            Scheme("ClearKey", UUID(0xe2719d58a985b3c9uL.toLong(), 0x781ab030af78d30euL.toLong()), spoofed = false)
+        )
+
+        val lines = mutableListOf<String>()
+        var leaked = false
+
+        schemes.forEach { scheme ->
+            val supported = runCatching { MediaDrm.isCryptoSchemeSupported(scheme.uuid) }.getOrDefault(false)
+            if (!supported) return@forEach
+            runCatching {
+                MediaDrm(scheme.uuid).use { drm ->
+                    val deviceId = runCatching {
+                        drm.getPropertyByteArray(MediaDrm.PROPERTY_DEVICE_UNIQUE_ID)
+                            .joinToString("") { "%02x".format(it) }
+                    }.getOrNull()?.takeUnless { it.isBlank() }
+                    val vendor = runCatching { drm.getPropertyString(MediaDrm.PROPERTY_VENDOR) }.getOrNull()
+                    val version = runCatching { drm.getPropertyString(MediaDrm.PROPERTY_VERSION) }.getOrNull()
+
+                    lines.add(scheme.name)
+                    vendor?.takeUnless { it.isBlank() }?.let { lines.add("  Vendor: $it") }
+                    version?.takeUnless { it.isBlank() }?.let { lines.add("  Version: $it") }
+                    if (deviceId != null) {
+                        // 非 Widevine scheme 仍能返回唯一设备 ID = 旁路泄漏。
+                        if (!scheme.spoofed) leaked = true
+                        val marker = if (!scheme.spoofed) " ${getString(R.string.self_check_channel_leak)}" else ""
+                        lines.add("  Device unique ID: ${deviceId.maskMiddle()}$marker")
+                    }
+                }
+            }.onFailure {
+                Log.e(PHONE_DIAG_TAG, "readDrmInfo ${scheme.name} failed", it)
+            }
+        }
+
+        return when {
+            lines.isEmpty() -> CheckResult(
+                CheckState.BLOCKED,
+                getString(R.string.self_check_status_not_visible),
+                getString(R.string.self_check_drm_hidden)
+            )
+            leaked -> CheckResult(
+                CheckState.LEAKED,
+                getString(R.string.self_check_status_leaked),
+                lines.joinToString("\n")
+            )
+            else -> CheckResult(
+                CheckState.VISIBLE,
+                getString(R.string.self_check_status_visible),
+                lines.joinToString("\n")
+            )
+        }
+    }
+
+    /**
+     * 读取 Settings.Global / Secure 表里常被用作设备指纹的键。这些经由 SettingsProvider，
+     * FuckSettingsProvider 只挑选部分键 spoof，其余直读暴露。
+     */
+    @SuppressLint("HardwareIds")
+    private fun readSettingsTables(): CheckResult {
+        val lines = mutableListOf<String>()
+
+        fun globalKey(key: String) = runCatching {
+            Settings.Global.getString(contentResolver, key)
+        }.getOrNull()?.takeUnless { it.isBlank() }
+
+        fun secureKey(key: String) = runCatching {
+            Settings.Secure.getString(contentResolver, key)
+        }.getOrNull()?.takeUnless { it.isBlank() }
+
+        globalKey("device_name")?.let { lines.add("Global device_name: $it") }
+        globalKey("bluetooth_name")?.let { lines.add("Global bluetooth_name: $it") }
+        globalKey("bluetooth_address")?.let { lines.add("Global bluetooth_address: $it") }
+        globalKey("wifi_country_code")?.let { lines.add("Global wifi_country_code: $it") }
+        globalKey("boot_count")?.let { lines.add("Global boot_count: $it") }
+        globalKey("adb_enabled")?.let { lines.add("Global adb_enabled: $it") }
+        globalKey("development_settings_enabled")?.let { lines.add("Global development_settings_enabled: $it") }
+        globalKey("install_non_market_apps")?.let { lines.add("Global install_non_market_apps: $it") }
+
+        secureKey("bluetooth_name")?.let { lines.add("Secure bluetooth_name: $it") }
+        secureKey("bluetooth_address")?.let { lines.add("Secure bluetooth_address: $it") }
+        secureKey("android_id")?.let { lines.add("Secure android_id: ${it.maskMiddle()}") }
+
+        return visibleListResult(
+            lines,
+            getString(R.string.self_check_status_visible),
+            getString(R.string.self_check_settings_hidden)
+        )
+    }
+
+    /**
+     * 列出传感器清单。传感器型号/厂商组合可作为稳定设备指纹，且通常不在任何 spoof 范围内。
+     */
+    private fun readSensors(): CheckResult {
+        return try {
+            val sensorManager = getSystemService(SensorManager::class.java)
+            val sensors = sensorManager?.getSensorList(Sensor.TYPE_ALL).orEmpty()
+            val values = sensors.take(20).map { sensor ->
+                "${sensor.name} | ${sensor.vendor}"
+            }
+            CheckResult(
+                if (values.isEmpty()) CheckState.BLOCKED else CheckState.VISIBLE,
+                resources.getQuantityString(R.plurals.self_check_sensors_status, sensors.size, sensors.size),
+                if (values.isEmpty()) getString(R.string.self_check_sensors_hidden) else values.joinToString("\n")
+            )
+        } catch (e: Exception) {
+            CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
+        }
+    }
+
+    private fun runGetprop(key: String): String? {
+        return runCatching {
+            val process = ProcessBuilder("/system/bin/getprop", key)
+                .redirectErrorStream(true)
+                .start()
+            val output = BufferedReader(InputStreamReader(process.inputStream)).use { it.readLine() }
+            process.waitFor(1500, TimeUnit.MILLISECONDS)
+            output?.trim()?.takeUnless { it.isBlank() }
+        }.getOrNull()
+    }
+
+    private fun readRawFile(path: String): String? {
+        return runCatching {
+            val file = File(path)
+            if (!file.canRead()) null else file.readText()
+        }.getOrNull()
+    }
+
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
@@ -1018,7 +1386,8 @@ class SelfCheckActivity : AppCompatActivity() {
 
     private enum class CheckState {
         VISIBLE,
-        BLOCKED
+        BLOCKED,
+        LEAKED
     }
 
     private class CheckSectionView(val root: View) {
@@ -1033,7 +1402,11 @@ class SelfCheckActivity : AppCompatActivity() {
 
         fun bindResult(result: CheckResult) {
             icon.setImageResource(
-                if (result.state == CheckState.VISIBLE) R.drawable.ic_status_enabled else R.drawable.ic_status_disabled
+                when (result.state) {
+                    CheckState.VISIBLE -> R.drawable.ic_status_enabled
+                    CheckState.BLOCKED -> R.drawable.ic_status_disabled
+                    CheckState.LEAKED -> R.drawable.ic_status_leak
+                }
             )
             status.text = result.status
             content.text = result.content

@@ -17,12 +17,18 @@
     <string name="self_check_summary_idle">Run a check to see what regular apps can currently read from this device.</string>
     <string name="self_check_summary_running">Checking visible device information...</string>
     <string name="self_check_summary_result">%1$d items are visible, %2$d items appear blocked or unavailable.</string>
+    <string name="self_check_summary_result_leak">%1$d items are visible, %2$d items appear blocked, and %3$d items leak real data through raw channels that bypass spoofing.</string>
     <string name="self_check_run">Run Self Check</string>
     <string name="self_check_run_again">Check Again</string>
     <string name="self_check_nav_unique">Unique IDs</string>
     <string name="self_check_nav_build">Build</string>
+    <string name="self_check_nav_props">Properties</string>
+    <string name="self_check_nav_rawfiles">Kernel Files</string>
     <string name="self_check_nav_telephony">Phone</string>
     <string name="self_check_nav_sim">SIM</string>
+    <string name="self_check_nav_drm">DRM</string>
+    <string name="self_check_nav_settings">Settings</string>
+    <string name="self_check_nav_sensors">Sensors</string>
     <string name="self_check_nav_apps">Apps</string>
     <string name="self_check_nav_location">Location</string>
     <string name="self_check_nav_wifi">Wi-Fi</string>
@@ -34,11 +40,20 @@
     <string name="self_check_status_visible">Visible to this app</string>
     <string name="self_check_status_not_visible">Not visible</string>
     <string name="self_check_status_not_supported">Not supported</string>
+    <string name="self_check_status_consistent">Consistent across channels</string>
+    <string name="self_check_status_leaked">Bypass leak detected</string>
+    <string name="self_check_channel_mismatch">⚠ MISMATCH</string>
+    <string name="self_check_channel_leak">⚠ LEAK</string>
     <string name="self_check_permission_needed">Permission needed</string>
     <string name="self_check_unique_title">Unique Identifiers</string>
     <string name="self_check_build_title">Build Information</string>
+    <string name="self_check_props_title">System Properties (cross-channel)</string>
+    <string name="self_check_rawfiles_title">Kernel Files (/sys, /proc)</string>
     <string name="self_check_telephony_title">Phone Identifiers</string>
     <string name="self_check_sim_title">SIM Card Information</string>
+    <string name="self_check_drm_title">DRM Device IDs</string>
+    <string name="self_check_settings_title">Settings Store</string>
+    <string name="self_check_sensors_title">Sensors</string>
     <string name="self_check_apps_title">Installed Apps</string>
     <string name="self_check_location_title">Location</string>
     <string name="self_check_wifi_title">Wi-Fi Information</string>
@@ -47,8 +62,15 @@
     <string name="self_check_bluetooth_title">Bluetooth Devices</string>
     <string name="self_check_unique_hidden">No readable unique identifier was returned.</string>
     <string name="self_check_build_hidden">No readable build information was returned.</string>
+    <string name="self_check_props_hidden">No system property was readable.</string>
+    <string name="self_check_rawfiles_hidden">No kernel file exposed identifying data.</string>
     <string name="self_check_telephony_hidden">No phone identifier was returned.</string>
     <string name="self_check_sim_hidden">No active SIM card information was returned.</string>
+    <string name="self_check_drm_hidden">No DRM scheme returned a device identifier.</string>
+    <string name="self_check_settings_hidden">No identifying settings value was returned.</string>
+    <string name="self_check_sensors_hidden">No sensor was returned.</string>
+    <string name="self_check_props_partition_label">Per-partition properties:</string>
+    <string name="self_check_telephony_ril_label">Raw RIL/GSM properties (getprop):</string>
     <string name="self_check_apps_hidden">No other installed apps were returned.</string>
     <string name="self_check_location_hidden">No location was returned.</string>
     <string name="self_check_wifi_hidden">No Wi-Fi network or scan result was returned.</string>
@@ -91,5 +113,9 @@
     <plurals name="self_check_bluetooth_status">
         <item quantity="one">%1$d paired device returned</item>
         <item quantity="other">%1$d paired devices returned</item>
+    </plurals>
+    <plurals name="self_check_sensors_status">
+        <item quantity="one">%1$d sensor returned</item>
+        <item quantity="other">%1$d sensors returned</item>
     </plurals>
 </resources>

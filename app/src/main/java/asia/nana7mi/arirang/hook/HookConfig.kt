@@ -38,6 +38,6 @@ class HookConfig(private val prefsName: String) {
         return if (!isAlternativeMode) !contains else contains
     }
 
-    // 针对 PackageList 的逻辑反转 (Keep)
+    // 针对应用过滤的逻辑反转 (Keep)
     fun shouldKeep(packageName: String): Boolean = !shouldBlock(packageName)
 }

@@ -138,22 +138,20 @@
                 android:orientation="horizontal">
 
                 <asia.nana7mi.arirang.view.FeatureItemView
-                    android:id="@+id/package_list_bottom"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    app:featureName="@string/feature_app_list" />
-
-                <Space
-                    android:layout_width="12dp"
-                    android:layout_height="match_parent" />
-
-                <asia.nana7mi.arirang.view.FeatureItemView
                     android:id="@+id/sim_info_setting_bottom"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     app:featureName="@string/feature_sim_info" />
+
+                <Space
+                    android:layout_width="12dp"
+                    android:layout_height="match_parent" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
             </LinearLayout>
 
 

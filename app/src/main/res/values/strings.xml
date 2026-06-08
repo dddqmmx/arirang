@@ -25,7 +25,6 @@
     <string name="feature_location">Location</string>
     <string name="feature_sensor_info">Sensor Info</string>
     <string name="feature_contacts">Contacts</string>
-    <string name="feature_app_list">App List</string>
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">Bluetooth</string>
 

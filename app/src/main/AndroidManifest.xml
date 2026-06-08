@@ -68,15 +68,6 @@
             android:name=".ui.activity.SimConfigActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.activity.PackageListConfigActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.activity.packagelist.PackageTemplateManagerActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.activity.packagelist.PackageCustomListActivity"
-            android:exported="false" />
-        <activity
             android:name=".ui.activity.TestActivity"
             android:exported="false" />
         <activity

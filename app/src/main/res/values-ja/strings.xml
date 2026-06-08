@@ -24,7 +24,6 @@
     <string name="feature_location">位置情報</string>
     <string name="feature_sensor_info">センサー情報</string>
     <string name="feature_contacts">連絡先</string>
-    <string name="feature_app_list">アプリリスト</string>
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">Bluetooth</string>
 

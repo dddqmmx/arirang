@@ -25,7 +25,6 @@
     <string name="feature_location">定位</string>
     <string name="feature_sensor_info">传感器信息</string>
     <string name="feature_contacts">联系人</string>
-    <string name="feature_app_list">应用列表</string>
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">蓝牙</string>
 
