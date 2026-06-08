@@ -359,6 +359,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                                 updateImeis()
                             }
                         },
+                        onRandomize = { revision++ },
                         onRemove = {
                             if (index >= 0) {
                                 imeiRows.removeAt(index)
@@ -507,6 +508,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         canRemove: Boolean,
         onImeiChange: (String) -> Unit,
         onTacChange: (String) -> Unit,
+        onRandomize: () -> Unit,
         onRemove: () -> Unit,
         modifier: Modifier = Modifier
     ) {
@@ -550,7 +552,10 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     value = imei,
                     revision = revision,
                     keyboardType = KeyboardType.Number,
-                    onRandom = { onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(index, tac)) },
+                    onRandom = { 
+                        onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(index, tac))
+                        onRandomize()
+                    },
                     onValueChange = { onImeiChange(it.filter(Char::isDigit)) }
                 )
                 IdentifierTextField(
@@ -562,6 +567,7 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                         val nextTac = UniqueIdentifierPrefs.randomTac()
                         onTacChange(nextTac)
                         onImeiChange(UniqueIdentifierPrefs.randomImeiForSlot(index, nextTac))
+                        onRandomize()
                     },
                     onValueChange = { onTacChange(it.filter(Char::isDigit).take(8)) }
                 )

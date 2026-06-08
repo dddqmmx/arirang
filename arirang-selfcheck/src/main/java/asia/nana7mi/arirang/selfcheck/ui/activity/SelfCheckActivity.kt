@@ -1149,17 +1149,17 @@ class SelfCheckActivity : AppCompatActivity() {
                 CheckState.BLOCKED,
                 getString(R.string.self_check_status_not_visible),
                 getString(R.string.self_check_props_hidden)
-            )
+            ).also { Log.i(PHONE_DIAG_TAG, "System Properties CheckResult: \n${it.content}") }
             leaked -> CheckResult(
                 CheckState.LEAKED,
                 getString(R.string.self_check_status_leaked),
                 lines.joinToString("\n")
-            )
+            ).also { Log.i(PHONE_DIAG_TAG, "System Properties CheckResult: \n${it.content}") }
             else -> CheckResult(
                 CheckState.VISIBLE,
                 getString(R.string.self_check_status_consistent),
                 lines.joinToString("\n")
-            )
+            ).also { Log.i(PHONE_DIAG_TAG, "System Properties CheckResult: \n${it.content}") }
         }
     }
 
