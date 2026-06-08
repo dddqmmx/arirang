@@ -38,20 +38,70 @@ const SubmoduleConfig *current_config() {
 
 const std::string *replacement_for_property(const SubmoduleConfig &config, const char *key) {
     if (config.device_info_enabled) {
-        if (std::strcmp(key, "ro.product.brand") == 0) return &config.build_brand;
-        if (std::strcmp(key, "ro.product.manufacturer") == 0) return &config.build_manufacturer;
-        if (std::strcmp(key, "ro.product.model") == 0) return &config.build_model;
-        if (std::strcmp(key, "ro.product.device") == 0) return &config.build_device;
-        if (std::strcmp(key, "ro.product.name") == 0) return &config.build_product;
-        if (std::strcmp(key, "ro.product.board") == 0) return &config.build_board;
-        if (std::strcmp(key, "ro.hardware") == 0) return &config.build_hardware;
+        // Brand
+        if (std::strcmp(key, "ro.product.brand") == 0 ||
+            std::strcmp(key, "ro.product.vendor.brand") == 0 ||
+            std::strcmp(key, "ro.product.system.brand") == 0 ||
+            std::strcmp(key, "ro.product.odm.brand") == 0 ||
+            std::strcmp(key, "ro.product.product.brand") == 0 ||
+            std::strcmp(key, "ro.product.system_ext.brand") == 0) return &config.build_brand;
+
+        // Manufacturer
+        if (std::strcmp(key, "ro.product.manufacturer") == 0 ||
+            std::strcmp(key, "ro.product.vendor.manufacturer") == 0 ||
+            std::strcmp(key, "ro.product.system.manufacturer") == 0 ||
+            std::strcmp(key, "ro.product.odm.manufacturer") == 0 ||
+            std::strcmp(key, "ro.product.product.manufacturer") == 0 ||
+            std::strcmp(key, "ro.product.system_ext.manufacturer") == 0) return &config.build_manufacturer;
+
+        // Model
+        if (std::strcmp(key, "ro.product.model") == 0 ||
+            std::strcmp(key, "ro.product.vendor.model") == 0 ||
+            std::strcmp(key, "ro.product.system.model") == 0 ||
+            std::strcmp(key, "ro.product.odm.model") == 0 ||
+            std::strcmp(key, "ro.product.product.model") == 0 ||
+            std::strcmp(key, "ro.product.system_ext.model") == 0) return &config.build_model;
+
+        // Device
+        if (std::strcmp(key, "ro.product.device") == 0 ||
+            std::strcmp(key, "ro.product.vendor.device") == 0 ||
+            std::strcmp(key, "ro.product.system.device") == 0 ||
+            std::strcmp(key, "ro.product.odm.device") == 0 ||
+            std::strcmp(key, "ro.product.product.device") == 0 ||
+            std::strcmp(key, "ro.product.system_ext.device") == 0) return &config.build_device;
+
+        // Name (Product)
+        if (std::strcmp(key, "ro.product.name") == 0 ||
+            std::strcmp(key, "ro.product.vendor.name") == 0 ||
+            std::strcmp(key, "ro.product.system.name") == 0 ||
+            std::strcmp(key, "ro.product.odm.name") == 0 ||
+            std::strcmp(key, "ro.product.product.name") == 0 ||
+            std::strcmp(key, "ro.product.system_ext.name") == 0) return &config.build_product;
+
+        // Board
+        if (std::strcmp(key, "ro.product.board") == 0 ||
+            std::strcmp(key, "ro.board.platform") == 0) return &config.build_board;
+
+        // Hardware
+        if (std::strcmp(key, "ro.hardware") == 0 ||
+            std::strcmp(key, "ro.boot.hardware") == 0) return &config.build_hardware;
+
+        // Fingerprint
+        if (std::strcmp(key, "ro.build.fingerprint") == 0 ||
+            std::strcmp(key, "ro.vendor.build.fingerprint") == 0 ||
+            std::strcmp(key, "ro.system.build.fingerprint") == 0 ||
+            std::strcmp(key, "ro.odm.build.fingerprint") == 0 ||
+            std::strcmp(key, "ro.product.build.fingerprint") == 0 ||
+            std::strcmp(key, "ro.system_ext.build.fingerprint") == 0 ||
+            std::strcmp(key, "ro.bootimage.build.fingerprint") == 0) return &config.build_fingerprint;
+
+        // Other Build fields
         if (std::strcmp(key, "ro.build.display.id") == 0) return &config.build_display;
         if (std::strcmp(key, "ro.build.host") == 0) return &config.build_host;
         if (std::strcmp(key, "ro.build.id") == 0) return &config.build_id;
         if (std::strcmp(key, "ro.build.tags") == 0) return &config.build_tags;
         if (std::strcmp(key, "ro.build.type") == 0) return &config.build_type;
         if (std::strcmp(key, "ro.build.user") == 0) return &config.build_user;
-        if (std::strcmp(key, "ro.build.fingerprint") == 0) return &config.build_fingerprint;
     }
 
     if (std::strcmp(key, "gsm.sim.operator.iso-country") == 0) return &config.gsm_sim_operator_iso_country;
