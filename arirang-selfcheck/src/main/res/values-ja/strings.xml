@@ -7,6 +7,7 @@
     <string name="self_check_summary_idle">チェックを実行して、通常のアプリがこの端末から現在読み取れる情報を確認します。</string>
     <string name="self_check_summary_running">可視状態の端末情報を確認しています...</string>
     <string name="self_check_summary_result">%1$d 項目が可視、%2$d 項目はブロック済みまたは利用不可のようです。</string>
+    <string name="self_check_summary_result_leak">%1$d 項目が可視、%2$d 項目はブロック済み、さらに %3$d 項目がスプーフィングを回避する生チャネルから実データを漏洩しています。</string>
     <string name="self_check_run">セルフチェックを実行</string>
     <string name="self_check_run_again">再チェック</string>
     <string name="self_check_nav_unique">一意ID</string>
@@ -62,6 +63,28 @@
     <string name="self_check_location_coordinates">座標: %1$.6f, %2$.6f</string>
     <string name="self_check_location_accuracy_time">精度: %1$.1fm | 時刻: %2$s</string>
 
+    <string name="self_check_nav_props">プロパティ</string>
+    <string name="self_check_nav_rawfiles">カーネルファイル</string>
+    <string name="self_check_nav_drm">DRM</string>
+    <string name="self_check_nav_settings">設定</string>
+    <string name="self_check_nav_sensors">センサー</string>
+    <string name="self_check_status_consistent">チャネル間で一致</string>
+    <string name="self_check_status_leaked">バイパス漏洩を検出</string>
+    <string name="self_check_channel_mismatch">⚠ 不一致</string>
+    <string name="self_check_channel_leak">⚠ 漏洩</string>
+    <string name="self_check_props_title">システムプロパティ（クロスチャネル）</string>
+    <string name="self_check_rawfiles_title">カーネルファイル（/sys、/proc）</string>
+    <string name="self_check_drm_title">DRM デバイス ID</string>
+    <string name="self_check_settings_title">設定ストア</string>
+    <string name="self_check_sensors_title">センサー</string>
+    <string name="self_check_props_hidden">読み取り可能なシステムプロパティはありません。</string>
+    <string name="self_check_rawfiles_hidden">カーネルファイルから識別データの漏洩はありません。</string>
+    <string name="self_check_drm_hidden">デバイス識別子を返した DRM スキームはありません。</string>
+    <string name="self_check_settings_hidden">識別可能な設定値は返されませんでした。</string>
+    <string name="self_check_sensors_hidden">センサーは返されませんでした。</string>
+    <string name="self_check_props_partition_label">パーティション別プロパティ：</string>
+    <string name="self_check_telephony_ril_label">生 RIL/GSM プロパティ（getprop）：</string>
+
     <plurals name="self_check_apps_status">
         <item quantity="other">%1$d 個のアプリが返されました</item>
     </plurals>
@@ -76,6 +99,9 @@
     </plurals>
     <plurals name="self_check_bluetooth_status">
         <item quantity="other">%1$d 個のペアリング済みデバイスが返されました</item>
+    </plurals>
+    <plurals name="self_check_sensors_status">
+        <item quantity="other">%1$d 個のセンサーが返されました</item>
     </plurals>
 
     <string name="action_export">エクスポート</string>

@@ -7,6 +7,7 @@
     <string name="self_check_summary_idle">运行自检，查看普通应用当前能从这台设备读取到哪些信息。</string>
     <string name="self_check_summary_running">正在检查设备信息可见性...</string>
     <string name="self_check_summary_result">%1$d 项仍可读取，%2$d 项看起来已被隐藏或不可用。</string>
+    <string name="self_check_summary_result_leak">%1$d 项仍可读取，%2$d 项已被隐藏，另有 %3$d 项通过绕过 spoof 的旁路通道泄露了真实信息。</string>
     <string name="self_check_run">开始自检</string>
     <string name="self_check_run_again">重新自检</string>
     <string name="self_check_nav_unique">唯一标识</string>
@@ -62,6 +63,28 @@
     <string name="self_check_location_coordinates">经纬度：%1$.6f, %2$.6f</string>
     <string name="self_check_location_accuracy_time">精度：%1$.1fm | 时间：%2$s</string>
 
+    <string name="self_check_nav_props">系统属性</string>
+    <string name="self_check_nav_rawfiles">内核文件</string>
+    <string name="self_check_nav_drm">DRM</string>
+    <string name="self_check_nav_settings">设置项</string>
+    <string name="self_check_nav_sensors">传感器</string>
+    <string name="self_check_status_consistent">各通道一致</string>
+    <string name="self_check_status_leaked">检测到旁路泄露</string>
+    <string name="self_check_channel_mismatch">⚠ 不一致</string>
+    <string name="self_check_channel_leak">⚠ 泄露</string>
+    <string name="self_check_props_title">系统属性（多通道交叉）</string>
+    <string name="self_check_rawfiles_title">内核文件（/sys、/proc）</string>
+    <string name="self_check_drm_title">DRM 设备标识</string>
+    <string name="self_check_settings_title">系统设置表</string>
+    <string name="self_check_sensors_title">传感器</string>
+    <string name="self_check_props_hidden">没有可读取的系统属性。</string>
+    <string name="self_check_rawfiles_hidden">没有内核文件泄露可识别数据。</string>
+    <string name="self_check_drm_hidden">没有 DRM scheme 返回设备标识。</string>
+    <string name="self_check_settings_hidden">没有返回可识别的设置项。</string>
+    <string name="self_check_sensors_hidden">没有返回传感器。</string>
+    <string name="self_check_props_partition_label">分区级属性：</string>
+    <string name="self_check_telephony_ril_label">原始 RIL/GSM 属性（getprop）：</string>
+
     <plurals name="self_check_apps_status">
         <item quantity="other">返回 %1$d 个应用</item>
     </plurals>
@@ -76,6 +99,9 @@
     </plurals>
     <plurals name="self_check_bluetooth_status">
         <item quantity="other">返回 %1$d 个已配对设备</item>
+    </plurals>
+    <plurals name="self_check_sensors_status">
+        <item quantity="other">返回 %1$d 个传感器</item>
     </plurals>
 
     <string name="action_export">导出</string>

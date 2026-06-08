@@ -724,7 +724,53 @@ class SelfCheckActivity : AppCompatActivity() {
                     ?.let { values.add("Network country ISO slot $slot: $it") }
             }
 
-            visibleListResult(values, getString(R.string.self_check_status_visible), getString(R.string.self_check_telephony_hidden))
+            // 旁路通道：直接经 getprop 读 RIL/GSM 属性，绕过 TelephonyManager Binder hook。
+            val rilProps = listOf(
+                "gsm.sim.operator.numeric",
+                "gsm.sim.operator.alpha",
+                "gsm.sim.operator.iso-country",
+                "gsm.operator.numeric",
+                "gsm.operator.alpha",
+                "gsm.operator.iso-country",
+                "gsm.sim.state",
+                "gsm.network.type",
+                "ril.serialnumber",
+                "ril.IMEI",
+                "ril.IMSI",
+                "ril.ICCID",
+                "ril.cdma.meid"
+            )
+            val rilLines = rilProps.mapNotNull { key ->
+                runGetprop(key)?.let { value ->
+                    val sensitive = key.startsWith("ril.")
+                    "getprop $key=${if (sensitive) value.maskMiddle() else value}" +
+                        if (sensitive) " ${getString(R.string.self_check_channel_leak)}" else ""
+                }
+            }
+            if (rilLines.isNotEmpty()) {
+                values.add(getString(R.string.self_check_telephony_ril_label))
+                values.addAll(rilLines)
+            }
+
+            val rawLeak = rilLines.any { it.contains(getString(R.string.self_check_channel_leak)) }
+            val filtered = values.filter { it.isNotBlank() }
+            when {
+                filtered.isEmpty() -> CheckResult(
+                    CheckState.BLOCKED,
+                    getString(R.string.self_check_status_not_visible),
+                    getString(R.string.self_check_telephony_hidden)
+                )
+                rawLeak -> CheckResult(
+                    CheckState.LEAKED,
+                    getString(R.string.self_check_status_leaked),
+                    filtered.joinToString("\n")
+                )
+                else -> CheckResult(
+                    CheckState.VISIBLE,
+                    getString(R.string.self_check_status_visible),
+                    filtered.joinToString("\n")
+                )
+            }
         } catch (e: Exception) {
             CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
         }

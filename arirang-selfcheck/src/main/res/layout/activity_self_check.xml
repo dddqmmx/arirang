@@ -53,6 +53,20 @@
                     android:text="@string/self_check_nav_build" />
 
                 <com.google.android.material.chip.Chip
+                    android:id="@+id/navPropsChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_props" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/navRawFilesChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_rawfiles" />
+
+                <com.google.android.material.chip.Chip
                     android:id="@+id/navTelephonyChip"
                     style="@style/Widget.Material3.Chip.Filter"
                     android:layout_width="wrap_content"
@@ -65,6 +79,27 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/self_check_nav_sim" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/navDrmChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_drm" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/navSettingsChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_settings" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/navSensorsChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_sensors" />
 
                 <com.google.android.material.chip.Chip
                     android:id="@+id/navAppsChip"
@@ -183,6 +218,20 @@
                 android:layout_marginTop="12dp" />
 
             <include
+                android:id="@+id/propsSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/rawFilesSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
                 android:id="@+id/telephonySection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
@@ -191,6 +240,27 @@
 
             <include
                 android:id="@+id/simSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/drmSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/settingsSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/sensorsSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
