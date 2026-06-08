@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -49,11 +51,12 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.os.LocaleListCompat
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.AppPreferences
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
-import asia.nana7mi.arirang.ui.activity.LanguageSettingsActivity
+import asia.nana7mi.arirang.ui.activity.AdvancedSettingsActivity
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class SettingsFragment : Fragment() {
@@ -68,8 +71,8 @@ class SettingsFragment : Fragment() {
             setContent {
                 ArirangTheme {
                     SettingsScreen(
-                        onOpenLanguage = {
-                            startActivity(Intent(requireContext(), LanguageSettingsActivity::class.java))
+                        onNavigateToAdvanced = {
+                            startActivity(Intent(requireContext(), AdvancedSettingsActivity::class.java))
                         }
                     )
                 }
@@ -80,7 +83,7 @@ class SettingsFragment : Fragment() {
 
 @Composable
 private fun SettingsScreen(
-    onOpenLanguage: () -> Unit
+    onNavigateToAdvanced: () -> Unit
 ) {
     val context = LocalContext.current
     val languageNames = stringArrayResource(R.array.language_names)
@@ -99,6 +102,7 @@ private fun SettingsScreen(
     var currentRegionCode by remember {
         mutableStateOf(AppPreferences.getRegion(context) ?: DEFAULT_REGION)
     }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var showRegionDialog by remember { mutableStateOf(false) }
     var showLogDialog by remember { mutableStateOf(false) }
     val currentRegion = regionNames.getOrElse(regionCodes.indexOf(currentRegionCode)) { currentRegionCode }
@@ -120,12 +124,23 @@ private fun SettingsScreen(
         }
 
         item {
+            SettingsSection(title = stringResource(R.string.global_settings_title)) {
+                SettingCard(
+                    title = stringResource(R.string.advanced_settings_title),
+                    summary = stringResource(R.string.advanced_settings_summary),
+                    icon = Icons.Default.Settings,
+                    onClick = onNavigateToAdvanced
+                )
+            }
+        }
+
+        item {
             SettingsSection(title = stringResource(R.string.ui_settings_title)) {
                 SettingCard(
                     title = stringResource(R.string.title_activity_language_settings),
                     summary = currentLanguage,
                     icon = Icons.Default.Language,
-                    onClick = onOpenLanguage
+                    onClick = { showLanguageDialog = true }
                 )
             }
         }
@@ -153,6 +168,20 @@ private fun SettingsScreen(
         }
     }
 
+    if (showLanguageDialog) {
+        LanguageDialog(
+            languageNames = languageNames,
+            languageCodes = languageCodes,
+            selectedCode = savedLanguage,
+            onDismiss = { showLanguageDialog = false },
+            onSelect = { code ->
+                AppPreferences.setLanguage(context, code)
+                applyLanguage(code)
+                showLanguageDialog = false
+            }
+        )
+    }
+
     if (showRegionDialog) {
         RegionDialog(
             regionNames = regionNames,
@@ -174,6 +203,52 @@ private fun SettingsScreen(
             onDismiss = { showLogDialog = false }
         )
     }
+}
+
+@Composable
+private fun LanguageDialog(
+    languageNames: Array<String>,
+    languageCodes: Array<String>,
+    selectedCode: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.title_language)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                languageNames.zip(languageCodes).forEach { (name, code) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(code) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        RadioButton(
+                            selected = code == selectedCode,
+                            onClick = { onSelect(code) }
+                        )
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(android.R.string.cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -356,6 +431,15 @@ private fun RegionDialog(
             }
         }
     )
+}
+
+private fun applyLanguage(code: String) {
+    val localeList = if (code == "system") {
+        LocaleListCompat.getEmptyLocaleList()
+    } else {
+        LocaleListCompat.forLanguageTags(code)
+    }
+    AppCompatDelegate.setApplicationLocales(localeList)
 }
 
 private const val DEFAULT_REGION = "JP"

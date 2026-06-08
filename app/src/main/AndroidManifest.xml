@@ -86,6 +86,9 @@
             android:name=".ui.activity.UniqueIdentifierConfigActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.activity.AdvancedSettingsActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.activity.LanguageSettingsActivity"
             android:exported="false" />
         <activity

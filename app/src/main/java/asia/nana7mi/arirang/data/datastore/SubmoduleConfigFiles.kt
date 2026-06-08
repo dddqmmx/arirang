@@ -26,6 +26,8 @@ object SubmoduleConfigFiles {
         val json = JSONObject()
             .put("version", Date().time)
             .put("enabled", true)
+            .put("globalConfigVersion", GlobalConfigPrefs.lastModified(context))
+            .put("globalConfigSnapshot", GlobalConfigPrefs.buildHookSnapshot(context))
             .put("deviceInfoEnabled", deviceConfig.enabled)
             .put("devicePresetId", deviceConfig.presetId)
             .put("buildBrand", deviceConfig.brand)

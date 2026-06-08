@@ -1,5 +1,6 @@
 package asia.nana7mi.arirang.hook
 
+import asia.nana7mi.arirang.data.datastore.GlobalConfigPrefs
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -14,19 +15,20 @@ class HookManager : IXposedHookLoadPackage {
         FuckLocation(),
         FuckSettingsProvider(),
         FuckGms(),
+        FuckPackageList(),
         XposedActivation()
     )
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        XposedBridge.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName})")
+        val prefs = HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
+        val restrictHotSwitching = prefs.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false)
+
+        XposedBridge.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
         modules
             .filter { it.matches(lpparam.packageName) }
+            .filter { !restrictHotSwitching || it.isEnabled() }
             .forEach { module ->
                 runCatching {
-                    // Check isEnabled only if it doesn't need to be reactive inside the module.
-                    // For now, let's keep installing hooks if matches, but ensure modules check isEnabled internally.
-                    // UNLESS the user wants a hard-cut off.
-                    // The user said "unify api or abstraction layer", so I should probably use it.
                     module.onHook(lpparam)
                 }.onFailure {
                     HookLog.e(HookLog.Module.CORE, "module ${module.javaClass.simpleName} failed for ${lpparam.packageName}", it)
