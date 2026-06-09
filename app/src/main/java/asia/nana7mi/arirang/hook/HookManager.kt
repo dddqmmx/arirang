@@ -20,6 +20,14 @@ class HookManager : IXposedHookLoadPackage {
     )
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
+        /*
+         * DESIGN PRINCIPLE: Arirang is a system-level privacy model.
+         *
+         * We aim to intercept and rewrite data at the source (system_server, phone process)
+         * rather than injecting hooks into arbitrary third-party applications. This ensures
+         * maximum performance and compatibility while maintaining a clean application
+         * runtime environment.
+         */
         val prefs = HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
         val restrictHotSwitching = prefs.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false)
 

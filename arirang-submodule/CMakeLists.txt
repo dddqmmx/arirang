@@ -36,6 +36,7 @@ add_library(arirang_zygisk SHARED
     src/main/cpp/utils/logging.cpp
     src/main/cpp/spoofer/build_spoofer.cpp
     src/main/cpp/spoofer/system_property_spoofer.cpp
+    src/main/cpp/hook/inline_hook.cpp
 )
 
 target_compile_features(arirang_zygisk PRIVATE cxx_std_17)
@@ -49,7 +50,7 @@ target_include_directories(arirang_zygisk PRIVATE
     src/main/cpp/api
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
-target_link_libraries(arirang_zygisk log)
+target_link_libraries(arirang_zygisk log dl)
 
 # Separate native library LD_PRELOAD'd into the Widevine DRM HAL daemon.
 # Intentionally has NO overlap with the Zygisk module - it must never be

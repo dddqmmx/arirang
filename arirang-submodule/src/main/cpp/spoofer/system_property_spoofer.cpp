@@ -1,9 +1,12 @@
 #include "system_property_spoofer.hpp"
 
 #include "logging.hpp"
+#include "hook/inline_hook.hpp"
 
 #include <ctime>
 #include <cstring>
+#include <dlfcn.h>
+#include <sys/system_properties.h>
 
 namespace arirang {
 namespace {
@@ -13,6 +16,19 @@ using NativeGetLong = jlong (*)(JNIEnv *, jclass, jstring, jlong);
 
 NativeGetWithDefault original_native_get_with_default = nullptr;
 NativeGetLong original_native_get_long = nullptr;
+
+using LibcSystemPropertyGet = int (*)(const char *, char *);
+LibcSystemPropertyGet original_system_property_get = nullptr;
+
+using LibcSystemPropertyReadCallback = void (*)(const prop_info *, void (*)(void *, const char *, const char *, uint32_t), void *);
+LibcSystemPropertyReadCallback original_system_property_read_callback = nullptr;
+
+using LibcSystemPropertyRead = int (*)(const prop_info *, char *, char *);
+LibcSystemPropertyRead original_system_property_read = nullptr;
+
+using LibcExecve = int (*)(const char *, char *const [], char *const []);
+LibcExecve original_execve = nullptr;
+
 const SubmoduleConfig *active_config = nullptr;
 SubmoduleConfig runtime_config;
 bool active_process = false;
@@ -102,6 +118,12 @@ const std::string *replacement_for_property(const SubmoduleConfig &config, const
         if (std::strcmp(key, "ro.build.tags") == 0) return &config.build_tags;
         if (std::strcmp(key, "ro.build.type") == 0) return &config.build_type;
         if (std::strcmp(key, "ro.build.user") == 0) return &config.build_user;
+
+        // Serial
+        if (config.unique_identifier_enabled && !config.serial.empty()) {
+            if (std::strcmp(key, "ro.serialno") == 0 ||
+                std::strcmp(key, "ro.boot.serialno") == 0) return &config.serial;
+        }
     }
 
     if (std::strcmp(key, "gsm.sim.operator.iso-country") == 0) return &config.gsm_sim_operator_iso_country;
@@ -110,6 +132,12 @@ const std::string *replacement_for_property(const SubmoduleConfig &config, const
     if (std::strcmp(key, "gsm.operator.numeric") == 0) return &config.gsm_operator_numeric;
     if (std::strcmp(key, "gsm.sim.operator.alpha") == 0) return &config.gsm_sim_operator_alpha;
     if (std::strcmp(key, "gsm.operator.alpha") == 0) return &config.gsm_operator_alpha;
+
+    if (std::strcmp(key, "gsm.sim.state") == 0) {
+        static const std::string loaded = "LOADED,LOADED";
+        return &loaded;
+    }
+
     return nullptr;
 }
 
@@ -121,7 +149,7 @@ bool replacement_for_long_property(const SubmoduleConfig &config, const char *ke
     return false;
 }
 
-jstring call_original(JNIEnv *env, jclass clazz, jstring key, jstring fallback) {
+jstring call_original_jni(JNIEnv *env, jclass clazz, jstring key, jstring fallback) {
     return original_native_get_with_default != nullptr
         ? original_native_get_with_default(env, clazz, key, fallback)
         : fallback;
@@ -130,7 +158,7 @@ jstring call_original(JNIEnv *env, jclass clazz, jstring key, jstring fallback) 
 jstring native_get_with_default(JNIEnv *env, jclass clazz, jstring key, jstring fallback) {
     const SubmoduleConfig *config = current_config();
     if (!active_process || config == nullptr || !config->enabled || key == nullptr) {
-        return call_original(env, clazz, key, fallback);
+        return call_original_jni(env, clazz, key, fallback);
     }
 
     const char *chars = env->GetStringUTFChars(key, nullptr);
@@ -141,7 +169,7 @@ jstring native_get_with_default(JNIEnv *env, jclass clazz, jstring key, jstring 
         return env->NewStringUTF(replacement->c_str());
     }
 
-    return call_original(env, clazz, key, fallback);
+    return call_original_jni(env, clazz, key, fallback);
 }
 
 jlong native_get_long(JNIEnv *env, jclass clazz, jstring key, jlong fallback) {
@@ -164,6 +192,71 @@ jlong native_get_long(JNIEnv *env, jclass clazz, jstring key, jlong fallback) {
         : fallback;
 }
 
+// Libc hooks
+int fake_system_property_get(const char *name, char *value) {
+    const SubmoduleConfig *config = current_config();
+    if (active_process && config != nullptr && config->enabled && name != nullptr) {
+        const std::string *replacement = replacement_for_property(*config, name);
+        if (replacement != nullptr && !replacement->empty()) {
+            std::strncpy(value, replacement->c_str(), PROP_VALUE_MAX);
+            value[PROP_VALUE_MAX - 1] = '\0';
+            return static_cast<int>(std::strlen(value));
+        }
+    }
+    return original_system_property_get(name, value);
+}
+
+struct CallbackWrapper {
+    void (*callback)(void *, const char *, const char *, uint32_t);
+    void *cookie;
+};
+
+void fake_read_callback_handler(void *cookie, const char *name, const char *value, uint32_t serial) {
+    auto *wrapper = static_cast<CallbackWrapper *>(cookie);
+    const SubmoduleConfig *config = current_config();
+    if (active_process && config != nullptr && config->enabled && name != nullptr) {
+        const std::string *replacement = replacement_for_property(*config, name);
+        if (replacement != nullptr && !replacement->empty()) {
+            wrapper->callback(wrapper->cookie, name, replacement->c_str(), serial);
+            return;
+        }
+    }
+    wrapper->callback(wrapper->cookie, name, value, serial);
+}
+
+void fake_system_property_read_callback(const prop_info *pi,
+                                        void (*callback)(void *, const char *, const char *, uint32_t),
+                                        void *cookie) {
+    CallbackWrapper wrapper = {callback, cookie};
+    original_system_property_read_callback(pi, fake_read_callback_handler, &wrapper);
+}
+
+int fake_system_property_read(const prop_info *pi, char *name, char *value) {
+    int res = original_system_property_read(pi, name, value);
+    if (res > 0 && active_process) {
+        const SubmoduleConfig *config = current_config();
+        if (config != nullptr && config->enabled) {
+            const std::string *replacement = replacement_for_property(*config, name);
+            if (replacement != nullptr && !replacement->empty()) {
+                std::strncpy(value, replacement->c_str(), PROP_VALUE_MAX);
+                value[PROP_VALUE_MAX - 1] = '\0';
+                return static_cast<int>(std::strlen(value));
+            }
+        }
+    }
+    return res;
+}
+
+int fake_execve(const char *pathname, char *const argv[], char *const envp[]) {
+    if (active_process && pathname != nullptr) {
+        std::string path(pathname);
+        if (path.find("getprop") != std::string::npos) {
+            log_info(std::string("intercepted execve: ") + pathname);
+        }
+    }
+    return original_execve(pathname, argv, envp);
+}
+
 } // namespace
 
 void install_system_property_spoofer(
@@ -176,6 +269,7 @@ void install_system_property_spoofer(
     active_config = &runtime_config;
     active_process = should_spoof_process;
 
+    // JNI Hooks
     JNINativeMethod methods[] = {
         {
             const_cast<char *>("native_get"),
@@ -191,7 +285,35 @@ void install_system_property_spoofer(
     api->hookJniNativeMethods(env, "android/os/SystemProperties", methods, 2);
     original_native_get_with_default = reinterpret_cast<NativeGetWithDefault>(methods[0].fnPtr);
     original_native_get_long = reinterpret_cast<NativeGetLong>(methods[1].fnPtr);
-    log_info("installed SystemProperties native_get/native_get_long hook");
+
+    // Libc Hooks
+    void *libc = dlopen("libc.so", RTLD_NOW);
+    if (libc != nullptr) {
+        void *get_fn = dlsym(libc, "__system_property_get");
+        if (get_fn != nullptr) {
+            inline_hook_install(get_fn, reinterpret_cast<void *>(fake_system_property_get),
+                                reinterpret_cast<void **>(&original_system_property_get));
+        }
+        void *read_fn = dlsym(libc, "__system_property_read_callback");
+        if (read_fn != nullptr) {
+            inline_hook_install(read_fn, reinterpret_cast<void *>(fake_system_property_read_callback),
+                                reinterpret_cast<void **>(&original_system_property_read_callback));
+        }
+        void *read_old_fn = dlsym(libc, "__system_property_read");
+        if (read_old_fn != nullptr) {
+            inline_hook_install(read_old_fn, reinterpret_cast<void *>(fake_system_property_read),
+                                reinterpret_cast<void **>(&original_system_property_read));
+        }
+        void *execve_fn = dlsym(libc, "execve");
+        if (execve_fn != nullptr) {
+            inline_hook_install(execve_fn, reinterpret_cast<void *>(fake_execve),
+                                reinterpret_cast<void **>(&original_execve));
+        }
+        dlclose(libc);
+    }
+
+    log_info("installed SystemProperties JNI and Libc hooks (expanded)");
 }
 
 } // namespace arirang
+

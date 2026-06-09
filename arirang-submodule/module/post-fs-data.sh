@@ -126,3 +126,56 @@ fi
 printf '%s' "$WIDEVINE_ID" > "$LANDING_ID"
 chmod 0644 "$LANDING_ID"
 chcon u:object_r:vendor_file:s0 "$LANDING_ID" 2>/dev/null
+
+# ----- global system property spoofing via resetprop -----------------------
+# Unlike JNI/Zygisk hooks, resetprop modifies the system property area directly,
+# affecting all processes (including getprop and native binaries) without
+# injecting into them. This aligns with Arirang's system-level design.
+
+get_config_val() {
+    grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$APP_CONFIG_PATH" \
+        | head -n1 \
+        | sed -e "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"//" -e 's/".*//'
+}
+
+ENABLED=$(grep -o -E '"enabled"[[:space:]]*:[[:space:]]*(true|false)' "$APP_CONFIG_PATH" | head -n1 | sed 's/.*://;s/[[:space:]]//g')
+DEVICE_INFO_ENABLED=$(grep -o -E '"deviceInfoEnabled"[[:space:]]*:[[:space:]]*(true|false)' "$APP_CONFIG_PATH" | head -n1 | sed 's/.*://;s/[[:space:]]//g')
+
+if [ "$ENABLED" = "true" ]; then
+    if [ "$DEVICE_INFO_ENABLED" = "true" ]; then
+        BRAND=$(get_config_val "buildBrand")
+        MANUFACTURER=$(get_config_val "buildManufacturer")
+        MODEL=$(get_config_val "buildModel")
+        DEVICE=$(get_config_val "buildDevice")
+        PRODUCT=$(get_config_val "buildProduct")
+        BOARD=$(get_config_val "buildBoard")
+        HARDWARE=$(get_config_val "buildHardware")
+        FINGERPRINT=$(get_config_val "buildFingerprint")
+
+        [ -n "$BRAND" ] && resetprop ro.product.brand "$BRAND" && resetprop ro.product.vendor.brand "$BRAND"
+        [ -n "$MANUFACTURER" ] && resetprop ro.product.manufacturer "$MANUFACTURER" && resetprop ro.product.vendor.manufacturer "$MANUFACTURER"
+        [ -n "$MODEL" ] && resetprop ro.product.model "$MODEL" && resetprop ro.product.vendor.model "$MODEL" && resetprop ro.product.system.model "$MODEL" && resetprop ro.product.odm.model "$MODEL"
+        [ -n "$DEVICE" ] && resetprop ro.product.device "$DEVICE" && resetprop ro.product.vendor.device "$DEVICE"
+        [ -n "$PRODUCT" ] && resetprop ro.product.name "$PRODUCT" && resetprop ro.product.vendor.name "$PRODUCT"
+        [ -n "$BOARD" ] && resetprop ro.product.board "$BOARD" && resetprop ro.board.platform "$BOARD"
+        [ -n "$HARDWARE" ] && resetprop ro.hardware "$HARDWARE"
+        [ -n "$FINGERPRINT" ] && {
+            resetprop ro.build.fingerprint "$FINGERPRINT"
+            resetprop ro.vendor.build.fingerprint "$FINGERPRINT"
+            resetprop ro.system.build.fingerprint "$FINGERPRINT"
+            resetprop ro.odm.build.fingerprint "$FINGERPRINT"
+            resetprop ro.bootimage.build.fingerprint "$FINGERPRINT"
+        }
+    fi
+
+    if [ "$UNIQUE_ENABLED" = "true" ]; then
+        SERIAL=$(get_config_val "serial")
+        [ -n "$SERIAL" ] && resetprop ro.serialno "$SERIAL" && resetprop ro.boot.serialno "$SERIAL"
+    fi
+
+    # Telephony properties
+    SIM_NUMERIC=$(get_config_val "gsmSimOperatorNumeric")
+    [ -n "$SIM_NUMERIC" ] && resetprop gsm.sim.operator.numeric "$SIM_NUMERIC"
+    NET_NUMERIC=$(get_config_val "gsmOperatorNumeric")
+    [ -n "$NET_NUMERIC" ] && resetprop gsm.operator.numeric "$NET_NUMERIC"
+fi

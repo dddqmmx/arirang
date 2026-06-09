@@ -7,14 +7,20 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class FuckProcess : BaseHookModule(matchSystem = false, matchClient = true) {
+class FuckProcess : BaseHookModule(matchSystem = true, matchClient = false) {
 
-    // Match all target packages where we want to spoof getprop (client app included for testing)
+    /**
+     * MANDATORY DESIGN COMPLIANCE: Arirang is a system-level privacy model.
+     *
+     * To avoid arbitrary third-party app injection and minimize performance impact,
+     * hooks are restricted to framework-level components. 
+     * 
+     * 1. Protection for apps is achieved by spoofing the source of truth (system_server)
+     *    or by globally modifying system state (resetprop).
+     * 2. DO NOT add third-party apps (including self-check tools) to the match list.
+     */
     override fun matches(packageName: String): Boolean {
-        // Apply this broadly to apps that might run getprop, similar to other hooks.
-        // For simplicity, we just return true for non-system apps if they are hooked.
-        // Actually, let's use the BaseHookModule's matches but allow any app where this module is loaded.
-        return true
+        return packageName == "android" || packageName == "com.android.phone"
     }
 
     override fun isEnabled(): Boolean = true // Always active if module is loaded, rely on underlying SystemProperties

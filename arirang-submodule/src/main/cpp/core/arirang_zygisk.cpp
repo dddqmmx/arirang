@@ -29,7 +29,20 @@ public:
                 env_->ReleaseStringUTFChars(args->nice_name, nice_name);
             }
         }
-        keep_module_loaded_in_app_ = current_app_process_ == "com.android.phone";
+        
+        /* 
+         * MANDATORY DESIGN COMPLIANCE: Arirang is a system-level privacy model.
+         * 
+         * 1. DO NOT inject hooks into arbitrary third-party applications. This avoids
+         *    unnecessary performance impact and runtime behavior interference.
+         * 2. Global property protection (e.g. build info, serials) MUST be handled via 
+         *    system-level modifications (like resetprop in post-fs-data.sh) rather than 
+         *    per-process hooks.
+         * 3. Hooks are reserved EXCLUSIVELY for framework-level components that serve
+         *    as data providers (e.g., com.android.phone for SIM/IMEI data).
+         */
+        keep_module_loaded_in_app_ = (current_app_process_ == "com.android.phone");
+                                     
         if (!keep_module_loaded_in_app_) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
         }
@@ -38,7 +51,7 @@ public:
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
         if (!keep_module_loaded_in_app_) return;
         arirang::install_system_property_spoofer(api_, env_, config_, true);
-        arirang::log_info(std::string("installed service app native hooks process=") + current_app_process_);
+        arirang::log_info(std::string("installed phone process native hooks"));
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *) override {
