@@ -135,7 +135,7 @@ chcon u:object_r:vendor_file:s0 "$LANDING_ID" 2>/dev/null
 get_config_val() {
     grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$APP_CONFIG_PATH" \
         | head -n1 \
-        | sed -e "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"//" -e 's/".*//'
+        | sed -e "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"//" -e 's/".*//' -e 's/\\\//\//g'
 }
 
 ENABLED=$(grep -o -E '"enabled"[[:space:]]*:[[:space:]]*(true|false)' "$APP_CONFIG_PATH" | head -n1 | sed 's/.*://;s/[[:space:]]//g')
