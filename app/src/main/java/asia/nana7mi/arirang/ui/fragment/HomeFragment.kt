@@ -55,6 +55,7 @@ import asia.nana7mi.arirang.ui.activity.BluetoothConfigActivity
 import asia.nana7mi.arirang.ui.activity.ClipboardConfigActivity
 import asia.nana7mi.arirang.ui.activity.DeviceInfoConfigActivity
 import asia.nana7mi.arirang.ui.activity.LocationConfigActivity
+import asia.nana7mi.arirang.ui.activity.SensorConfigActivity
 import asia.nana7mi.arirang.ui.activity.SimConfigActivity
 import asia.nana7mi.arirang.ui.activity.UniqueIdentifierConfigActivity
 import asia.nana7mi.arirang.ui.activity.WifiConfigActivity
@@ -126,7 +127,7 @@ private fun HomeScreen(
                 title = stringResource(R.string.category_permission),
                 items = listOf(
                     FeatureItem(R.string.feature_clipboard, Icons.Default.ContentPaste, ClipboardConfigActivity::class.java, true),
-                    FeatureItem(R.string.feature_sensor_info, Icons.Default.Sensors, null, false),
+                    FeatureItem(R.string.feature_sensor_info, Icons.Default.Sensors, SensorConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_bluetooth_list, Icons.Default.Bluetooth, BluetoothConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_wifi_list, Icons.Default.Wifi, WifiConfigActivity::class.java, true)
                 ),
