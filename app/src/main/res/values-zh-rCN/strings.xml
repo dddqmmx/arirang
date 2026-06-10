@@ -62,6 +62,7 @@
     <string name="log_module_unique_id">唯一标识</string>
     <string name="log_module_notify">Hook 服务桥接</string>
 
+    <string name="restrict_hot_switching_summary">仅当应用启动时启用该功能时才安装钩子。这样可以避免后台开销，但需要重启应用才能应用更改</string>
     <string name="slot_title_text">%1$d. SIM插槽</string>
 
     <string name="title_activity_init">初始化</string>
@@ -172,6 +173,7 @@
     <string name="bluetooth_section_scan_result">周边设备</string>
     <string name="bluetooth_field_name">设备名称</string>
     <string name="bluetooth_field_address">MAC 地址</string>
+    <string name="bluetooth_hide_all_connected_summary">获取连接设备时会返回空值</string>
     <string name="bluetooth_hide_all_scan_results">隐藏所有周边设备</string>
     <string name="bluetooth_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表</string>
     <string name="bluetooth_add_connected_device">新增已连接设备</string>
@@ -358,5 +360,10 @@
     <string name="sensor_precision_low">低精度（保留1位小数）</string>
     <string name="sensor_precision_medium">中等精度（保留2位小数）</string>
     <string name="sensor_precision_high">高精度降低（仅保留整数）</string>
+    <string name="bluetooth_hide_all_connected">隐藏所有已接设备</string>
+    <string name="global_settings_title">全局设定</string>
+    <string name="advanced_settings_title">高级设置</string>
+    <string name="advanced_settings_summary">架构相关的底层设定</string>
+    <string name="restrict_hot_switching_title">限制实时配置文件</string>
 </resources>
 

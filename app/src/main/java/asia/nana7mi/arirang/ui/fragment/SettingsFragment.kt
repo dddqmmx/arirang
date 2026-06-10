@@ -99,6 +99,7 @@ private fun SettingsScreen(
     val savedLanguage = AppPreferences.getLanguage(context) ?: "system"
     val currentLanguage = languageNames.getOrElse(languageCodes.indexOf(savedLanguage)) { savedLanguage }
 
+
     var currentRegionCode by remember {
         mutableStateOf(AppPreferences.getRegion(context) ?: DEFAULT_REGION)
     }
