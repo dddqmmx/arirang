@@ -88,6 +88,9 @@
         <activity
             android:name=".ui.activity.SensorConfigActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.activity.SensorListActivity"
+            android:exported="false" />
         <meta-data
             android:name="xposedmodule"
             android:value="true" />

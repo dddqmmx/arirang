@@ -2,7 +2,6 @@ package asia.nana7mi.arirang.service
 
 import android.app.Service
 import android.content.Intent
-import android.os.Binder.getCallingUid
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
