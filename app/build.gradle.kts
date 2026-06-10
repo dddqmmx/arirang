@@ -2,8 +2,6 @@ import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
-    id("kotlin-kapt")
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -77,6 +75,10 @@ kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
+}
+
+tasks.register("unitTestClasses") {
+    dependsOn("compileDebugUnitTestSources")
 }
 
 dependencies {

@@ -39,6 +39,8 @@
 #include <utility>
 #include <vector>
 
+#include "json.hpp"
+
 namespace {
 
 constexpr const char *kLinkerNames[] = {
@@ -298,13 +300,48 @@ int do_inject(pid_t pid, const char *so_path) {
     return 0;
 }
 
+int do_config(const char *path, const char *key) {
+    std::string content = read_file(path);
+    if (content.empty()) return 10;
+    try {
+        auto j = nlohmann::json::parse(content);
+        if (j.contains(key)) {
+            auto val = j[key];
+            if (val.is_string()) std::printf("%s", val.get<std::string>().c_str());
+            else if (val.is_boolean()) std::printf("%s", val.get<bool>() ? "true" : "false");
+            else if (val.is_number()) std::printf("%s", val.dump().c_str());
+            else std::printf("%s", val.dump().c_str());
+            return 0;
+        }
+    } catch (const std::exception &e) {
+        std::fprintf(stderr, "[arirang_injector] config error: %s\n", e.what());
+    }
+    return 11;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
+    if (argc < 2) {
+        std::fprintf(stderr, "usage:\n");
+        std::fprintf(stderr, "  %s <pid> <absolute-path-to-.so>\n", argv[0]);
+        std::fprintf(stderr, "  %s config <path> <key>\n", argv[0]);
+        return 1;
+    }
+
+    if (std::strcmp(argv[1], "config") == 0) {
+        if (argc != 4) {
+            std::fprintf(stderr, "usage: %s config <path> <key>\n", argv[0]);
+            return 1;
+        }
+        return do_config(argv[2], argv[3]);
+    }
+
     if (argc != 3) {
         std::fprintf(stderr, "usage: %s <pid> <absolute-path-to-.so>\n", argv[0]);
         return 1;
     }
+
     const pid_t pid = static_cast<pid_t>(std::atoi(argv[1]));
     const char *path = argv[2];
     if (pid <= 0) {

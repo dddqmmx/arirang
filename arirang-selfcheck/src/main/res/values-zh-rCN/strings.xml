@@ -110,4 +110,6 @@
     <string name="export_success">导出成功</string>
     <string name="export_failed">导出失败</string>
 
-    </resources>
+        <string name="cancel">取消</string>
+    <string name="ok">确定</string>
+</resources>

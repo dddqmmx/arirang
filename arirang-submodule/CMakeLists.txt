@@ -90,6 +90,7 @@ target_include_directories(arirang_injector PRIVATE
     src/main/cpp/core
     src/main/cpp/utils
     src/main/cpp/drm
+    src/main/cpp/api
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_link_libraries(arirang_injector log dl)

@@ -20,6 +20,7 @@
 # can pass it to the injector.
 
 MODDIR="${0%/*}"
+INJECTOR="$MODDIR/bin/arirang_injector"
 
 # ----- staging dir on tmpfs -----------------------------------------------
 LANDING_DIR="/dev/.arirang"
@@ -110,13 +111,16 @@ if [ -z "$APP_CONFIG_PATH" ]; then
     exit 0
 fi
 
-WIDEVINE_ID=$(grep -o '"widevineDrmId"[[:space:]]*:[[:space:]]*"[0-9a-fA-F]*"' "$APP_CONFIG_PATH" \
-              | head -n1 \
-              | sed -e 's/.*"widevineDrmId"[[:space:]]*:[[:space:]]*"//' -e 's/".*//')
+if [ ! -x "$INJECTOR" ]; then
+    chmod 0755 "$INJECTOR" 2>/dev/null
+fi
 
-UNIQUE_ENABLED=$(grep -o -E '"uniqueIdentifierEnabled"[[:space:]]*:[[:space:]]*(true|false)' "$APP_CONFIG_PATH" \
-                 | head -n1 \
-                 | sed -e 's/.*://' -e 's/[[:space:]]//g')
+get_config_val() {
+    "$INJECTOR" config "$APP_CONFIG_PATH" "$1" 2>/dev/null
+}
+
+WIDEVINE_ID=$(get_config_val "widevineDrmId")
+UNIQUE_ENABLED=$(get_config_val "uniqueIdentifierEnabled")
 
 if [ "$UNIQUE_ENABLED" != "true" ] || [ -z "$WIDEVINE_ID" ]; then
     rm -f "$LANDING_ID"
@@ -132,14 +136,8 @@ chcon u:object_r:vendor_file:s0 "$LANDING_ID" 2>/dev/null
 # affecting all processes (including getprop and native binaries) without
 # injecting into them. This aligns with Arirang's system-level design.
 
-get_config_val() {
-    grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$APP_CONFIG_PATH" \
-        | head -n1 \
-        | sed -e "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"//" -e 's/".*//' -e 's/\\\//\//g'
-}
-
-ENABLED=$(grep -o -E '"enabled"[[:space:]]*:[[:space:]]*(true|false)' "$APP_CONFIG_PATH" | head -n1 | sed 's/.*://;s/[[:space:]]//g')
-DEVICE_INFO_ENABLED=$(grep -o -E '"deviceInfoEnabled"[[:space:]]*:[[:space:]]*(true|false)' "$APP_CONFIG_PATH" | head -n1 | sed 's/.*://;s/[[:space:]]//g')
+ENABLED=$(get_config_val "enabled")
+DEVICE_INFO_ENABLED=$(get_config_val "deviceInfoEnabled")
 
 if [ "$ENABLED" = "true" ]; then
     if [ "$DEVICE_INFO_ENABLED" = "true" ]; then

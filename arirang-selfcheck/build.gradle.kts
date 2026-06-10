@@ -2,7 +2,6 @@ import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 val selfCheckApplicationId = "asia.nana7mi.arirang.selfcheck"
