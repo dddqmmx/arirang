@@ -32,7 +32,7 @@
 
     <string name="clipboard_permission_title">クリップボード読み取り権限</string>
     <string name="clipboard_overlay_permission_title">オーバーレイ権限が必要です</string>
-    <string name="clipboard_overlay_permission_message">クリップボードのリアルタイム遮断には、他のアプリの上に表示する権限が必要です。権限を付与してください。</string>
+    <string name="clipboard_overlay_permission_message">クリップボードのリアルタイム遮断には、他のアプリの上に表示する権限が必要です。権限を付与してください</string>
     <string name="grant_permission">許可</string>
     <string name="not_now">今はしない</string>
     <string name="keep_original_setting">許可しない</string>
@@ -47,8 +47,8 @@
 
     <string name="ui_settings_title">UI設定</string>
     <string name="log_settings_title">Hook ログ</string>
-    <string name="log_settings_summary">ログ出力を許可する Hook モジュールを選択します。</string>
-    <string name="log_settings_save_failed">ログ設定を更新できませんでした。</string>
+    <string name="log_settings_summary">ログ出力を許可する Hook モジュールを選択します</string>
+    <string name="log_settings_save_failed">ログ設定を更新できませんでした</string>
     <string name="log_module_core">コア</string>
     <string name="log_module_clipboard">クリップボード</string>
     <string name="log_module_gms">Google サービス</string>
@@ -75,14 +75,14 @@
     <string name="fused_realtime_waiting">Fused(リアルタイム): 待機中...</string>
     <string name="save">保存</string>
     <string name="unsaved_changes_title">未保存の変更</string>
-    <string name="unsaved_changes_message">設定が変更されています。移動する前に保存しますか？</string>
+    <string name="unsaved_changes_message">設定が変更されています。移動する前に保存しますか</string>
     <string name="discard_changes">破棄</string>
     <string name="add_new_slot">新しいスロットを追加</string>
     <string name="hide_sim">SIM 情報をすべて非表示</string>
     <string name="sim_hook_enabled">Hook を有効化</string>
-    <string name="sim_hook_enabled_summary">SIM Hook を有効にするかどうかを切り替えます。</string>
-    <string name="hide_sim_enabled_summary">SIM カード情報を表示しません。</string>
-    <string name="hide_sim_disabled_summary">下に設定した SIM 情報を表示します。</string>
+    <string name="sim_hook_enabled_summary">SIM Hook を有効にするかどうかを切り替えます</string>
+    <string name="hide_sim_enabled_summary">SIM カード情報を表示しません</string>
+    <string name="hide_sim_disabled_summary">下に設定した SIM 情報を表示します</string>
     <string name="remove_sim_slot">SIM スロットを削除</string>
     <string name="apply_hook_defaults">Hook の既定値を適用</string>
     <string name="sim_field_mcc">MCC</string>
@@ -96,13 +96,13 @@
     <string name="sim_field_iccid">ICCID</string>
     <string name="sim_field_imei">IMEI</string>
     <string name="unique_section_slot_info">スロット情報</string>
-    <string name="unique_section_imei_summary">スロット関連の識別子はここで設定できます。SIMカードが挿入されていない場合でも、IMEIなどの一部の識別子は読み取られる可能性があります。長押しでスロットを並べ替えることができます。</string>
+    <string name="unique_section_imei_summary">スロット関連の識別子はここで設定できます。SIMカードが挿入されていない場合でも、IMEIなどの一部の識別子は読み取られる可能性があります。長押しでスロットを並べ替えることができます</string>
     <string name="unique_imei_slot_title">スロット %1$d</string>
     <string name="sim_field_card_id">カード ID</string>
     <string name="sim_field_number">電話番号</string>
     <string name="set_scope">スコープを設定</string>
     <string name="unique_hook_enabled">Hook を有効化</string>
-    <string name="unique_hook_enabled_summary">Android ID、IMEI、その他の一意識別子の偽装を制御します。</string>
+    <string name="unique_hook_enabled_summary">Android ID、IMEI、その他の一意識別子の偽装を制御します</string>
     <string name="unique_section_device_ids">端末識別子</string>
     <string name="unique_field_android_id">Android ID</string>
     <string name="unique_field_gaid">GAID</string>
@@ -113,19 +113,19 @@
     <string name="unique_randomize">ランダム生成</string>
     <string name="unique_add_imei_slot">IMEI スロットを追加</string>
     <string name="unique_import_imei">現在の IMEI をインポート</string>
-    <string name="unique_import_imei_empty">読み取り可能な IMEI は返されませんでした。</string>
-    <string name="sim_slot_limit_reached">%1$d 件の SIM スロットのみ設定できます。先に一意識別子で IMEI スロットを調整してください。</string>
+    <string name="unique_import_imei_empty">読み取り可能な IMEI は返されませんでした</string>
+    <string name="sim_slot_limit_reached">%1$d 件の SIM スロットのみ設定できます。先に一意識別子で IMEI スロットを調整してください</string>
     <string name="sim_slot_limit_title">スロット上限に達しました</string>
     <string name="test_clipboard_receiver">ClipboardRequestReceiver をテスト</string>
     <string name="location_hook_enabled">仮想位置情報を有効化</string>
-    <string name="location_hook_enabled_summary">設定した座標を、Hook 済みのネイティブおよび Fused 位置情報の読み取りに適用します。</string>
+    <string name="location_hook_enabled_summary">設定した座標を、Hook 済みのネイティブおよび Fused 位置情報の読み取りに適用します</string>
     <string name="location_global_config">グローバル位置情報</string>
     <string name="location_section_coordinates">座標</string>
     <string name="location_section_motion">移動と信号</string>
     <string name="location_section_per_app">アプリ別の位置情報</string>
     <string name="location_app_config_title">アプリ位置情報</string>
     <string name="location_app_config_entry">アプリ位置情報</string>
-    <string name="location_app_config_entry_summary">アプリごとに個別の座標を設定します。</string>
+    <string name="location_app_config_entry_summary">アプリごとに個別の座標を設定します</string>
     <string name="location_search_apps">アプリを検索</string>
     <string name="location_filter_user_apps">ユーザーアプリ</string>
     <string name="location_filter_system_apps">システムアプリ</string>
@@ -144,11 +144,11 @@
     <string name="location_default_pyongyang">平壌の既定値を使用</string>
     <string name="location_add_app_profile">アプリ位置を追加</string>
     <string name="location_remove_app_profile">アプリ位置を削除</string>
-    <string name="location_invalid_number">%1$s は %2$s から %3$s の範囲で入力してください。</string>
-    <string name="location_invalid_package">有効なパッケージ名を入力してください。</string>
+    <string name="location_invalid_number">%1$s は %2$s から %3$s の範囲で入力してください</string>
+    <string name="location_invalid_package">有効なパッケージ名を入力してください</string>
     <string name="wifi_config_title">Wi-Fi情報</string>
     <string name="wifi_hook_enabled">Hook を有効化</string>
-    <string name="wifi_hook_enabled_summary">アプリに返される現在の Wi-Fi 識別情報と周辺スキャン結果を書き換えます。</string>
+    <string name="wifi_hook_enabled_summary">アプリに返される現在の Wi-Fi 識別情報と周辺スキャン結果を書き換えます</string>
     <string name="wifi_section_current">現在の Wi-Fi</string>
     <string name="wifi_section_scan_result">周辺 Wi-Fi</string>
     <string name="wifi_field_current_ssid">現在の SSID</string>
@@ -156,7 +156,7 @@
     <string name="wifi_field_scan_ssid">スキャン結果 SSID</string>
     <string name="wifi_field_scan_bssid">スキャン結果 BSSID</string>
     <string name="wifi_hide_all_scan_results">周辺 Wi-Fi をすべて非表示</string>
-    <string name="wifi_hide_all_scan_results_summary">Hook 対象アプリへ空のスキャンリストを返します。</string>
+    <string name="wifi_hide_all_scan_results_summary">Hook 対象アプリへ空のスキャンリストを返します</string>
     <string name="wifi_add_scan_result">周辺 Wi-Fi を追加</string>
     <string name="wifi_remove_scan_result">周辺 Wi-Fi を削除</string>
     <string name="wifi_scan_result_title">周辺 Wi-Fi %1$d</string>
@@ -164,17 +164,17 @@
 
     <string name="bluetooth_config_title">Bluetooth 情報</string>
     <string name="bluetooth_hook_enabled">Hook を有効化</string>
-    <string name="bluetooth_hook_enabled_summary">アプリに返される接続済み Bluetooth デバイスと周辺スキャン結果を書き換えます。</string>
+    <string name="bluetooth_hook_enabled_summary">アプリに返される接続済み Bluetooth デバイスと周辺スキャン結果を書き換えます</string>
     <string name="bluetooth_field_local_name">デバイス名</string>
-    <string name="bluetooth_field_local_name_summary">他人に表示されるこのデバイスの Bluetooth 名を設定します。</string>
+    <string name="bluetooth_field_local_name_summary">他人に表示されるこのデバイスの Bluetooth 名を設定します</string>
     <string name="bluetooth_section_connected">接続済みデバイス</string>
     <string name="bluetooth_section_scan_result">周辺デバイス</string>
     <string name="bluetooth_field_name">デバイス名</string>
     <string name="bluetooth_field_address">MAC アドレス</string>
     <string name="bluetooth_hide_all_connected">接続済みデバイスをすべて非表示</string>
-    <string name="bluetooth_hide_all_connected_summary">Hook 対象アプリへ空の接続済みデバイスリストを返します。</string>
+    <string name="bluetooth_hide_all_connected_summary">Hook 対象アプリへ空の接続済みデバイスリストを返します</string>
     <string name="bluetooth_hide_all_scan_results">周辺デバイスをすべて非表示</string>
-    <string name="bluetooth_hide_all_scan_results_summary">Hook 対象アプリへ空のスキャンリストを返します。</string>
+    <string name="bluetooth_hide_all_scan_results_summary">Hook 対象アプリへ空のスキャンリストを返します</string>
     <string name="bluetooth_add_connected_device">接続済みデバイスを追加</string>
     <string name="bluetooth_remove_connected_device">接続済みデバイスを削除</string>
     <string name="bluetooth_connected_device_title">接続済みデバイス %1$d</string>
@@ -196,9 +196,9 @@
     <string name="init_button_enter">アプリに入る</string>
     <string name="init_security_check_title">実行环境チェック</string>
     <string name="init_core_dependency_title">コア依存関係</string>
-    <string name="init_core_dependency_desc">本ソフトウェアは Xposed に依存しています。サポートされている環境以外では機能しません。</string>
+    <string name="init_core_dependency_desc">本ソフトウェアは Xposed に依存しています。サポートされている環境以外では機能しません</string>
     <string name="init_precondition_title">前提条件</string>
-    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保护を提供します。</string>
+    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保护を提供します</string>
     <string name="init_risk_cases_title">例えば：</string>
     <string name="init_risk_item_backdoor">システムにバックドアがある</string>
     <string name="init_risk_item_rom">信頼できないROMソース</string>
@@ -253,7 +253,7 @@
 
     <!-- Test Activity -->
     <string name="test_dialog_title">ダイアログ機能のテスト</string>
-    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対话ポップアップをテストします。</string>
+    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対话ポップアップをテストします</string>
     <string name="test_dialog_foreground">フォアグラウンドテストダイアログ</string>
     <string name="test_dialog_background">バックグラウンドテストダイアログ (3秒遅延)</string>
     <string name="test_dialog_result">対话结果がここに表示されます</string>
@@ -272,7 +272,7 @@
 
     <string name="feature_not_available">未開放</string>
     <string name="reset_all">すべての設定をリセット</string>
-    <string name="reset_all_confirm">すべてのクリップボード設定をリセットしますか？アプリごとのポリシーが消去され、既定の動作に戻ります。</string>
+    <string name="reset_all_confirm">すべてのクリップボード設定をリセットしますか？アプリごとのポリシーが消去され、既定の動作に戻ります</string>
 
     <string name="sim_preset_title">キャリアのプリセットを選択</string>
     <string name="sim_preset_button">国・キャリアのプリセットを選択</string>
@@ -286,7 +286,7 @@
     <string name="sim_preset_carrier_placeholder_select">キャリアを選択...</string>
     <string name="sim_summary_fallback">SIM</string>
     <string name="save_success">保存しました</string>
-    <string name="save_success_reboot_required">保存しました。変更を反映するには端末を再起動してください。</string>
+    <string name="save_success_reboot_required">保存しました。変更を反映するには端末を再起動してください</string>
     <string name="sim_import_no_active">有効なシステムSIMが見つかりません</string>
     <string name="sim_import_desc">システムからSIM情報をインポート</string>
     <string name="sim_mcc_prefix">MCC:</string>
@@ -296,7 +296,7 @@
     <string name="sim_country_default">kp</string>
     <string name="sim_carrier_default">Koryolink</string>
     <string name="device_hook_enabled">端末情報 Hook を有効化</string>
-    <string name="device_hook_enabled_summary">次回の対象プロセス起動時に、選択した端末プロファイルをネイティブ Zygisk 補助モジュールへ適用します。</string>
+    <string name="device_hook_enabled_summary">次回の対象プロセス起動時に、選択した端末プロファイルをネイティブ Zygisk 補助モジュールへ適用します</string>
     <string name="device_preset_title">端末プリセット</string>
     <string name="device_preset_custom">カスタム</string>
     <string name="device_section_identity">識別情報</string>

@@ -33,7 +33,7 @@
 
     <string name="clipboard_permission_title">Clipboard Access Permission</string>
     <string name="clipboard_overlay_permission_title">Overlay Permission Required</string>
-    <string name="clipboard_overlay_permission_message">Real-time clipboard interception needs permission to display over other apps. Please grant this permission.</string>
+    <string name="clipboard_overlay_permission_message">Real-time clipboard interception needs permission to display over other apps. Please grant this permission</string>
     <string name="grant_permission">Grant</string>
     <string name="not_now">Not Now</string>
     <string name="keep_original_setting">Do Not Grant</string>
@@ -48,8 +48,8 @@
 
     <string name="ui_settings_title">UI Settings</string>
     <string name="log_settings_title">Hook Logs</string>
-    <string name="log_settings_summary">Choose which hook modules can write logs.</string>
-    <string name="log_settings_save_failed">Failed to update log setting.</string>
+    <string name="log_settings_summary">Choose which hook modules can write logs</string>
+    <string name="log_settings_save_failed">Failed to update log setting</string>
     <string name="log_module_core">Core</string>
     <string name="log_module_clipboard">Clipboard</string>
     <string name="log_module_gms">Google services</string>
@@ -64,9 +64,9 @@
 
     <string name="global_settings_title">Global Control</string>
     <string name="advanced_settings_title">Advanced</string>
-    <string name="advanced_settings_summary">Architectural and low-level performance tweaks.</string>
+    <string name="advanced_settings_summary">Architectural and low-level performance tweaks</string>
     <string name="restrict_hot_switching_title">Restrict Hot-Switching</string>
-    <string name="restrict_hot_switching_summary">Only install hooks if feature is enabled at app start. Prevents background overhead but requires restart to apply changes.</string>
+    <string name="restrict_hot_switching_summary">Only install hooks if feature is enabled at app start. Prevents background overhead but requires restart to apply changes</string>
 
     <string name="slot_title_text">%1$d. SIM Slot</string>
 
@@ -82,14 +82,14 @@
     <string name="fused_realtime_waiting">Fused (Real-time): Waiting...</string>
     <string name="save">Save</string>
     <string name="unsaved_changes_title">Unsaved changes</string>
-    <string name="unsaved_changes_message">Settings have changed. Save before leaving?</string>
+    <string name="unsaved_changes_message">Settings have changed. Save before leaving</string>
     <string name="discard_changes">Discard</string>
     <string name="add_new_slot">Add New Slot</string>
     <string name="hide_sim">Hide all SIM info</string>
     <string name="sim_hook_enabled">Enable hook</string>
-    <string name="sim_hook_enabled_summary">Controls whether the SIM hook is enabled.</string>
-    <string name="hide_sim_enabled_summary">Do not show any SIM card information.</string>
-    <string name="hide_sim_disabled_summary">Show the SIM information configured below.</string>
+    <string name="sim_hook_enabled_summary">Controls whether the SIM hook is enabled</string>
+    <string name="hide_sim_enabled_summary">Do not show any SIM card information</string>
+    <string name="hide_sim_disabled_summary">Show the SIM information configured below</string>
     <string name="remove_sim_slot">Remove SIM slot</string>
     <string name="apply_hook_defaults">Apply hook defaults</string>
     <string name="sim_field_mcc">MCC</string>
@@ -106,10 +106,10 @@
     <string name="sim_field_number">Number</string>
     <string name="set_scope">Set Scope</string>
     <string name="unique_hook_enabled">Enable hook</string>
-    <string name="unique_hook_enabled_summary">Controls spoofing for Android ID, IMEI and other unique identifiers.</string>
+    <string name="unique_hook_enabled_summary">Controls spoofing for Android ID, IMEI and other unique identifiers</string>
     <string name="unique_section_device_ids">Device identifiers</string>
     <string name="unique_section_slot_info">Slot Info</string>
-    <string name="unique_section_imei_summary">Slot-related identifiers can be configured here. Some identifiers, like IMEI, can be read even when no SIM card is installed. Long press to drag and reorder.</string>
+    <string name="unique_section_imei_summary">Slot-related identifiers can be configured here. Some identifiers, like IMEI, can be read even when no SIM card is installed. Long press to drag and reorder</string>
     <string name="unique_field_android_id">Android ID</string>
     <string name="unique_field_gaid">GAID</string>
     <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
@@ -119,20 +119,20 @@
     <string name="unique_randomize">Randomize</string>
     <string name="unique_add_imei_slot">Add IMEI Slot</string>
     <string name="unique_import_imei">Import current IMEI</string>
-    <string name="unique_import_imei_empty">No readable IMEI was returned.</string>
+    <string name="unique_import_imei_empty">No readable IMEI was returned</string>
     <string name="unique_imei_slot_title">Slot %1$d</string>
-    <string name="sim_slot_limit_reached">Only %1$d SIM slot(s) can be configured. Adjust IMEI slots in Unique identifiers first.</string>
+    <string name="sim_slot_limit_reached">Only %1$d SIM slot(s) can be configured. Adjust IMEI slots in Unique identifiers first</string>
     <string name="sim_slot_limit_title">Slot limit reached</string>
     <string name="test_clipboard_receiver">Test ClipboardRequestReceiver</string>
     <string name="location_hook_enabled">Enable virtual location</string>
-    <string name="location_hook_enabled_summary">Applies the configured coordinates to hooked native and fused location reads.</string>
+    <string name="location_hook_enabled_summary">Applies the configured coordinates to hooked native and fused location reads</string>
     <string name="location_global_config">Global location</string>
     <string name="location_section_coordinates">Coordinates</string>
     <string name="location_section_motion">Motion and signal</string>
     <string name="location_section_per_app">Per-app locations</string>
     <string name="location_app_config_title">App locations</string>
     <string name="location_app_config_entry">App locations</string>
-    <string name="location_app_config_entry_summary">Set coordinates for individual applications.</string>
+    <string name="location_app_config_entry_summary">Set coordinates for individual applications</string>
     <string name="location_search_apps">Search apps</string>
     <string name="location_filter_user_apps">User apps</string>
     <string name="location_filter_system_apps">System apps</string>
@@ -151,11 +151,11 @@
     <string name="location_default_pyongyang">Use Pyongyang default</string>
     <string name="location_add_app_profile">Add app location</string>
     <string name="location_remove_app_profile">Remove app location</string>
-    <string name="location_invalid_number">%1$s must be between %2$s and %3$s.</string>
-    <string name="location_invalid_package">Enter a valid package name.</string>
+    <string name="location_invalid_number">%1$s must be between %2$s and %3$s</string>
+    <string name="location_invalid_package">Enter a valid package name</string>
     <string name="wifi_config_title">Wi-Fi Information</string>
     <string name="wifi_hook_enabled">Enable hook</string>
-    <string name="wifi_hook_enabled_summary">Rewrites the current Wi-Fi identity and nearby scan result returned to apps.</string>
+    <string name="wifi_hook_enabled_summary">Rewrites the current Wi-Fi identity and nearby scan result returned to apps</string>
     <string name="wifi_section_current">Current Wi-Fi</string>
     <string name="wifi_section_scan_result">Nearby Wi-Fi</string>
     <string name="wifi_field_current_ssid">Current SSID</string>
@@ -163,7 +163,7 @@
     <string name="wifi_field_scan_ssid">Scan result SSID</string>
     <string name="wifi_field_scan_bssid">Scan result BSSID</string>
     <string name="wifi_hide_all_scan_results">Hide all nearby Wi-Fi</string>
-    <string name="wifi_hide_all_scan_results_summary">Return an empty scan list to hooked apps.</string>
+    <string name="wifi_hide_all_scan_results_summary">Return an empty scan list to hooked apps</string>
     <string name="wifi_add_scan_result">Add nearby Wi-Fi</string>
     <string name="wifi_remove_scan_result">Remove nearby Wi-Fi</string>
     <string name="wifi_scan_result_title">Nearby Wi-Fi %1$d</string>
@@ -171,17 +171,17 @@
 
     <string name="bluetooth_config_title">Bluetooth Information</string>
     <string name="bluetooth_hook_enabled">Enable hook</string>
-    <string name="bluetooth_hook_enabled_summary">Rewrites the connected Bluetooth devices and nearby scan results returned to apps.</string>
+    <string name="bluetooth_hook_enabled_summary">Rewrites the connected Bluetooth devices and nearby scan results returned to apps</string>
     <string name="bluetooth_field_local_name">Device Name</string>
-    <string name="bluetooth_field_local_name_summary">Sets the name of this device visible to other Bluetooth devices.</string>
+    <string name="bluetooth_field_local_name_summary">Sets the name of this device visible to other Bluetooth devices</string>
     <string name="bluetooth_section_connected">Connected Devices</string>
     <string name="bluetooth_section_scan_result">Nearby Devices</string>
     <string name="bluetooth_field_name">Device Name</string>
     <string name="bluetooth_field_address">MAC Address</string>
     <string name="bluetooth_hide_all_connected">Hide all connected devices</string>
-    <string name="bluetooth_hide_all_connected_summary">Return an empty connected device list to hooked apps.</string>
+    <string name="bluetooth_hide_all_connected_summary">Return an empty connected device list to hooked apps</string>
     <string name="bluetooth_hide_all_scan_results">Hide all nearby devices</string>
-    <string name="bluetooth_hide_all_scan_results_summary">Return an empty scan list to hooked apps.</string>
+    <string name="bluetooth_hide_all_scan_results_summary">Return an empty scan list to hooked apps</string>
     <string name="bluetooth_add_connected_device">Add connected device</string>
     <string name="bluetooth_remove_connected_device">Remove connected device</string>
     <string name="bluetooth_connected_device_title">Connected Device %1$d</string>
@@ -203,9 +203,9 @@
     <string name="init_button_enter">Enter App</string>
     <string name="init_security_check_title">Environment Check</string>
     <string name="init_core_dependency_title">Core Dependency</string>
-    <string name="init_core_dependency_desc">This app relies on Xposed. Functions will not work if not running in a supported environment.</string>
+    <string name="init_core_dependency_desc">This app relies on Xposed. Functions will not work if not running in a supported environment</string>
     <string name="init_precondition_title">Precondition</string>
-    <string name="init_precondition_desc">This app is not a panacea; it only provides privacy protection when the system itself is trusted.</string>
+    <string name="init_precondition_desc">This app is not a panacea; it only provides privacy protection when the system itself is trusted</string>
     <string name="init_risk_cases_title">Such as:</string>
     <string name="init_risk_item_backdoor">System has backdoors</string>
     <string name="init_risk_item_rom">Untrusted ROM source</string>
@@ -259,7 +259,7 @@
 
     <!-- Test Activity -->
     <string name="test_dialog_title">Test Dialog Functionality</string>
-    <string name="test_dialog_desc">Click the buttons below to test interaction popups in the foreground or delayed in the background.</string>
+    <string name="test_dialog_desc">Click the buttons below to test interaction popups in the foreground or delayed in the background</string>
     <string name="test_dialog_foreground">Foreground Test Dialog</string>
     <string name="test_dialog_background">Background Test Dialog (3s delay)</string>
     <string name="test_dialog_result">Interaction results will appear here</string>
@@ -279,7 +279,7 @@
 
     <string name="feature_not_available">Coming Soon</string>
     <string name="reset_all">Reset All Settings</string>
-    <string name="reset_all_confirm">Are you sure you want to reset all clipboard settings? This will clear all app-specific policies and restore the default behavior.</string>
+    <string name="reset_all_confirm">Are you sure you want to reset all clipboard settings? This will clear all app-specific policies and restore the default behavior</string>
 
     <string name="sim_preset_title">Select Carrier Preset</string>
     <string name="sim_preset_button">Select Preset</string>
@@ -293,7 +293,7 @@
     <string name="sim_preset_carrier_placeholder_select">Select Carrier...</string>
     <string name="sim_summary_fallback">SIM</string>
     <string name="save_success">Saved successfully</string>
-    <string name="save_success_reboot_required">Saved successfully. Reboot the phone for changes to take effect.</string>
+    <string name="save_success_reboot_required">Saved successfully. Reboot the phone for changes to take effect</string>
     <string name="sim_import_no_active">No active system SIMs found</string>
     <string name="sim_import_desc">Import System SIMs</string>
     <string name="sim_mcc_prefix">MCC:</string>
@@ -303,7 +303,7 @@
     <string name="sim_country_default">kp</string>
     <string name="sim_carrier_default">Koryolink</string>
     <string name="device_hook_enabled">Enable device info hook</string>
-    <string name="device_hook_enabled_summary">Applies the selected device profile to the native Zygisk helper on next target process start.</string>
+    <string name="device_hook_enabled_summary">Applies the selected device profile to the native Zygisk helper on next target process start</string>
     <string name="device_preset_title">Device preset</string>
     <string name="device_preset_custom">Custom</string>
     <string name="device_section_identity">Identity</string>
@@ -326,28 +326,28 @@
     <string name="device_field_time">Build time</string>
     <string name="sensor_config_title">Sensor Information</string>
     <string name="sensor_hook_enabled">Enable sensor hook</string>
-    <string name="sensor_hook_enabled_summary">Spoofs the vendor and name fields of device sensors.</string>
+    <string name="sensor_hook_enabled_summary">Spoofs the vendor and name fields of device sensors</string>
     <string name="sensor_section_vendor">Vendor Replacement</string>
     <string name="sensor_vendor_keywords_hint">Keywords to replace (comma separated)</string>
-    <string name="sensor_vendor_keywords_summary">List of keywords to search for in sensor names and vendors.</string>
+    <string name="sensor_vendor_keywords_summary">List of keywords to search for in sensor names and vendors</string>
     <string name="sensor_vendor_replace_hint">Replacement Vendor</string>
-    <string name="sensor_vendor_replace_summary">Replace matching vendor keywords in all sensor fields. Case is matched automatically (e.g. xiaomi → google, XIAOMI → GOOGLE).</string>
+    <string name="sensor_vendor_replace_summary">Replace matching vendor keywords in all sensor fields. Case is matched automatically (e.g. xiaomi → google, XIAOMI → GOOGLE)</string>
     <string name="sensor_vendor_replace_apply">Apply to All</string>
     <string name="sensor_hide_all">Hide all sensors</string>
-    <string name="sensor_hide_all_summary">Return an empty list for all sensor enumerations.</string>
+    <string name="sensor_hide_all_summary">Return an empty list for all sensor enumerations</string>
     <string name="sensor_section_media">Media &amp; Recording</string>
     <string name="sensor_disable_mic">Disable Microphone</string>
-    <string name="sensor_disable_mic_summary">Prevent apps from recording audio.</string>
+    <string name="sensor_disable_mic_summary">Prevent apps from recording audio</string>
     <string name="sensor_disable_camera_front">Disable Front Camera</string>
-    <string name="sensor_disable_camera_front_summary">Prevent apps from accessing the front camera.</string>
+    <string name="sensor_disable_camera_front_summary">Prevent apps from accessing the front camera</string>
     <string name="sensor_disable_camera_rear">Disable Rear Camera</string>
-    <string name="sensor_disable_camera_rear_summary">Prevent apps from accessing the rear camera.</string>
+    <string name="sensor_disable_camera_rear_summary">Prevent apps from accessing the rear camera</string>
     <string name="sensor_section_motion">Motion &amp; Environment</string>
     <string name="sensor_disable_accel">Disable Accelerometer</string>
     <string name="sensor_disable_gyro">Disable Gyroscope</string>
     <string name="sensor_disable_magnetic">Disable Magnetic Field</string>
     <string name="sensor_section_list">Sensor List</string>
-    <string name="sensor_list_summary">Tap a sensor to edit its name and vendor. Toggle the switch to hide/show it.</string>
+    <string name="sensor_list_summary">Tap a sensor to edit its name and vendor. Toggle the switch to hide/show it</string>
     <string name="sensor_type_format">Type %1$d</string>
     <string name="sensor_hidden">Hidden</string>
     <string name="sensor_visible">Visible</string>
@@ -359,7 +359,7 @@
     <string name="sensor_field_type">Sensor Type</string>
     <string name="sensor_custom_tag">Custom</string>
     <string name="sensor_section_precision">Precision Control</string>
-    <string name="sensor_precision_summary">Reduce the decimal precision of motion sensor readings (accelerometer, gyroscope, magnetometer) to prevent fingerprinting.</string>
+    <string name="sensor_precision_summary">Reduce the decimal precision of motion sensor readings (accelerometer, gyroscope, magnetometer) to prevent fingerprinting</string>
     <string name="sensor_precision_level">Precision level</string>
     <string name="sensor_precision_original">Original (no reduction)</string>
     <string name="sensor_precision_low">Low (1 decimal place)</string>

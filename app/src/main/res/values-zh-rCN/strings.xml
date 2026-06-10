@@ -33,7 +33,7 @@
 
     <string name="clipboard_permission_title">剪切板读取权限</string>
     <string name="clipboard_overlay_permission_title">需要悬浮窗权限</string>
-    <string name="clipboard_overlay_permission_message">剪切板的实时拦截需要显示在其他应用上层，请授予权限。</string>
+    <string name="clipboard_overlay_permission_message">剪切板的实时拦截需要显示在其他应用上层，请授予权限</string>
     <string name="grant_permission">授予</string>
     <string name="not_now">暂不授予</string>
     <string name="keep_original_setting">不授予</string>
@@ -48,8 +48,8 @@
 
     <string name="ui_settings_title">UI设置</string>
     <string name="log_settings_title">Hook 日志</string>
-    <string name="log_settings_summary">选择允许输出日志的 Hook 模块。</string>
-    <string name="log_settings_save_failed">更新日志设置失败。</string>
+    <string name="log_settings_summary">选择允许输出日志的 Hook 模块</string>
+    <string name="log_settings_save_failed">更新日志设置失败</string>
     <string name="log_module_core">核心</string>
     <string name="log_module_clipboard">剪贴板</string>
     <string name="log_module_gms">Google 服务</string>
@@ -76,14 +76,14 @@
     <string name="fused_realtime_waiting">Fused(实时): 等待中...</string>
     <string name="save">保存</string>
     <string name="unsaved_changes_title">设置未保存</string>
-    <string name="unsaved_changes_message">设置已修改，离开前是否保存？</string>
+    <string name="unsaved_changes_message">设置已修改，离开前是否保存</string>
     <string name="discard_changes">放弃</string>
     <string name="add_new_slot">添加新插槽</string>
     <string name="hide_sim">隐藏全部 SIM 信息</string>
     <string name="sim_hook_enabled">启用 Hook</string>
-    <string name="sim_hook_enabled_summary">控制是否启用 SIM Hook。</string>
-    <string name="hide_sim_enabled_summary">不显示任何 SIM 卡信息。</string>
-    <string name="hide_sim_disabled_summary">显示下方配置的 SIM 信息。</string>
+    <string name="sim_hook_enabled_summary">控制是否启用 SIM Hook</string>
+    <string name="hide_sim_enabled_summary">不显示任何 SIM 卡信息</string>
+    <string name="hide_sim_disabled_summary">显示下方配置的 SIM 信息</string>
     <string name="remove_sim_slot">移除 SIM 插槽</string>
     <string name="apply_hook_defaults">应用 Hook 默认值</string>
     <string name="sim_field_mcc">MCC</string>
@@ -100,10 +100,10 @@
     <string name="sim_field_number">手机号</string>
     <string name="set_scope">设置作用域</string>
     <string name="unique_hook_enabled">启用 Hook</string>
-    <string name="unique_hook_enabled_summary">控制 Android ID、IMEI 和其他唯一标识的伪装。</string>
+    <string name="unique_hook_enabled_summary">控制 Android ID、IMEI 和其他唯一标识的伪装</string>
     <string name="unique_section_device_ids">设备标识</string>
     <string name="unique_section_slot_info">卡槽信息</string>
-    <string name="unique_section_imei_summary">卡槽相关的标识符可以在这里配置。即使没有安装 SIM 卡，某些标识符（如 IMEI）也可以被读取。长按可以拖动排序。</string>
+    <string name="unique_section_imei_summary">卡槽相关的标识符可以在这里配置。即使没有安装 SIM 卡，某些标识符（如 IMEI）也可以被读取。长按可以拖动排序</string>
     <string name="unique_field_android_id">Android ID</string>
     <string name="unique_field_gaid">GAID</string>
     <string name="unique_field_widevine_drm_id">Widevine DRM ID</string>
@@ -113,20 +113,20 @@
     <string name="unique_randomize">随机生成</string>
     <string name="unique_add_imei_slot">添加 IMEI 槽位</string>
     <string name="unique_import_imei">导入当前 IMEI</string>
-    <string name="unique_import_imei_empty">没有读取到可用的 IMEI。</string>
+    <string name="unique_import_imei_empty">没有读取到可用的 IMEI</string>
     <string name="unique_imei_slot_title">卡槽 %1$d</string>
-    <string name="sim_slot_limit_reached">只能配置 %1$d 个 SIM 卡槽。请先在唯一标识中调整 IMEI 槽位。</string>
+    <string name="sim_slot_limit_reached">只能配置 %1$d 个 SIM 卡槽。请先在唯一标识中调整 IMEI 槽位</string>
     <string name="sim_slot_limit_title">已达到卡槽上限</string>
     <string name="test_clipboard_receiver">测试 ClipboardRequestReceiver</string>
     <string name="location_hook_enabled">启用虚拟定位</string>
-    <string name="location_hook_enabled_summary">将配置的坐标应用到已 Hook 的原生和 Fused 定位读取。</string>
+    <string name="location_hook_enabled_summary">将配置的坐标应用到已 Hook 的原生和 Fused 定位读取</string>
     <string name="location_global_config">全局位置</string>
     <string name="location_section_coordinates">坐标</string>
     <string name="location_section_motion">运动与信号</string>
     <string name="location_section_per_app">按应用位置</string>
     <string name="location_app_config_title">应用位置</string>
     <string name="location_app_config_entry">应用位置</string>
-    <string name="location_app_config_entry_summary">为单个应用设置独立坐标。</string>
+    <string name="location_app_config_entry_summary">为单个应用设置独立坐标</string>
     <string name="location_search_apps">搜索应用</string>
     <string name="location_filter_user_apps">用户软件</string>
     <string name="location_filter_system_apps">系统软件</string>
@@ -145,11 +145,11 @@
     <string name="location_default_pyongyang">使用平壤默认值</string>
     <string name="location_add_app_profile">添加应用位置</string>
     <string name="location_remove_app_profile">删除应用位置</string>
-    <string name="location_invalid_number">%1$s 必须在 %2$s 到 %3$s 之间。</string>
-    <string name="location_invalid_package">请输入有效的包名。</string>
+    <string name="location_invalid_number">%1$s 必须在 %2$s 到 %3$s 之间</string>
+    <string name="location_invalid_package">请输入有效的包名</string>
     <string name="wifi_config_title">Wi-Fi 信息</string>
     <string name="wifi_hook_enabled">启用 Hook</string>
-    <string name="wifi_hook_enabled_summary">改写应用读取到的当前 Wi-Fi 标识和周边扫描结果。</string>
+    <string name="wifi_hook_enabled_summary">改写应用读取到的当前 Wi-Fi 标识和周边扫描结果</string>
     <string name="wifi_section_current">当前 Wi-Fi</string>
     <string name="wifi_section_scan_result">周边 Wi-Fi</string>
     <string name="wifi_field_current_ssid">当前 SSID</string>
@@ -157,7 +157,7 @@
     <string name="wifi_field_scan_ssid">扫描结果 SSID</string>
     <string name="wifi_field_scan_bssid">扫描结果 BSSID</string>
     <string name="wifi_hide_all_scan_results">隐藏所有周边 Wi-Fi</string>
-    <string name="wifi_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表。</string>
+    <string name="wifi_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表</string>
     <string name="wifi_add_scan_result">新增周边 Wi-Fi</string>
     <string name="wifi_remove_scan_result">删除周边 Wi-Fi</string>
     <string name="wifi_scan_result_title">周边 Wi-Fi %1$d</string>
@@ -165,15 +165,15 @@
 
     <string name="bluetooth_config_title">蓝牙信息</string>
     <string name="bluetooth_hook_enabled">启用 Hook</string>
-    <string name="bluetooth_hook_enabled_summary">改写应用读取到的已连接蓝牙设备和周边扫描结果。</string>
+    <string name="bluetooth_hook_enabled_summary">改写应用读取到的已连接蓝牙设备和周边扫描结果</string>
     <string name="bluetooth_field_local_name">设备名称</string>
-    <string name="bluetooth_field_local_name_summary">设置此设备对他人的可见蓝牙名称。</string>
+    <string name="bluetooth_field_local_name_summary">设置此设备对他人的可见蓝牙名称</string>
     <string name="bluetooth_section_connected">已连接设备</string>
     <string name="bluetooth_section_scan_result">周边设备</string>
     <string name="bluetooth_field_name">设备名称</string>
     <string name="bluetooth_field_address">MAC 地址</string>
     <string name="bluetooth_hide_all_scan_results">隐藏所有周边设备</string>
-    <string name="bluetooth_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表。</string>
+    <string name="bluetooth_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表</string>
     <string name="bluetooth_add_connected_device">新增已连接设备</string>
     <string name="bluetooth_remove_connected_device">删除已连接设备</string>
     <string name="bluetooth_connected_device_title">已连接设备 %1$d</string>
@@ -253,7 +253,7 @@
 
     <!-- Test Activity -->
     <string name="test_dialog_title">测试弹窗功能</string>
-    <string name="test_dialog_desc">点击下方按钮可以在前台或者延时在后台弹出交互弹窗进行测试。</string>
+    <string name="test_dialog_desc">点击下方按钮可以在前台或者延时在后台弹出交互弹窗进行测试</string>
     <string name="test_dialog_foreground">前台测试弹窗</string>
     <string name="test_dialog_background">后台测试弹窗 (延时3秒)</string>
     <string name="test_dialog_result">交互结果将显示在这里</string>
@@ -272,7 +272,7 @@
 
     <string name="feature_not_available">暂未开放</string>
     <string name="reset_all">重置所有设定</string>
-    <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为。</string>
+    <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为</string>
 
     <string name="sim_preset_title">选择运营商预设</string>
     <string name="sim_preset_button">选择国家/运营商预设</string>
@@ -286,7 +286,7 @@
     <string name="sim_preset_carrier_placeholder_select">选择运营商...</string>
     <string name="sim_summary_fallback">SIM</string>
     <string name="save_success">保存成功</string>
-    <string name="save_success_reboot_required">保存成功。请重启手机后生效。</string>
+    <string name="save_success_reboot_required">保存成功。请重启手机后生效</string>
     <string name="sim_import_no_active">未发现活跃的系统 SIM 卡</string>
     <string name="sim_import_desc">从系统导入 SIM 卡信息</string>
     <string name="sim_mcc_prefix">MCC:</string>
@@ -296,7 +296,7 @@
     <string name="sim_country_default">kp</string>
     <string name="sim_carrier_default">Koryolink</string>
     <string name="device_hook_enabled">启用设备信息 Hook</string>
-    <string name="device_hook_enabled_summary">在下次目标进程启动时，将选中的设备档案应用到原生 Zygisk 辅助模块。</string>
+    <string name="device_hook_enabled_summary">在下次目标进程启动时，将选中的设备档案应用到原生 Zygisk 辅助模块</string>
     <string name="device_preset_title">设备预设</string>
     <string name="device_preset_custom">自定义</string>
     <string name="device_section_identity">身份信息</string>
@@ -319,28 +319,28 @@
     <string name="device_field_time">构建时间</string>
     <string name="sensor_config_title">传感器信息</string>
     <string name="sensor_hook_enabled">启用 Hook</string>
-    <string name="sensor_hook_enabled_summary">改写应用读取到的传感器厂商和名称字段。</string>
+    <string name="sensor_hook_enabled_summary">改写应用读取到的传感器厂商和名称字段</string>
     <string name="sensor_section_vendor">厂商替换</string>
     <string name="sensor_vendor_keywords_hint">要替换的关键字（逗号分隔）</string>
-    <string name="sensor_vendor_keywords_summary">要在传感器名称和厂商中搜索的关键字列表。</string>
+    <string name="sensor_vendor_keywords_summary">要在传感器名称和厂商中搜索的关键字列表</string>
     <string name="sensor_vendor_replace_hint">替换的厂商</string>
-    <string name="sensor_vendor_replace_summary">替换传感器所有字段中匹配的关键字。自动匹配大小写（如 xiaomi → google，XIAOMI → GOOGLE）。</string>
+    <string name="sensor_vendor_replace_summary">替换传感器所有字段中匹配的关键字。自动匹配大小写（如 xiaomi → google，XIAOMI → GOOGLE）</string>
     <string name="sensor_vendor_replace_apply">应用到全部</string>
     <string name="sensor_hide_all">隐藏所有传感器</string>
-    <string name="sensor_hide_all_summary">向应用返回空的传感器列表。</string>
+    <string name="sensor_hide_all_summary">向应用返回空的传感器列表</string>
     <string name="sensor_section_media">媒体与录制</string>
     <string name="sensor_disable_mic">禁用麦克风</string>
-    <string name="sensor_disable_mic_summary">阻止应用进行录音。</string>
+    <string name="sensor_disable_mic_summary">阻止应用进行录音</string>
     <string name="sensor_disable_camera_front">禁用前置摄像头</string>
-    <string name="sensor_disable_camera_front_summary">阻止应用访问前置摄像头。</string>
+    <string name="sensor_disable_camera_front_summary">阻止应用访问前置摄像头</string>
     <string name="sensor_disable_camera_rear">禁用后置摄像头</string>
-    <string name="sensor_disable_camera_rear_summary">阻止应用访问后置摄像头。</string>
+    <string name="sensor_disable_camera_rear_summary">阻止应用访问后置摄像头</string>
     <string name="sensor_section_motion">运动与环境传感器</string>
     <string name="sensor_disable_accel">禁用加速度传感器</string>
     <string name="sensor_disable_gyro">禁用陀螺仪</string>
     <string name="sensor_disable_magnetic">禁用磁场传感器</string>
     <string name="sensor_section_list">传感器列表</string>
-    <string name="sensor_list_summary">点击传感器可编辑名称和厂商。开关控制是否对应用隐藏。</string>
+    <string name="sensor_list_summary">点击传感器可编辑名称和厂商。开关控制是否对应用隐藏</string>
     <string name="sensor_type_format">类型 %1$d</string>
     <string name="sensor_hidden">已隐藏</string>
     <string name="sensor_visible">可见</string>
@@ -352,7 +352,7 @@
     <string name="sensor_field_type">传感器类型</string>
     <string name="sensor_custom_tag">自定义</string>
     <string name="sensor_section_precision">精度控制</string>
-    <string name="sensor_precision_summary">降低运动传感器（加速度计、陀螺仪、磁力计）读数的小数精度，以防止指纹识别。</string>
+    <string name="sensor_precision_summary">降低运动传感器（加速度计、陀螺仪、磁力计）读数的小数精度，以防止指纹识别</string>
     <string name="sensor_precision_level">精度等级</string>
     <string name="sensor_precision_original">原始精度（不降低）</string>
     <string name="sensor_precision_low">低精度（保留1位小数）</string>
