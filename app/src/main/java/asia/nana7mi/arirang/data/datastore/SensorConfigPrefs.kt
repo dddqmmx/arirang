@@ -19,7 +19,7 @@ object SensorConfigPrefs {
     private const val KEY_DISABLE_GYRO = "disable_gyro"
     private const val KEY_DISABLE_MAGNETIC = "disable_magnetic"
 
-    private const val KEY_PRECISION_LEVEL = "precision_level"
+    private const val KEY_PRECISION_BY_SENSOR_TYPE = "precision_by_sensor_type"
     private const val KEY_SENSOR_ENTRIES = "sensor_entries"
     private const val KEY_VENDOR_REPLACEMENT = "vendor_replacement"
     private const val KEY_VENDOR_KEYWORDS = "vendor_keywords"
@@ -70,7 +70,7 @@ object SensorConfigPrefs {
         val disableAccel: Boolean = false,
         val disableGyro: Boolean = false,
         val disableMagnetic: Boolean = false,
-        val precisionLevel: Int = PRECISION_ORIGINAL,
+        val precisionBySensorType: Map<Int, Int> = emptyMap(),
         val sensorEntries: List<SensorEntry> = emptyList(),
         val vendorReplacement: String = "",
         val vendorKeywords: String = "xiaomi, qti, qualcomm, samsung, huawei, oppo, vivo, oneplus, meizu, motorola, lenovo, asus, sony, mediatek, mtk, spreadtrum, unisoc, realme, nothing, google"
@@ -85,6 +85,20 @@ object SensorConfigPrefs {
         } else {
             emptyList()
         }
+        
+        val precisionJsonStr = prefs.getString(KEY_PRECISION_BY_SENSOR_TYPE, null)
+        val precisionMap = mutableMapOf<Int, Int>()
+        if (precisionJsonStr != null) {
+            try {
+                val json = JSONObject(precisionJsonStr)
+                json.keys().forEach { key ->
+                    precisionMap[key.toInt()] = json.getInt(key)
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+        
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             hideAll = prefs.getBoolean(KEY_HIDE_ALL, false),
@@ -94,7 +108,7 @@ object SensorConfigPrefs {
             disableAccel = prefs.getBoolean(KEY_DISABLE_ACCEL, false),
             disableGyro = prefs.getBoolean(KEY_DISABLE_GYRO, false),
             disableMagnetic = prefs.getBoolean(KEY_DISABLE_MAGNETIC, false),
-            precisionLevel = prefs.getInt(KEY_PRECISION_LEVEL, PRECISION_ORIGINAL),
+            precisionBySensorType = precisionMap,
             sensorEntries = entries,
             vendorReplacement = prefs.getString(KEY_VENDOR_REPLACEMENT, null) ?: "",
             vendorKeywords = prefs.getString(KEY_VENDOR_KEYWORDS, null) ?: "xiaomi, qti, qualcomm, samsung, huawei, oppo, vivo, oneplus, meizu, motorola, lenovo, asus, sony, mediatek, mtk, spreadtrum, unisoc, realme, nothing, google"
@@ -104,6 +118,12 @@ object SensorConfigPrefs {
     fun saveConfig(context: Context, config: Config) {
         val entriesArray = JSONArray()
         config.sensorEntries.forEach { entriesArray.put(it.toJson()) }
+        
+        val precisionJson = JSONObject()
+        config.precisionBySensorType.forEach { (type, level) ->
+            precisionJson.put(type.toString(), level)
+        }
+        
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putBoolean(KEY_ENABLED, config.enabled)
             putBoolean(KEY_HIDE_ALL, config.hideAll)
@@ -113,7 +133,7 @@ object SensorConfigPrefs {
             putBoolean(KEY_DISABLE_ACCEL, config.disableAccel)
             putBoolean(KEY_DISABLE_GYRO, config.disableGyro)
             putBoolean(KEY_DISABLE_MAGNETIC, config.disableMagnetic)
-            putInt(KEY_PRECISION_LEVEL, config.precisionLevel)
+            putString(KEY_PRECISION_BY_SENSOR_TYPE, precisionJson.toString())
             putString(KEY_SENSOR_ENTRIES, entriesArray.toString())
             putString(KEY_VENDOR_REPLACEMENT, config.vendorReplacement)
             putString(KEY_VENDOR_KEYWORDS, config.vendorKeywords)

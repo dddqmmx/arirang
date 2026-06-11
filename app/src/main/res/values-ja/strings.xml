@@ -364,4 +364,10 @@
     <string name="sensor_vendor_replace_hint">交換ベンダー</string>
     <string name="sensor_vendor_replace_summary">すべてのセンサーフィールドで一致するベンダーキーワードを置換します。大文字と小文字は自動的に一致します（例：xiaomi → google、XIAOMI → GOOGLE）</string>
     <string name="sensor_visible">表示</string>
+
+    <string name="sensor_type_accelerometer">加速度センサー</string>
+    <string name="sensor_type_gyroscope">ジャイロスコープ</string>
+    <string name="sensor_type_magnetic_field">磁気センサー</string>
+    <string name="sensor_type_gravity">重力センサー</string>
+    <string name="sensor_type_linear_acceleration">線形加速度センサー</string>
 </resources>

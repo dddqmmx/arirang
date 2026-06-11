@@ -365,5 +365,11 @@
     <string name="advanced_settings_title">高级设置</string>
     <string name="advanced_settings_summary">架构相关的底层设定</string>
     <string name="restrict_hot_switching_title">限制实时配置文件</string>
+
+    <string name="sensor_type_accelerometer">加速度传感器</string>
+    <string name="sensor_type_gyroscope">陀螺仪</string>
+    <string name="sensor_type_magnetic_field">磁场传感器</string>
+    <string name="sensor_type_gravity">重力传感器</string>
+    <string name="sensor_type_linear_acceleration">线性加速度传感器</string>
 </resources>
 

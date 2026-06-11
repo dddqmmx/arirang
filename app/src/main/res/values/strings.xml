@@ -365,5 +365,11 @@
     <string name="sensor_precision_low">Low (1 decimal place)</string>
     <string name="sensor_precision_medium">Medium (2 decimal places)</string>
     <string name="sensor_precision_high">High (integer only)</string>
+
+    <string name="sensor_type_accelerometer">Accelerometer</string>
+    <string name="sensor_type_gyroscope">Gyroscope</string>
+    <string name="sensor_type_magnetic_field">Magnetic Field</string>
+    <string name="sensor_type_gravity">Gravity</string>
+    <string name="sensor_type_linear_acceleration">Linear Acceleration</string>
 </resources>
 

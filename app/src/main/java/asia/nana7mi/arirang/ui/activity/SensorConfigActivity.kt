@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -226,7 +228,25 @@ class SensorConfigActivity : ComponentActivity() {
                 item(key = "precision") {
                     SectionCard(title = stringResource(R.string.sensor_section_precision)) {
                         Text(stringResource(R.string.sensor_precision_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        PrecisionDropdown(config.precisionLevel) { config = config.copy(precisionLevel = it) }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val sensorTypes = listOf(
+                            android.hardware.Sensor.TYPE_ACCELEROMETER to stringResource(R.string.sensor_type_accelerometer),
+                            android.hardware.Sensor.TYPE_GYROSCOPE to stringResource(R.string.sensor_type_gyroscope),
+                            android.hardware.Sensor.TYPE_MAGNETIC_FIELD to stringResource(R.string.sensor_type_magnetic_field),
+                            android.hardware.Sensor.TYPE_GRAVITY to stringResource(R.string.sensor_type_gravity),
+                            android.hardware.Sensor.TYPE_LINEAR_ACCELERATION to stringResource(R.string.sensor_type_linear_acceleration)
+                        )
+                        
+                        sensorTypes.forEach { (type, name) ->
+                            val currentLevel = config.precisionBySensorType[type] ?: SensorConfigPrefs.PRECISION_ORIGINAL
+                            PrecisionDropdown(name, currentLevel) { newLevel ->
+                                val updatedMap = config.precisionBySensorType.toMutableMap()
+                                updatedMap[type] = newLevel
+                                config = config.copy(precisionBySensorType = updatedMap)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                     }
                 }
             }
@@ -246,9 +266,8 @@ class SensorConfigActivity : ComponentActivity() {
     // Composable helpers
     // ──────────────────────────────────────────────
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun PrecisionDropdown(selectedLevel: Int, onLevelSelected: (Int) -> Unit) {
+    private fun PrecisionDropdown(labelStr: String, selectedLevel: Int, onLevelSelected: (Int) -> Unit) {
         val options = listOf(
             SensorConfigPrefs.PRECISION_ORIGINAL to stringResource(R.string.sensor_precision_original),
             SensorConfigPrefs.PRECISION_LOW to stringResource(R.string.sensor_precision_low),
@@ -258,22 +277,32 @@ class SensorConfigActivity : ComponentActivity() {
         var expanded by remember { mutableStateOf(false) }
         val selectedText = options.firstOrNull { it.first == selectedLevel }?.second ?: options.first().second
 
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-            OutlinedTextField(
-                value = selectedText,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text(stringResource(R.string.sensor_precision_level)) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { (level, label) ->
-                    DropdownMenuItem(
-                        text = { Text(label) },
-                        onClick = { onLevelSelected(level); expanded = false },
-                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
-                    )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = labelStr, style = MaterialTheme.typography.bodyMedium)
+            
+            androidx.compose.foundation.layout.Box {
+                Text(
+                    text = selectedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                androidx.compose.material3.DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    options.forEach { (level, label) ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = { onLevelSelected(level); expanded = false }
+                        )
+                    }
                 }
             }
         }
