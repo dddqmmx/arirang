@@ -38,7 +38,8 @@ object SensorConfigPrefs {
         val vendor: String,
         val type: Int,
         val hidden: Boolean = false,
-        val isCustom: Boolean = false
+        val isCustom: Boolean = false,
+        val id: String = java.util.UUID.randomUUID().toString()
     ) {
         fun toJson(): JSONObject = JSONObject()
             .put("name", name)
@@ -46,6 +47,7 @@ object SensorConfigPrefs {
             .put("type", type)
             .put("hidden", hidden)
             .put("isCustom", isCustom)
+            .put("id", id)
 
         companion object {
             fun fromJson(json: JSONObject): SensorEntry = SensorEntry(
@@ -53,7 +55,8 @@ object SensorConfigPrefs {
                 vendor = json.optString("vendor", ""),
                 type = json.optInt("type", 0),
                 hidden = json.optBoolean("hidden", false),
-                isCustom = json.optBoolean("isCustom", false)
+                isCustom = json.optBoolean("isCustom", false),
+                id = json.optString("id", java.util.UUID.randomUUID().toString())
             )
         }
     }

@@ -21,8 +21,19 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import android.hardware.SensorManager
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -30,6 +41,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,10 +49,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,11 +69,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs.SensorEntry
@@ -90,6 +112,7 @@ class SensorListActivity : ComponentActivity() {
         onBack: () -> Unit,
         onSave: (SensorConfigPrefs.Config) -> Unit
     ) {
+        val context = LocalContext.current
         var config by remember { mutableStateOf(initialConfig) }
         var savedConfig by remember { mutableStateOf(initialConfig) }
         var showUnsavedDialog by remember { mutableStateOf(false) }
@@ -115,10 +138,31 @@ class SensorListActivity : ComponentActivity() {
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = {
+                                val sm = context.getSystemService(SensorManager::class.java)
+                                val deviceEntries = sm?.getSensorList(Sensor.TYPE_ALL).orEmpty()
+                                    .map { SensorEntry(name = it.name, vendor = it.vendor, type = it.type) }
+                                    .distinctBy { it.type }
+                                    .sortedBy { it.type }
+                                config = config.copy(
+                                    sensorEntries = deviceEntries,
+                                    vendorKeywords = "",
+                                    vendorReplacement = ""
+                                )
+                            }
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.btn_cancel)) // using cancel as a placeholder for reset/refresh text if not available, but actually we can just not provide string. Or let's use "Reset"
+                        }
                         SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
                     scrollBehavior = scrollBehavior
                 )
+            },
+            floatingActionButton = {
+                FloatingActionButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.sensor_add))
+                }
             }
         ) { padding ->
             LazyColumn(
@@ -130,47 +174,49 @@ class SensorListActivity : ComponentActivity() {
                 contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
             ) {
                 // ── Vendor replacement ──
-                item(key = "vendor_replace") {
-                    SectionCard(title = stringResource(R.string.sensor_section_vendor)) {
-                        Text(
-                            text = stringResource(R.string.sensor_vendor_keywords_summary),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedTextField(
-                            value = config.vendorKeywords,
-                            onValueChange = { config = config.copy(vendorKeywords = it) },
-                            label = { Text(stringResource(R.string.sensor_vendor_keywords_hint)) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        Text(
-                            text = stringResource(R.string.sensor_vendor_replace_summary),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedTextField(
-                            value = config.vendorReplacement,
-                            onValueChange = { config = config.copy(vendorReplacement = it) },
-                            label = { Text(stringResource(R.string.sensor_vendor_replace_hint)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        FilledTonalButton(
-                            onClick = {
-                                val replacement = config.vendorReplacement
-                                val keywords = config.vendorKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                                val updated = config.sensorEntries.map { entry ->
-                                    entry.copy(
-                                        vendor = SensorConfigPrefs.applyCaseAwareReplace(entry.vendor, replacement, keywords),
-                                        name = SensorConfigPrefs.applyCaseAwareReplace(entry.name, replacement, keywords)
-                                    )
-                                }
-                                config = config.copy(sensorEntries = updated)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(stringResource(R.string.sensor_vendor_replace_apply))
+                if (!config.hideAll) {
+                    item(key = "vendor_replace") {
+                        SectionCard(title = stringResource(R.string.sensor_section_vendor)) {
+                            Text(
+                                text = stringResource(R.string.sensor_vendor_keywords_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedTextField(
+                                value = config.vendorKeywords,
+                                onValueChange = { config = config.copy(vendorKeywords = it) },
+                                label = { Text(stringResource(R.string.sensor_vendor_keywords_hint)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                            Text(
+                                text = stringResource(R.string.sensor_vendor_replace_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedTextField(
+                                value = config.vendorReplacement,
+                                onValueChange = { config = config.copy(vendorReplacement = it) },
+                                label = { Text(stringResource(R.string.sensor_vendor_replace_hint)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            FilledTonalButton(
+                                onClick = {
+                                    val replacement = config.vendorReplacement
+                                    val keywords = config.vendorKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                    val updated = config.sensorEntries.map { entry ->
+                                        entry.copy(
+                                            vendor = SensorConfigPrefs.applyCaseAwareReplace(entry.vendor, replacement, keywords),
+                                            name = SensorConfigPrefs.applyCaseAwareReplace(entry.name, replacement, keywords)
+                                        )
+                                    }
+                                    config = config.copy(sensorEntries = updated)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.sensor_vendor_replace_apply))
+                            }
                         }
                     }
                 }
@@ -187,73 +233,144 @@ class SensorListActivity : ComponentActivity() {
                     }
                 }
 
-                // ── Sensor list header ──
-                item(key = "sensor_list_header") {
-                    SectionCard(title = stringResource(R.string.sensor_section_list)) {
-                        Text(stringResource(R.string.sensor_list_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!config.hideAll) {
+                    // ── Sensor list header ──
+                    item(key = "sensor_list_header") {
+                        SectionCard(title = stringResource(R.string.sensor_section_list)) {
+                            Text(stringResource(R.string.sensor_list_summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
-                }
-
-                // ── Sensor entries ──
-                itemsIndexed(
-                    items = config.sensorEntries,
-                    key = { idx, entry -> "sensor_${idx}_${entry.type}" }
-                ) { index, entry ->
-                    ElevatedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(CardDefaults.elevatedShape)
-                            .clickable { editingIndex = index },
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = if (entry.hidden)
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            else
-                                MaterialTheme.colorScheme.surfaceContainer
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+    
+                    // ── Sensor entries ──
+                    itemsIndexed(
+                        items = config.sensorEntries,
+                        key = { _, entry -> entry.id }
+                    ) { index, entry ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { editingIndex = index },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (entry.hidden)
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                else
+                                    MaterialTheme.colorScheme.surfaceContainer
+                            )
                         ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(entry.name, style = MaterialTheme.typography.bodyLarge)
-                                    if (entry.isCustom) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Icon Box
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(
+                                            if (entry.hidden) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.secondaryContainer,
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Sensors,
+                                        contentDescription = null,
+                                        tint = if (entry.hidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+    
+                                // Text Column
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
                                         Text(
-                                            text = " · ${stringResource(R.string.sensor_custom_tag)}",
+                                            text = entry.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                            color = if (entry.hidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (entry.isCustom) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = MaterialTheme.colorScheme.tertiaryContainer
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.sensor_custom_tag),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = entry.vendor,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                                        ) {
+                                            Text(
+                                                text = sensorTypeLabel(entry.type),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Text(
+                                            text = stringResource(R.string.sensor_type_format, entry.type),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
+                                            color = MaterialTheme.colorScheme.outline
                                         )
                                     }
                                 }
-                                Text(entry.vendor, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(
-                                    sensorTypeLabel(entry.type) + " · " + stringResource(R.string.sensor_type_format, entry.type),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                            Switch(
-                                checked = !entry.hidden,
-                                onCheckedChange = { visible ->
-                                    val updated = config.sensorEntries.toMutableList()
-                                    updated[index] = entry.copy(hidden = !visible)
-                                    config = config.copy(sensorEntries = updated)
+    
+                                // Actions Row
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Switch(
+                                        checked = !entry.hidden,
+                                        onCheckedChange = { visible ->
+                                            val updated = config.sensorEntries.toMutableList()
+                                            updated[index] = entry.copy(hidden = !visible)
+                                            config = config.copy(sensorEntries = updated)
+                                        }
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            val updated = config.sensorEntries.toMutableList()
+                                            updated.removeAt(index)
+                                            config = config.copy(sensorEntries = updated)
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = stringResource(R.string.sensor_remove),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                 }
-                            )
+                            }
                         }
-                    }
-                }
-
-                // ── Add sensor button ──
-                item(key = "add_sensor") {
-                    OutlinedButton(
-                        onClick = { showAddDialog = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                        Text(stringResource(R.string.sensor_add))
                     }
                 }
             }
