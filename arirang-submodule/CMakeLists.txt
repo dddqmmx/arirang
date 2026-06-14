@@ -55,10 +55,12 @@ target_link_libraries(arirang_zygisk log dl)
 # Separate native library LD_PRELOAD'd into the Widevine DRM HAL daemon.
 # Intentionally has NO overlap with the Zygisk module - it must never be
 # loaded into app processes.
+# The DRM hook now uses the data-level vtable/method-table hook instead of the
+# fragile inline hook, so inline_hook.cpp is intentionally omitted here.
 add_library(arirang_drm_hook SHARED
     src/main/cpp/drm/arirang_drm_hook.cpp
-    src/main/cpp/hook/inline_hook.cpp
     src/main/cpp/hook/symbol_resolver.cpp
+    src/main/cpp/hook/vtable_hook.cpp
     src/main/cpp/utils/logging.cpp
 )
 

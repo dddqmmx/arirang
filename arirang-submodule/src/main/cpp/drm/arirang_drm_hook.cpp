@@ -3,18 +3,20 @@
 // LD_PRELOAD'd into the Widevine DRM HAL daemon (system layer). Reads a
 // spoofed device unique id from a HAL-readable config file (written by the
 // Magisk module's post-fs-data.sh on each boot, sourced from the Arirang
-// app's own config). Locates libwvdrmengine.so (the Widevine vendor plugin),
-// finds an AIDL-style getPropertyByteArray symbol via the dynamic symbol
-// table, installs an ARM64 inline hook, and rewrites the returned byte[]
-// when the requested property name is "deviceUniqueId".
+// app's own config). Locates libwvhidl.so / libwvdrmengine.so, finds HIDL
+// or AIDL getPropertyByteArray symbols via the dynamic symbol table, then
+// hooks them by rewriting vtable / method-table slots instead of patching
+// machine code. This avoids fragile prologue analysis, PC-relative
+// instruction checks and PAC (Pointer Authentication) issues.
 //
 // This .so is NEVER loaded into ordinary app processes - only into native
 // DRM HAL daemons via init.rc `setenv LD_PRELOAD`.
 
-#include "inline_hook.hpp"
 #include "logging.hpp"
 #include "symbol_resolver.hpp"
+#include "vtable_hook.hpp"
 
+#include <android/log.h>
 #include <atomic>
 #include <cerrno>
 #include <cstdint>
@@ -28,21 +30,20 @@
 #include <unistd.h>
 #include <vector>
 
-// C-linkage globals used by the inline-asm thunk. Must NOT live in an anon
-// namespace because the inline asm references them by bare symbol name. They
-// are hidden so the asm's `adrp + add :lo12:` (PC-relative within this .so)
-// addressing mode is safe under -fPIC; otherwise the linker rejects the
-// relocation against a default-visibility (potentially preempted) symbol.
+// Hidden C-linkage globals storing the original function pointers captured by
+// the vtable hook. The AIDL and HIDL entry points call through these pointers
+// to reach the real HAL implementation.
 #define ARIRANG_HIDDEN __attribute__((visibility("hidden")))
 extern "C" ARIRANG_HIDDEN void *g_trampoline = nullptr;
+extern "C" ARIRANG_HIDDEN void *g_hidl_trampoline = nullptr;
+
 extern "C" ARIRANG_HIDDEN void arirang_drm_aidl_post(void *this_ptr,
-                                                     const void *name_ptr,
-                                                     void *vec_ptr);
-ARIRANG_HIDDEN void arirang_drm_hidl_entry(void *, const void *, void *);
+                                                      const void *name_ptr,
+                                                      void *vec_ptr);
 struct AIDL_ScopedAStatus;
 AIDL_ScopedAStatus arirang_drm_aidl_entry(void* this_ptr, void* name_ptr, void* vec_ptr);
 
-extern "C" ARIRANG_HIDDEN void *g_hidl_trampoline = nullptr;
+static const char *g_hook_method = nullptr;
 
 #include <functional>
 
@@ -67,9 +68,22 @@ namespace hidl {
 }
 
 using HidlCallback = std::function<void(hidl::Status, const hidl::vec<uint8_t>&)>;
-using HidlGetPropertyByteArrayFunc = void (*)(void* this_ptr, const hidl::string& name, HidlCallback cb);
 
-void arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, HidlCallback cb);
+// The real HIDL method returns android::hardware::Return<void>, a trivially
+// destructible 32-byte-ish struct.  We use a sufficiently large opaque struct
+// with the same AArch64 ABI (returned indirectly via x8) so the compiler
+// preserves and forwards the caller's hidden return pointer to the original
+// function.  Returning void made x8 garbage, which caused the original HAL
+// function to crash while zeroing its Return<void>.
+struct HidlReturnVoid {
+    alignas(16) unsigned char payload[64];
+};
+
+using HidlGetPropertyByteArrayFunc = HidlReturnVoid (*)(void* this_ptr,
+                                                        const hidl::string& name,
+                                                        HidlCallback cb);
+
+HidlReturnVoid arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, HidlCallback cb);
 
 namespace {
 
@@ -263,32 +277,47 @@ bool install_hook_in_library(const char *library_path) {
         arirang::log_info(std::string("arirang_drm_hook: candidate ") + sym.name);
     }
 
+    // Hook through vtable / method-table slots instead of rewriting function
+    // prologues. This is stable across instruction encodings, compilers and
+    // ARMv8.3+ PAC because it only touches data tables.
     for (auto &sym : symbols) {
+        void *hook = nullptr;
+        void **trampoline_slot = nullptr;
+        const char *flavor = nullptr;
         if (symbol_is_aidl_target(sym.name)) {
-            void *trampoline = nullptr;
-            if (!arirang::inline_hook_install(sym.address,
-                                              reinterpret_cast<void *>(&arirang_drm_aidl_entry),
-                                              &trampoline)) {
-                arirang::log_warn(std::string("arirang_drm_hook: failed to hook AIDL ") + sym.name);
-                continue;
-            }
-            g_trampoline = trampoline;
-            arirang::log_info(std::string("arirang_drm_hook: hooked AIDL ") + sym.name +
-                              " in " + library_path);
-            return true;
+            hook = reinterpret_cast<void *>(&arirang_drm_aidl_entry);
+            trampoline_slot = &g_trampoline;
+            flavor = "AIDL";
         } else if (symbol_is_hidl_target(sym.name)) {
-            void *trampoline = nullptr;
-            if (!arirang::inline_hook_install(sym.address,
-                                              reinterpret_cast<void *>(&arirang_drm_hidl_hook),
-                                              &trampoline)) {
-                arirang::log_warn(std::string("arirang_drm_hook: failed to hook HIDL ") + sym.name);
-                continue;
-            }
-            g_hidl_trampoline = trampoline;
-            arirang::log_info(std::string("arirang_drm_hook: hooked HIDL ") + sym.name +
-                              " in " + library_path);
-            return true;
+            hook = reinterpret_cast<void *>(&arirang_drm_hidl_hook);
+            trampoline_slot = &g_hidl_trampoline;
+            flavor = "HIDL";
         }
+        if (hook == nullptr) continue;
+
+        std::vector<arirang::VtablePatch> patches;
+        // Pass the exact mangled symbol name as a substring so only this
+        // overload is resolved and scanned.
+        if (!arirang::vtable_hook_install(library_path, sym.name.c_str(),
+                                          hook, &patches)) {
+            __android_log_print(ANDROID_LOG_WARN, "ArirangDrmHook",
+                                "vtable hook failed for %s %s", flavor, sym.name.c_str());
+            arirang::log_warn(std::string("arirang_drm_hook: failed to hook ") + flavor +
+                              " " + sym.name);
+            continue;
+        }
+
+        if (!patches.empty()) {
+            // The original implementation is the same in every patched slot;
+            // any patch gives us a usable function pointer.
+            *trampoline_slot = patches[0].original_function;
+        }
+        g_hook_method = "vtable";
+        __android_log_print(ANDROID_LOG_INFO, "ArirangDrmHook",
+                            "vtable hook success for %s %s", flavor, sym.name.c_str());
+        arirang::log_info(std::string("arirang_drm_hook: vtable-hooked ") + flavor +
+                          " " + sym.name + " in " + library_path);
+        return true;
     }
 
     arirang::log_warn(std::string("arirang_drm_hook: no AIDL/HIDL-flavored symbol matched in ") +
@@ -298,7 +327,14 @@ bool install_hook_in_library(const char *library_path) {
 
 } // namespace
 
-void arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, HidlCallback cb) {
+HidlReturnVoid arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, HidlCallback cb) {
+    static bool path_logged = false;
+    if (!path_logged && g_hook_method != nullptr) {
+        arirang::log_info(std::string("arirang_drm_hook: HIDL callback reached via ") +
+                          g_hook_method + " hook");
+        path_logged = true;
+    }
+
     bool spoof = false;
     if (name.mBuffer != nullptr && name.mSize == 14 /* "deviceUniqueId" */ &&
         std::memcmp(name.mBuffer, "deviceUniqueId", 14) == 0) {
@@ -307,11 +343,20 @@ void arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, HidlCallbac
 
     auto func = reinterpret_cast<HidlGetPropertyByteArrayFunc>(g_hidl_trampoline);
     if (!spoof) {
-        func(this_ptr, name, std::move(cb));
-        return;
+        // C++17 guaranteed copy elision passes the caller's hidden return pointer
+        // (x8) straight through to the original HAL function.
+        return func(this_ptr, name, std::move(cb));
     }
 
-    HidlCallback wrapped_cb = [cb = std::move(cb)](hidl::Status status, const hidl::vec<uint8_t>& orig_vec) {
+    // Capture only a pointer to the original std::function callback instead
+    // of moving it into the lambda.  The HIDL callback is invoked synchronously
+    // by the original HAL function, so the original callback pointer stays
+    // valid for the whole call.  Moving the callback into the wrapper caused a
+    // crash while destroying the nested std::function object after the call
+    // returned.
+    HidlCallback *original_cb = &cb;
+    HidlCallback wrapped_cb = [original_cb](hidl::Status status, const hidl::vec<uint8_t>& orig_vec) {
+        if (original_cb == nullptr) return;
         if (static_cast<uint32_t>(status) == 0) {
             pthread_rwlock_rdlock(&g_spoof_lock);
             auto bytes = g_spoof_bytes;
@@ -319,15 +364,19 @@ void arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, HidlCallbac
 
             if (!bytes.empty()) {
                 hidl::vec<uint8_t> spoofed_vec(bytes.data(), static_cast<uint32_t>(bytes.size()), false);
-                cb(status, spoofed_vec);
+                (*original_cb)(status, spoofed_vec);
                 arirang::log_info("arirang_drm_hook: spoofed deviceUniqueId byte[] (HIDL)");
                 return;
             }
         }
-        cb(status, orig_vec);
+        (*original_cb)(status, orig_vec);
     };
 
-    func(this_ptr, name, std::move(wrapped_cb));
+    // Forward the Return<void> ABI to the original; the dummy return struct
+    // keeps x8 intact across the hook.
+    return func(this_ptr, name, std::move(wrapped_cb));
+    // `cb` still owns the original std::function here (we did not move it) and
+    // is destroyed normally when we return.
 }
 
 // Post-call C handler invoked from the entry thunk after the original
@@ -359,6 +408,13 @@ struct AIDL_ScopedAStatus {
 };
 
 AIDL_ScopedAStatus arirang_drm_aidl_entry(void* this_ptr, void* name_ptr, void* vec_ptr) {
+    static bool path_logged = false;
+    if (!path_logged && g_hook_method != nullptr) {
+        arirang::log_info(std::string("arirang_drm_hook: AIDL callback reached via ") +
+                          g_hook_method + " hook");
+        path_logged = true;
+    }
+
     auto func = reinterpret_cast<AIDL_ScopedAStatus (*)(void*, void*, void*)>(g_trampoline);
     AIDL_ScopedAStatus ret = func(this_ptr, name_ptr, vec_ptr);
     arirang_drm_aidl_post(this_ptr, name_ptr, vec_ptr);
