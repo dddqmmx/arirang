@@ -117,6 +117,7 @@
     <string name="unique_field_serial">Serial</string>
     <string name="unique_field_type_allocation_code">Type Allocation Code</string>
     <string name="unique_randomize">Randomize</string>
+    <string name="unique_randomize_all">Randomize All</string>
     <string name="unique_add_imei_slot">Add IMEI Slot</string>
     <string name="unique_import_imei">Import current IMEI</string>
     <string name="unique_import_imei_empty">No readable IMEI was returned</string>

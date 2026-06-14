@@ -1,9 +1,6 @@
 package asia.nana7mi.arirang.ui.activity
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
-import android.telephony.TelephonyManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
@@ -31,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -65,7 +63,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.core.app.ActivityCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
@@ -86,7 +83,6 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                 UniqueIdentifierConfigScreen(
                     initialConfig = initialConfig,
                     onBack = { finish() },
-                    onImportImeis = { importCurrentImeis() },
                     onSave = { config ->
                         UniqueIdentifierPrefs.saveConfig(this, config)
                         Toast.makeText(this, getString(R.string.save_success_reboot_required), Toast.LENGTH_LONG).show()
@@ -101,7 +97,6 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
     private fun UniqueIdentifierConfigScreen(
         initialConfig: UniqueIdentifierPrefs.Config,
         onBack: () -> Unit,
-        onImportImeis: () -> Map<Int, String>,
         onSave: (UniqueIdentifierPrefs.Config) -> Unit
     ) {
         var config by remember { mutableStateOf(initialConfig) }
@@ -112,7 +107,12 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
             mutableStateListOf<ImeiRowState>().apply {
                 addAll(
                     initialConfig.imeiList()
-                        .ifEmpty { listOf(0 to UniqueIdentifierPrefs.defaultImeiForSlot(0)) }
+                        .ifEmpty {
+                            listOf(
+                                0 to UniqueIdentifierPrefs.defaultImeiForSlot(0),
+                                1 to UniqueIdentifierPrefs.defaultImeiForSlot(1)
+                            )
+                        }
                         .map { (slot, imei) ->
                             ImeiRowState(
                                 slot = slot,
@@ -170,19 +170,24 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
                     },
                     actions = {
                         IconButton(onClick = {
-                            val imported = onImportImeis()
-                            if (imported.isNotEmpty()) {
-                                imeiRows.clear()
-                                imeiRows.addAll(
-                                    imported.toSortedMap().map { (slot, imei) ->
-                                        ImeiRowState(slot = slot, imei = imei, tac = imei.take(8))
-                                    }
+                            config = config.copy(
+                                androidId = UniqueIdentifierPrefs.randomAndroidId(),
+                                gaid = UniqueIdentifierPrefs.randomGaid(),
+                                widevineDrmId = UniqueIdentifierPrefs.randomWidevineDrmId(),
+                                appSetId = UniqueIdentifierPrefs.randomAppSetId(),
+                                serial = UniqueIdentifierPrefs.randomSerial()
+                            )
+                            imeiRows.forEachIndexed { index, row ->
+                                val tac = UniqueIdentifierPrefs.randomTac()
+                                imeiRows[index] = row.copy(
+                                    tac = tac,
+                                    imei = UniqueIdentifierPrefs.randomImeiForSlot(row.slot, tac)
                                 )
-                                updateImeis()
-                                revision++
                             }
+                            updateImeis()
+                            revision++
                         }) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_import_imei))
+                            Icon(Icons.Default.Shuffle, contentDescription = stringResource(R.string.unique_randomize_all))
                         }
                         SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
@@ -575,26 +580,6 @@ class UniqueIdentifierConfigActivity : ComponentActivity() {
         }
     }
 
-
-    private fun importCurrentImeis(): Map<Int, String> {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_PHONE_STATE), 1)
-            return emptyMap()
-        }
-
-        val telephonyManager = getSystemService(TelephonyManager::class.java)
-        val count = runCatching { telephonyManager.phoneCount }.getOrDefault(1).coerceAtLeast(1)
-        val result = (0 until count).mapNotNull { slot ->
-            runCatching { telephonyManager.getImei(slot) }.getOrNull()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { slot to it }
-        }.toMap()
-
-        if (result.isEmpty()) {
-            Toast.makeText(this, getString(R.string.unique_import_imei_empty), Toast.LENGTH_SHORT).show()
-        }
-        return result
-    }
 
     private data class ImeiRowState(
         val slot: Int,

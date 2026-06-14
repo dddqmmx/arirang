@@ -82,8 +82,7 @@ object UniqueIdentifierPrefs {
     }
 
     fun configuredSlotCount(context: Context): Int {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return loadSlotStringMap(prefs.getString(KEY_IMEI_BY_SLOT, null)).size
+        return loadConfig(context).imeiBySlot.size
     }
 
     fun buildHookSnapshot(context: Context): String {
@@ -154,7 +153,14 @@ object UniqueIdentifierPrefs {
     }
 
     private fun loadImeiBySlot(json: String?): Map<Int, String> {
-        return loadSlotStringMap(json)
+        val map = loadSlotStringMap(json)
+        if (map.isEmpty()) {
+            return mapOf(
+                0 to defaultImeiForSlot(0),
+                1 to defaultImeiForSlot(1)
+            )
+        }
+        return map
     }
 
     private fun loadSlotStringMap(json: String?): Map<Int, String> {
