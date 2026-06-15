@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.*
@@ -35,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -116,7 +116,6 @@ fun SetupFlow() {
 // =======================
 @Composable
 fun LanguageRegionScreen(onNext: (String, String) -> Unit) {
-    val context = LocalContext.current
     // --- 读取 XML 资源 ---
     val languageLabels = stringArrayResource(id = R.array.language_names)
     val languageCodes = stringArrayResource(id = R.array.language_codes)
@@ -393,7 +392,7 @@ fun getCurrentAppLanguageCode(): String {
 // =======================
 @Composable
 fun WarningScreen(languageCode: String, regionCode: String, onBack: () -> Unit) {
-    val context = LocalContext.current
+    val activity = LocalActivity.current as InitActivity
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -402,11 +401,12 @@ fun WarningScreen(languageCode: String, regionCode: String, onBack: () -> Unit) 
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = {
-                        AppPreferences.setSetupCompleted(context, true)
-                        AppPreferences.setRegion(context, regionCode)
-                        AppPreferences.setLanguage(context, languageCode)
-                        val intent = Intent(context, MainActivity::class.java)
-                        context.startActivity(intent)
+                        AppPreferences.setSetupCompleted(activity, true)
+                        AppPreferences.setRegion(activity, regionCode)
+                        AppPreferences.setLanguage(activity, languageCode)
+                        val intent = Intent(activity, MainActivity::class.java)
+                        activity.startActivity(intent)
+                        activity.finish()
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
