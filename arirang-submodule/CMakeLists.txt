@@ -36,7 +36,11 @@ add_library(arirang_zygisk SHARED
     src/main/cpp/utils/logging.cpp
     src/main/cpp/spoofer/build_spoofer.cpp
     src/main/cpp/spoofer/system_property_spoofer.cpp
+    src/main/cpp/spoofer/sensor_spoofer.cpp
+    src/main/cpp/spoofer/sensor_aosp_types.hpp
     src/main/cpp/hook/inline_hook.cpp
+    src/main/cpp/hook/vtable_hook.cpp
+    src/main/cpp/hook/symbol_resolver.cpp
 )
 
 target_compile_features(arirang_zygisk PRIVATE cxx_std_17)

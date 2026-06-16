@@ -85,6 +85,92 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         read_long("locationConfigVersion", config.location_config_version);
         read_string("locationConfigSnapshot", config.location_config_snapshot);
 
+        // Sensor spoofing configuration.
+        read_bool("sensorConfigEnabled", config.sensor_config_enabled);
+        read_bool("sensorHideAll", config.sensor_hide_all);
+        read_string("sensorGlobalVendorReplacement", config.sensor_global_vendor_replacement);
+
+        if (j.contains("sensorVendorKeywords") && j["sensorVendorKeywords"].is_array()) {
+            config.sensor_vendor_keywords.clear();
+            for (const auto& item : j["sensorVendorKeywords"]) {
+                if (item.is_string()) {
+                    config.sensor_vendor_keywords.push_back(item.get<std::string>());
+                }
+            }
+        }
+
+        if (j.contains("sensorBlacklist") && j["sensorBlacklist"].is_array()) {
+            config.sensor_blacklist.clear();
+            for (const auto& item : j["sensorBlacklist"]) {
+                if (!item.is_object()) continue;
+                SensorBlockRule rule;
+                if (item.contains("type") && item["type"].is_number()) {
+                    rule.type = item["type"].get<int32_t>();
+                }
+                if (item.contains("nameContains") && item["nameContains"].is_string()) {
+                    rule.name_contains = item["nameContains"].get<std::string>();
+                }
+                if (item.contains("vendorContains") && item["vendorContains"].is_string()) {
+                    rule.vendor_contains = item["vendorContains"].get<std::string>();
+                }
+                config.sensor_blacklist.push_back(std::move(rule));
+            }
+        }
+
+        if (j.contains("sensorOverrides") && j["sensorOverrides"].is_array()) {
+            config.sensor_overrides.clear();
+            for (const auto& item : j["sensorOverrides"]) {
+                if (!item.is_object()) continue;
+                SensorOverrideRule rule;
+                if (item.contains("matchType") && item["matchType"].is_number()) {
+                    rule.match_type = item["matchType"].get<int32_t>();
+                }
+                if (item.contains("matchNameContains") && item["matchNameContains"].is_string()) {
+                    rule.match_name_contains = item["matchNameContains"].get<std::string>();
+                }
+                if (item.contains("matchVendorContains") && item["matchVendorContains"].is_string()) {
+                    rule.match_vendor_contains = item["matchVendorContains"].get<std::string>();
+                }
+                if (item.contains("newName") && item["newName"].is_string()) {
+                    rule.new_name = item["newName"].get<std::string>();
+                }
+                if (item.contains("newVendor") && item["newVendor"].is_string()) {
+                    rule.new_vendor = item["newVendor"].get<std::string>();
+                }
+                if (item.contains("newType") && item["newType"].is_number()) {
+                    rule.new_type = item["newType"].get<int32_t>();
+                }
+                if (item.contains("newHandle") && item["newHandle"].is_number()) {
+                    rule.new_handle = item["newHandle"].get<int32_t>();
+                }
+                config.sensor_overrides.push_back(std::move(rule));
+            }
+        }
+
+        if (j.contains("sensorInjections") && j["sensorInjections"].is_array()) {
+            config.sensor_injections.clear();
+            for (const auto& item : j["sensorInjections"]) {
+                if (!item.is_object()) continue;
+                SensorInjectEntry entry;
+                if (item.contains("name") && item["name"].is_string()) {
+                    entry.name = item["name"].get<std::string>();
+                }
+                if (item.contains("vendor") && item["vendor"].is_string()) {
+                    entry.vendor = item["vendor"].get<std::string>();
+                }
+                if (item.contains("type") && item["type"].is_number()) {
+                    entry.type = item["type"].get<int32_t>();
+                }
+                if (item.contains("handle") && item["handle"].is_number()) {
+                    entry.handle = item["handle"].get<int32_t>();
+                }
+                config.sensor_injections.push_back(std::move(entry));
+            }
+        }
+
+        read_long("sensorConfigVersion", config.sensor_config_version);
+        read_string("sensorConfigSnapshot", config.sensor_config_snapshot);
+
     } catch (const nlohmann::json::exception& e) {
         log_warn(std::string("failed to parse config json: ") + e.what());
     }
@@ -93,7 +179,11 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         (config.unique_identifier_enabled ? "true" : "false") +
         " widevineLen=" + std::to_string(config.widevine_id.size()) +
         " locationConfigVersion=" + std::to_string(config.location_config_version) +
-        " wifiConfigVersion=" + std::to_string(config.wifi_config_version)
+        " wifiConfigVersion=" + std::to_string(config.wifi_config_version) +
+        " sensorConfigEnabled=" + (config.sensor_config_enabled ? "true" : "false") +
+        " sensorBlacklist=" + std::to_string(config.sensor_blacklist.size()) +
+        " sensorOverrides=" + std::to_string(config.sensor_overrides.size()) +
+        " sensorInjections=" + std::to_string(config.sensor_injections.size())
     );
 }
 

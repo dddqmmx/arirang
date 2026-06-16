@@ -4,8 +4,32 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace arirang {
+
+struct SensorBlockRule {
+    int32_t type = -1;
+    std::string name_contains;
+    std::string vendor_contains;
+};
+
+struct SensorOverrideRule {
+    int32_t match_type = -1;
+    std::string match_name_contains;
+    std::string match_vendor_contains;
+    std::string new_name;
+    std::string new_vendor;
+    int32_t new_type = -1;
+    int32_t new_handle = -1;
+};
+
+struct SensorInjectEntry {
+    std::string name;
+    std::string vendor;
+    int32_t type = 0;
+    int32_t handle = 0;
+};
 
 struct SubmoduleConfig {
     bool enabled = false;
@@ -48,6 +72,17 @@ struct SubmoduleConfig {
     std::string wifi_config_snapshot;
     jlong location_config_version = 0;
     std::string location_config_snapshot;
+
+    // Sensor spoofing configuration.
+    bool sensor_config_enabled = false;
+    bool sensor_hide_all = false;
+    std::string sensor_global_vendor_replacement;
+    std::vector<std::string> sensor_vendor_keywords;
+    std::vector<SensorBlockRule> sensor_blacklist;
+    std::vector<SensorOverrideRule> sensor_overrides;
+    std::vector<SensorInjectEntry> sensor_injections;
+    jlong sensor_config_version = 0;
+    std::string sensor_config_snapshot;
 };
 
 void apply_json_config(SubmoduleConfig &config, const std::string &json);

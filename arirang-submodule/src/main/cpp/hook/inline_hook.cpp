@@ -99,4 +99,75 @@ bool inline_hook_install(void *target, void *handler, void **out_trampoline) {
     return true;
 }
 
+bool inline_hook_branch(void *target, void *handler) {
+    if (target == nullptr || handler == nullptr) return false;
+
+    const long page_size = sysconf(_SC_PAGESIZE);
+    if (page_size <= 0) return false;
+
+    const uintptr_t target_addr = reinterpret_cast<uintptr_t>(target);
+
+    // Allocate an executable page within ±128 MB of target for the trampoline.
+    void *tramp = nullptr;
+    for (uintptr_t offset = static_cast<uintptr_t>(page_size);
+         offset < 120u * 1024u * 1024u;
+         offset += static_cast<uintptr_t>(page_size)) {
+        for (int dir : {1, -1}) {
+            const uintptr_t hint = (target_addr + dir * offset) &
+                                   ~static_cast<uintptr_t>(page_size - 1);
+            void *result = mmap(reinterpret_cast<void *>(hint), static_cast<size_t>(page_size),
+                                PROT_READ | PROT_WRITE | PROT_EXEC,
+                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (result == MAP_FAILED) continue;
+            const intptr_t diff = reinterpret_cast<intptr_t>(result) -
+                                  static_cast<intptr_t>(target_addr);
+            if (diff >= -128LL * 1024 * 1024 && diff <= 128LL * 1024 * 1024 - 4) {
+                tramp = result;
+                break;
+            }
+            munmap(result, static_cast<size_t>(page_size));
+        }
+        if (tramp != nullptr) break;
+    }
+    if (tramp == nullptr) {
+        log_warn("inline_hook_branch: failed to allocate nearby trampoline");
+        return false;
+    }
+
+    // Trampoline: LDR x16, [pc, #8] ; BR x16 ; <8-byte handler address>
+    auto *tramp_words = reinterpret_cast<uint32_t *>(tramp);
+    tramp_words[0] = 0x58000050u; // LDR x16, [pc, #8]
+    tramp_words[1] = 0xd61f0200u; // BR x16
+    std::memcpy(&tramp_words[2], &handler, sizeof(handler));
+    __builtin___clear_cache(static_cast<char *>(tramp),
+                            static_cast<char *>(tramp) + 16);
+
+    // Patch target: B trampoline (signed 26-bit offset in words)
+    const intptr_t branch_offset = reinterpret_cast<intptr_t>(tramp) -
+                                   static_cast<intptr_t>(target_addr);
+    const int32_t imm26 = static_cast<int32_t>(branch_offset / 4);
+    if (imm26 < -33554432 || imm26 > 33554431) {
+        log_warn("inline_hook_branch: trampoline out of B range");
+        munmap(tramp, static_cast<size_t>(page_size));
+        return false;
+    }
+
+    const uint32_t b_instr = 0x14000000u | (static_cast<uint32_t>(imm26) & 0x03FFFFFFu);
+
+    if (!unprotect_page(target, 4)) {
+        log_warn("inline_hook_branch: mprotect failed");
+        munmap(tramp, static_cast<size_t>(page_size));
+        return false;
+    }
+    *reinterpret_cast<uint32_t *>(target) = b_instr;
+    __builtin___clear_cache(static_cast<char *>(target),
+                            static_cast<char *>(target) + 4);
+    reprotect_page(target, 4);
+
+    log_info(std::string("inline_hook_branch: patched target @ ") +
+             std::to_string(target_addr) + " -> trampoline @ " +
+             std::to_string(reinterpret_cast<uintptr_t>(tramp)));
+    return true;
+}
+
 } // namespace arirang

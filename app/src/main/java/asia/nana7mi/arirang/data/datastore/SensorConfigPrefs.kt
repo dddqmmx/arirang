@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Date
 
 object SensorConfigPrefs {
     const val PREFS_NAME = "sensor_config_prefs"
 
+    private const val KEY_LAST_MODIFIED = "last_modified"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_HIDE_ALL = "hide_all"
 
@@ -118,13 +120,14 @@ object SensorConfigPrefs {
     fun saveConfig(context: Context, config: Config) {
         val entriesArray = JSONArray()
         config.sensorEntries.forEach { entriesArray.put(it.toJson()) }
-        
+
         val precisionJson = JSONObject()
         config.precisionBySensorType.forEach { (type, level) ->
             precisionJson.put(type.toString(), level)
         }
-        
+
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
+            putLong(KEY_LAST_MODIFIED, Date().time)
             putBoolean(KEY_ENABLED, config.enabled)
             putBoolean(KEY_HIDE_ALL, config.hideAll)
             putBoolean(KEY_DISABLE_MIC, config.disableMic)
@@ -138,6 +141,23 @@ object SensorConfigPrefs {
             putString(KEY_VENDOR_REPLACEMENT, config.vendorReplacement)
             putString(KEY_VENDOR_KEYWORDS, config.vendorKeywords)
         }
+        SubmoduleConfigFiles.write(context)
+    }
+
+    fun lastModified(context: Context): Long {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getLong(KEY_LAST_MODIFIED, 0L)
+    }
+
+    fun buildHookSnapshot(context: Context): String {
+        val config = loadConfig(context)
+        return JSONObject().apply {
+            put("version", lastModified(context))
+            put(KEY_ENABLED, config.enabled)
+            put(KEY_HIDE_ALL, config.hideAll)
+            put("blacklistSize", config.sensorEntries.count { it.hidden })
+            put("injectionSize", config.sensorEntries.count { it.isCustom })
+        }.toString()
     }
 
     /**

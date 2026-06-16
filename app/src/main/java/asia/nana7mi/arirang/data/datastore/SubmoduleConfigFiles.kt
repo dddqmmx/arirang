@@ -3,6 +3,7 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import androidx.core.content.edit
 import asia.nana7mi.arirang.BuildConfig
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Date
@@ -17,7 +18,8 @@ object SubmoduleConfigFiles {
         context: Context,
         simConfig: SimConfigPrefs.Config = SimConfigPrefs.loadConfig(context),
         deviceConfig: DeviceInfoPrefs.Config = DeviceInfoPrefs.loadConfig(context),
-        uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context)
+        uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context),
+        sensorConfig: SensorConfigPrefs.Config = SensorConfigPrefs.loadConfig(context)
     ) {
         val configFile = configFile(context)
         configFile.parentFile?.mkdirs()
@@ -69,6 +71,18 @@ object SubmoduleConfigFiles {
             .put("wifiConfigSnapshot", WifiConfigPrefs.buildHookSnapshot(context))
             .put("locationConfigVersion", LocationConfigPrefs.lastModified(context))
             .put("locationConfigSnapshot", LocationConfigPrefs.buildHookSnapshot(context))
+            .put("sensorConfigEnabled", sensorConfig.enabled)
+            .put("sensorHideAll", sensorConfig.hideAll)
+            .put("sensorGlobalVendorReplacement", sensorConfig.vendorReplacement)
+            .put(
+                "sensorVendorKeywords",
+                JSONArray(sensorConfig.vendorKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() })
+            )
+            .put("sensorBlacklist", buildSensorBlacklist(sensorConfig))
+            .put("sensorOverrides", buildSensorOverrides(sensorConfig))
+            .put("sensorInjections", buildSensorInjections(sensorConfig))
+            .put("sensorConfigVersion", SensorConfigPrefs.lastModified(context))
+            .put("sensorConfigSnapshot", SensorConfigPrefs.buildHookSnapshot(context))
             .toString()
 
         configFile.writeText(json)
@@ -78,6 +92,62 @@ object SubmoduleConfigFiles {
         configFile.setReadable(true, true)
         configFile.setWritable(true, true)
         configFile.parentFile?.setExecutable(true, true)
+    }
+
+    private fun buildSensorBlacklist(config: SensorConfigPrefs.Config): JSONArray {
+        val array = JSONArray()
+        if (config.hideAll) return array
+
+        if (config.disableAccel) {
+            array.put(JSONObject().put("type", android.hardware.Sensor.TYPE_ACCELEROMETER))
+        }
+        if (config.disableGyro) {
+            array.put(JSONObject().put("type", android.hardware.Sensor.TYPE_GYROSCOPE))
+        }
+        if (config.disableMagnetic) {
+            array.put(JSONObject().put("type", android.hardware.Sensor.TYPE_MAGNETIC_FIELD))
+        }
+
+        config.sensorEntries.filter { it.hidden && !it.isCustom }.forEach { entry ->
+            array.put(
+                JSONObject()
+                    .put("type", entry.type)
+                    .put("nameContains", entry.name)
+            )
+        }
+        return array
+    }
+
+    private fun buildSensorOverrides(config: SensorConfigPrefs.Config): JSONArray {
+        val array = JSONArray()
+        if (config.hideAll) return array
+
+        config.sensorEntries.filter { !it.hidden && !it.isCustom }.forEach { entry ->
+            array.put(
+                JSONObject()
+                    .put("matchType", entry.type)
+                    .put("newName", entry.name)
+                    .put("newVendor", entry.vendor)
+                    .put("newType", entry.type)
+            )
+        }
+        return array
+    }
+
+    private fun buildSensorInjections(config: SensorConfigPrefs.Config): JSONArray {
+        val array = JSONArray()
+        if (config.hideAll) return array
+
+        config.sensorEntries.filter { it.isCustom && !it.hidden }.forEach { entry ->
+            array.put(
+                JSONObject()
+                    .put("name", entry.name)
+                    .put("vendor", entry.vendor)
+                    .put("type", entry.type)
+                    .put("handle", 0)
+            )
+        }
+        return array
     }
 
     private fun buildSimProperties(config: SimConfigPrefs.Config): SimProperties {

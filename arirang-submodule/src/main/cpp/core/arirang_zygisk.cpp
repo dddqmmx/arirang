@@ -4,6 +4,7 @@
 #include "jni_utils.hpp"
 #include "logging.hpp"
 #include "submodule_config.hpp"
+#include "sensor_spoofer.hpp"
 #include "system_property_spoofer.hpp"
 
 #include <string>
@@ -48,6 +49,16 @@ public:
         }
     }
 
+    void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
+        // Some Zygisk implementations used by KernelSU Next keep the module
+        // mapped in system_server but do not reliably call postServerSpecialize.
+        // Install the SensorService vtable hooks before specialization instead.
+        if (config_.sensor_config_enabled) {
+            arirang::install_sensor_spoofer(api_, env_, config_, true);
+        }
+        arirang::log_info("preServerSpecialize: installed early system_server hooks");
+    }
+
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
         if (!keep_module_loaded_in_app_) return;
         arirang::install_system_property_spoofer(api_, env_, config_, true);
@@ -55,7 +66,14 @@ public:
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *) override {
+        arirang::log_info(std::string("postServerSpecialize: enter sensor_enabled=") +
+                          (config_.sensor_config_enabled ? "true" : "false"));
         arirang::install_system_property_spoofer(api_, env_, config_, true);
+        if (config_.sensor_config_enabled) {
+            arirang::install_sensor_spoofer(api_, env_, config_, true);
+        } else {
+            arirang::log_info("postServerSpecialize: sensor disabled by config, skipping");
+        }
         arirang::log_info("installed system_server native hooks");
     }
 
