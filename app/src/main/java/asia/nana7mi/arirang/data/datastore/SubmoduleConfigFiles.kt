@@ -81,6 +81,7 @@ object SubmoduleConfigFiles {
             .put("sensorBlacklist", buildSensorBlacklist(sensorConfig))
             .put("sensorOverrides", buildSensorOverrides(sensorConfig))
             .put("sensorInjections", buildSensorInjections(sensorConfig))
+            .put("sensorPrecisionRules", buildSensorPrecisionRules(sensorConfig))
             .put("sensorConfigVersion", SensorConfigPrefs.lastModified(context))
             .put("sensorConfigSnapshot", SensorConfigPrefs.buildHookSnapshot(context))
             .toString()
@@ -89,9 +90,9 @@ object SubmoduleConfigFiles {
         configFile.setReadable(false, false)
         configFile.setWritable(false, false)
         configFile.setExecutable(false, false)
-        configFile.setReadable(true, true)
-        configFile.setWritable(true, true)
-        configFile.parentFile?.setExecutable(true, true)
+        configFile.setReadable(true, false)   // 0644 - world-readable so system_server can read
+        configFile.setWritable(true, true)    // owner-only write
+        configFile.parentFile?.setExecutable(true, false)  // world-traversable directory
     }
 
     private fun buildSensorBlacklist(config: SensorConfigPrefs.Config): JSONArray {
@@ -146,6 +147,22 @@ object SubmoduleConfigFiles {
                     .put("type", entry.type)
                     .put("handle", 0)
             )
+        }
+        return array
+    }
+
+    private fun buildSensorPrecisionRules(config: SensorConfigPrefs.Config): JSONArray {
+        val array = JSONArray()
+        if (config.hideAll) return array
+
+        config.precisionBySensorType.forEach { (type, level) ->
+            if (level != SensorConfigPrefs.PRECISION_ORIGINAL) {
+                array.put(
+                    JSONObject()
+                        .put("type", type)
+                        .put("level", level)
+                )
+            }
         }
         return array
     }

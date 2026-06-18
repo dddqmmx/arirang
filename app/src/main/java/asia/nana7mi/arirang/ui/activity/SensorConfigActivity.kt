@@ -31,14 +31,9 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -199,28 +194,6 @@ class SensorConfigActivity : ComponentActivity() {
                             }
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
-                }
-
-                // ── Media ──
-                item(key = "media") {
-                    SectionCard(title = stringResource(R.string.sensor_section_media)) {
-                        SwitchRow(stringResource(R.string.sensor_disable_mic), stringResource(R.string.sensor_disable_mic_summary), config.disableMic, onCheckedChange = { config = config.copy(disableMic = it) })
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        SwitchRow(stringResource(R.string.sensor_disable_camera_front), stringResource(R.string.sensor_disable_camera_front_summary), config.disableCameraFront, onCheckedChange = { config = config.copy(disableCameraFront = it) })
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        SwitchRow(stringResource(R.string.sensor_disable_camera_rear), stringResource(R.string.sensor_disable_camera_rear_summary), config.disableCameraRear, onCheckedChange = { config = config.copy(disableCameraRear = it) })
-                    }
-                }
-
-                // ── Motion ──
-                item(key = "motion") {
-                    SectionCard(title = stringResource(R.string.sensor_section_motion)) {
-                        SwitchRow(stringResource(R.string.sensor_disable_accel), null, config.disableAccel, onCheckedChange = { config = config.copy(disableAccel = it) })
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        SwitchRow(stringResource(R.string.sensor_disable_gyro), null, config.disableGyro, onCheckedChange = { config = config.copy(disableGyro = it) })
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        SwitchRow(stringResource(R.string.sensor_disable_magnetic), null, config.disableMagnetic, onCheckedChange = { config = config.copy(disableMagnetic = it) })
                     }
                 }
 

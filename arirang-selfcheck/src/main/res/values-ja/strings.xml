@@ -68,6 +68,7 @@
     <string name="self_check_nav_drm">DRM</string>
     <string name="self_check_nav_settings">設定</string>
     <string name="self_check_nav_sensors">センサー</string>
+    <string name="self_check_nav_sensor_precision">センサー精度</string>
     <string name="self_check_status_consistent">チャネル間で一致</string>
     <string name="self_check_status_leaked">バイパス漏洩を検出</string>
     <string name="self_check_channel_mismatch">⚠ 不一致</string>
@@ -77,6 +78,15 @@
     <string name="self_check_drm_title">DRM デバイス ID</string>
     <string name="self_check_settings_title">設定ストア</string>
     <string name="self_check_sensors_title">センサー</string>
+    <string name="self_check_sensor_precision_title">センサー精度低下</string>
+    <string name="self_check_sensor_precision_no_sensor">加速度計またはジャイロスコープが利用できません</string>
+    <string name="self_check_sensor_precision_original">元の精度（精度低下は検出されませんでした）</string>
+    <string name="self_check_sensor_precision_reduced">精度が小数点以下 %1$d 桁に低下しました</string>
+    <string name="self_check_sensor_precision_config_mismatch">設定はレベル %1$d を期待していますが、データは小数点以下 %2$d 桁を示しています</string>
+    <string name="self_check_sensor_precision_data_label">サンプルデータ（加速度計）：</string>
+    <string name="self_check_sensor_precision_monitor_start">リアルタイム監視を開始</string>
+    <string name="self_check_sensor_precision_monitor_stop">リアルタイム監視を停止</string>
+    <string name="self_check_sensor_precision_monitoring">監視中…</string>
     <string name="self_check_props_hidden">読み取り可能なシステムプロパティはありません</string>
     <string name="self_check_rawfiles_hidden">カーネルファイルから識別データの漏洩はありません</string>
     <string name="self_check_drm_hidden">デバイス識別子を返した DRM スキームはありません</string>

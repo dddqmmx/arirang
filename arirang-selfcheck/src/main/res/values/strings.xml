@@ -29,6 +29,7 @@
     <string name="self_check_nav_drm">DRM</string>
     <string name="self_check_nav_settings">Settings</string>
     <string name="self_check_nav_sensors">Sensors</string>
+    <string name="self_check_nav_sensor_precision">Sensor Precision</string>
     <string name="self_check_nav_apps">Apps</string>
     <string name="self_check_nav_location">Location</string>
     <string name="self_check_nav_wifi">Wi-Fi</string>
@@ -54,6 +55,15 @@
     <string name="self_check_drm_title">DRM Device IDs</string>
     <string name="self_check_settings_title">Settings Store</string>
     <string name="self_check_sensors_title">Sensors</string>
+    <string name="self_check_sensor_precision_title">Sensor Precision Reduction</string>
+    <string name="self_check_sensor_precision_no_sensor">No accelerometer or gyroscope available</string>
+    <string name="self_check_sensor_precision_original">Original precision (no reduction detected)</string>
+    <string name="self_check_sensor_precision_reduced">Precision reduced to %1$d decimal place(s)</string>
+    <string name="self_check_sensor_precision_config_mismatch">Config expects level %1$d but data shows %2$d decimal places</string>
+    <string name="self_check_sensor_precision_data_label">Sample data (accelerometer):</string>
+    <string name="self_check_sensor_precision_monitor_start">Start Live Monitor</string>
+    <string name="self_check_sensor_precision_monitor_stop">Stop Live Monitor</string>
+    <string name="self_check_sensor_precision_monitoring">Monitoring…</string>
     <string name="self_check_apps_title">Installed Apps</string>
     <string name="self_check_location_title">Location</string>
     <string name="self_check_wifi_title">Wi-Fi Information</string>

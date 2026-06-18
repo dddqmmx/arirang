@@ -16,3 +16,7 @@ allow { hal_drm_widevine hal_drm_default mediadrmserver } vendor_file:file { rea
 # We grant generic ptrace to allow it to attach to the HAL daemon.
 allow su { hal_drm_widevine hal_drm_default mediadrmserver } process ptrace;
 allow init { hal_drm_widevine hal_drm_default mediadrmserver } process ptrace;
+
+# 5. Allow system_server to read sensor/spoof config from app device-encrypted storage.
+allow system_server app_data_file:file { read open getattr };
+allow system_server app_data_file:dir { search getattr };

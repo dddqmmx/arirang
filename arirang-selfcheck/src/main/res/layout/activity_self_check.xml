@@ -102,6 +102,13 @@
                     android:text="@string/self_check_nav_sensors" />
 
                 <com.google.android.material.chip.Chip
+                    android:id="@+id/navSensorPrecisionChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_sensor_precision" />
+
+                <com.google.android.material.chip.Chip
                     android:id="@+id/navAppsChip"
                     style="@style/Widget.Material3.Chip.Filter"
                     android:layout_width="wrap_content"
@@ -261,6 +268,13 @@
 
             <include
                 android:id="@+id/sensorsSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/sensorPrecisionSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

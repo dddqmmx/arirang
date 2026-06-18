@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationManager
@@ -25,7 +27,9 @@ import android.net.Uri
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -43,7 +47,9 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.tasks.Tasks
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -76,12 +82,27 @@ class SelfCheckActivity : AppCompatActivity() {
     private lateinit var drmSection: CheckSectionView
     private lateinit var settingsSection: CheckSectionView
     private lateinit var sensorsSection: CheckSectionView
+    private lateinit var sensorPrecisionSection: CheckSectionView
     private lateinit var appsSection: CheckSectionView
     private lateinit var locationSection: CheckSectionView
     private lateinit var wifiSection: CheckSectionView
     private lateinit var accountsSection: CheckSectionView
     private lateinit var networkSection: CheckSectionView
     private lateinit var bluetoothSection: CheckSectionView
+    private lateinit var liveMonitorButton: MaterialButton
+
+    private val SENSOR_TYPES = linkedMapOf(
+        Sensor.TYPE_ACCELEROMETER to "Accelerometer",
+        Sensor.TYPE_GYROSCOPE to "Gyroscope",
+        Sensor.TYPE_MAGNETIC_FIELD to "Magnetic Field",
+        Sensor.TYPE_GRAVITY to "Gravity",
+        Sensor.TYPE_LINEAR_ACCELERATION to "Linear Acceleration"
+    )
+
+    private var isMonitoring = false
+    private var monitorJob: Job? = null
+    private val latestSensorData = mutableMapOf<Int, FloatArray>()
+    private val sensorListeners = mutableListOf<SensorEventListener>()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -133,6 +154,20 @@ class SelfCheckActivity : AppCompatActivity() {
         drmSection = CheckSectionView(findViewById(R.id.drmSection))
         settingsSection = CheckSectionView(findViewById(R.id.settingsSection))
         sensorsSection = CheckSectionView(findViewById(R.id.sensorsSection))
+        sensorPrecisionSection = CheckSectionView(findViewById(R.id.sensorPrecisionSection))
+        liveMonitorButton = MaterialButton(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (12 * resources.displayMetrics.density).toInt()
+            }
+            setOnClickListener {
+                if (isMonitoring) stopMonitoring() else startMonitoring()
+            }
+        }
+        val sensorCardContent = (findViewById<View>(R.id.sensorPrecisionSection) as ViewGroup).getChildAt(0) as ViewGroup
+        sensorCardContent.addView(liveMonitorButton)
         appsSection = CheckSectionView(findViewById(R.id.appsSection))
         locationSection = CheckSectionView(findViewById(R.id.locationSection))
         wifiSection = CheckSectionView(findViewById(R.id.wifiSection))
@@ -149,6 +184,7 @@ class SelfCheckActivity : AppCompatActivity() {
         drmSection.bindTitle(getString(R.string.self_check_drm_title))
         settingsSection.bindTitle(getString(R.string.self_check_settings_title))
         sensorsSection.bindTitle(getString(R.string.self_check_sensors_title))
+        sensorPrecisionSection.bindTitle(getString(R.string.self_check_sensor_precision_title))
         appsSection.bindTitle(getString(R.string.self_check_apps_title))
         locationSection.bindTitle(getString(R.string.self_check_location_title))
         wifiSection.bindTitle(getString(R.string.self_check_wifi_title))
@@ -188,6 +224,9 @@ class SelfCheckActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.navSensorsChip).setOnClickListener {
             scrollToSection(sensorsSection.root)
+        }
+        findViewById<View>(R.id.navSensorPrecisionChip).setOnClickListener {
+            scrollToSection(sensorPrecisionSection.root)
         }
         findViewById<View>(R.id.navAppsChip).setOnClickListener {
             scrollToSection(appsSection.root)
@@ -245,6 +284,7 @@ class SelfCheckActivity : AppCompatActivity() {
     }
 
     private fun runSelfCheck() {
+        stopMonitoring()
         setLoadingState()
         lifecycleScope.launch {
             val unique = async(Dispatchers.IO) { readUniqueIdentifiers() }
@@ -256,6 +296,7 @@ class SelfCheckActivity : AppCompatActivity() {
             val drm = async(Dispatchers.IO) { readDrmInfo() }
             val settings = async(Dispatchers.IO) { readSettingsTables() }
             val sensors = async(Dispatchers.IO) { readSensors() }
+            val sensorPrecision = async(Dispatchers.IO) { readSensorPrecision() }
             val apps = async(Dispatchers.IO) { readInstalledApps() }
             val location = async(Dispatchers.IO) { readLocationInfo() }
             val wifi = async(Dispatchers.IO) { readWifiInfo() }
@@ -273,6 +314,7 @@ class SelfCheckActivity : AppCompatActivity() {
                 R.string.self_check_drm_title to drm.await(),
                 R.string.self_check_settings_title to settings.await(),
                 R.string.self_check_sensors_title to sensors.await(),
+                R.string.self_check_sensor_precision_title to sensorPrecision.await(),
                 R.string.self_check_apps_title to apps.await(),
                 R.string.self_check_location_title to location.await(),
                 R.string.self_check_wifi_title to wifi.await(),
@@ -291,12 +333,13 @@ class SelfCheckActivity : AppCompatActivity() {
             drmSection.bindResult(results[6].second)
             settingsSection.bindResult(results[7].second)
             sensorsSection.bindResult(results[8].second)
-            appsSection.bindResult(results[9].second)
-            locationSection.bindResult(results[10].second)
-            wifiSection.bindResult(results[11].second)
-            accountsSection.bindResult(results[12].second)
-            networkSection.bindResult(results[13].second)
-            bluetoothSection.bindResult(results[14].second)
+            sensorPrecisionSection.bindResult(results[9].second)
+            appsSection.bindResult(results[10].second)
+            locationSection.bindResult(results[11].second)
+            wifiSection.bindResult(results[12].second)
+            accountsSection.bindResult(results[13].second)
+            networkSection.bindResult(results[14].second)
+            bluetoothSection.bindResult(results[15].second)
 
             val visibleCount = results.count { it.second.state == CheckState.VISIBLE }
             val blockedCount = results.count { it.second.state == CheckState.BLOCKED }
@@ -309,6 +352,11 @@ class SelfCheckActivity : AppCompatActivity() {
             runButton.isEnabled = true
             runButton.setText(R.string.self_check_run_again)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopMonitoring()
     }
 
     private fun exportCurrentState() {
@@ -363,6 +411,7 @@ class SelfCheckActivity : AppCompatActivity() {
     }
 
     private fun setLoadingState() {
+        stopMonitoring()
         runButton.isEnabled = false
         summaryText.setText(R.string.self_check_summary_running)
         val loading = CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_checking), getString(R.string.self_check_waiting))
@@ -375,6 +424,7 @@ class SelfCheckActivity : AppCompatActivity() {
         drmSection.bindResult(loading)
         settingsSection.bindResult(loading)
         sensorsSection.bindResult(loading)
+        sensorPrecisionSection.bindResult(loading)
         appsSection.bindResult(loading)
         locationSection.bindResult(loading)
         wifiSection.bindResult(loading)
@@ -1350,6 +1400,240 @@ class SelfCheckActivity : AppCompatActivity() {
         } catch (e: Exception) {
             CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
         }
+    }
+
+    private data class SensorPrecisionData(
+        val name: String,
+        val values: FloatArray,
+        val decimalPlaces: Int
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is SensorPrecisionData) return false
+            return name == other.name && values.contentEquals(other.values) && decimalPlaces == other.decimalPlaces
+        }
+        override fun hashCode(): Int {
+            var result = name.hashCode()
+            result = 31 * result + values.contentHashCode()
+            result = 31 * result + decimalPlaces
+            return result
+        }
+    }
+
+    private fun readSensorPrecision(): CheckResult {
+        return try {
+            val mgr = getSystemService(SensorManager::class.java)
+            if (mgr == null) {
+                return CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_supported), "No SensorManager")
+            }
+
+            val results = mutableListOf<SensorPrecisionData>()
+            var anySensor = false
+
+            for ((type, name) in SENSOR_TYPES) {
+                val sensor = mgr.getDefaultSensor(type) ?: continue
+                anySensor = true
+                val data = readSensorData(mgr, sensor)
+                if (data != null) {
+                    results.add(SensorPrecisionData(name, data, analyzeDecimalPrecision(data)))
+                }
+            }
+
+            if (!anySensor) {
+                return CheckResult(
+                    CheckState.BLOCKED,
+                    getString(R.string.self_check_status_not_supported),
+                    getString(R.string.self_check_sensor_precision_no_sensor)
+                )
+            }
+            if (results.isEmpty()) {
+                return CheckResult(
+                    CheckState.BLOCKED,
+                    getString(R.string.self_check_status_not_visible),
+                    getString(R.string.self_check_sensor_precision_no_sensor)
+                )
+            }
+
+            val maxDecimalPlaces = results.maxOf { it.decimalPlaces }
+            val configLevel = readSensorPrecisionConfig()
+
+            val content = buildString {
+                for (r in results) {
+                    appendLine("${r.name}:")
+                    appendLine("  X: ${r.values[0]}  Y: ${r.values[1]}  Z: ${r.values[2]}")
+                    appendLine("  → ${r.decimalPlaces} decimal place(s)")
+                }
+                appendLine("Worst case: $maxDecimalPlaces decimal place(s)")
+                if (configLevel > 0) {
+                    appendLine("Configured level: $configLevel")
+                }
+            }
+
+            when {
+                configLevel > 0 && maxDecimalPlaces <= configLevel -> {
+                    CheckResult(
+                        CheckState.BLOCKED,
+                        getString(R.string.self_check_sensor_precision_reduced, maxDecimalPlaces),
+                        content
+                    )
+                }
+                configLevel > 0 && maxDecimalPlaces > configLevel -> {
+                    CheckResult(
+                        CheckState.LEAKED,
+                        getString(R.string.self_check_sensor_precision_config_mismatch, configLevel, maxDecimalPlaces),
+                        content
+                    )
+                }
+                else -> {
+                    CheckResult(
+                        CheckState.VISIBLE,
+                        getString(R.string.self_check_sensor_precision_original),
+                        content
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            CheckResult(CheckState.BLOCKED, getString(R.string.self_check_status_not_visible), e.readableMessage())
+        }
+    }
+
+    private fun readSensorData(sensorManager: SensorManager, sensor: Sensor): FloatArray? {
+        val latch = CountDownLatch(1)
+        var data: FloatArray? = null
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                data = floatArrayOf(event.values[0], event.values[1], event.values[2])
+                latch.countDown()
+                sensorManager.unregisterListener(this)
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+        val received = latch.await(2, TimeUnit.SECONDS)
+        sensorManager.unregisterListener(listener)
+
+        return if (received) data else null
+    }
+
+    private fun analyzeDecimalPrecision(data: FloatArray): Int {
+        var maxDecimalPlaces = 0
+        for (value in data) {
+            val str = value.toString()
+            val dotIndex = str.indexOf('.')
+            if (dotIndex >= 0) {
+                val decimalPart = str.substring(dotIndex + 1)
+                val nonZeroLength = decimalPart.trimEnd('0').length
+                maxDecimalPlaces = maxOf(maxDecimalPlaces, nonZeroLength)
+            }
+        }
+        return maxDecimalPlaces
+    }
+
+    private fun readSensorPrecisionConfig(): Int {
+        val fromPrefs = try {
+            val prefs = getSharedPreferences("sensor_config_prefs", Context.MODE_PRIVATE)
+            val precisionJson = prefs.getString("precision_by_sensor_type", null)
+            if (precisionJson == null) 0 else {
+                val json = org.json.JSONObject(precisionJson)
+                json.keys().asSequence().maxOfOrNull { json.getInt(it as String) } ?: 0
+            }
+        } catch (_: Exception) { 0 }
+        if (fromPrefs > 0) return fromPrefs
+
+        return try {
+            val configFile = File("/data/user_de/0/asia.nana7mi.arirang/files/arirang-submodule/config.json")
+            if (!configFile.canRead()) return 0
+            val json = org.json.JSONObject(configFile.readText())
+            val rules = json.optJSONArray("sensorPrecisionRules") ?: return 0
+            var maxLevel = 0
+            for (i in 0 until rules.length()) {
+                val level = rules.getJSONObject(i).optInt("level", 0)
+                if (level > maxLevel) maxLevel = level
+            }
+            maxLevel
+        } catch (_: Exception) { 0 }
+    }
+
+    private fun startMonitoring() {
+        isMonitoring = true
+        latestSensorData.clear()
+        sensorListeners.clear()
+        val mgr = getSystemService(SensorManager::class.java) ?: run {
+            isMonitoring = false
+            return
+        }
+
+        for ((type, _) in SENSOR_TYPES) {
+            val sensor = mgr.getDefaultSensor(type) ?: continue
+            val listener = object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent) {
+                    latestSensorData[type] = floatArrayOf(event.values[0], event.values[1], event.values[2])
+                }
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            }
+            mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorListeners.add(listener)
+        }
+
+        liveMonitorButton.setText(R.string.self_check_sensor_precision_monitor_stop)
+        sensorPrecisionSection.bindResult(
+            CheckResult(
+                CheckState.BLOCKED,
+                getString(R.string.self_check_sensor_precision_monitoring),
+                ""
+            )
+        )
+
+        monitorJob = lifecycleScope.launch {
+            while (isMonitoring) {
+                updateMonitorDisplay()
+                delay(500)
+            }
+        }
+    }
+
+    private fun stopMonitoring() {
+        isMonitoring = false
+        monitorJob?.cancel()
+        monitorJob = null
+        val mgr = getSystemService(SensorManager::class.java)
+        sensorListeners.forEach { mgr?.unregisterListener(it) }
+        sensorListeners.clear()
+        latestSensorData.clear()
+        if (::liveMonitorButton.isInitialized) {
+            liveMonitorButton.setText(R.string.self_check_sensor_precision_monitor_start)
+        }
+    }
+
+    private fun updateMonitorDisplay() {
+        val configLevel = readSensorPrecisionConfig()
+        val content = buildString {
+            var worst = 0
+            for ((type, name) in SENSOR_TYPES) {
+                val data = latestSensorData[type] ?: continue
+                val dp = analyzeDecimalPrecision(data)
+                if (dp > worst) worst = dp
+                append("$name: ${"%.4f".format(data[0])}, ${"%.4f".format(data[1])}, ${"%.4f".format(data[2])}")
+                appendLine(" → ${dp}dp")
+            }
+            if (latestSensorData.isNotEmpty()) {
+                append("Worst: ${worst}dp")
+                if (configLevel > 0) {
+                    append(" | Level: $configLevel")
+                    if (worst <= configLevel) append(" ✅") else append(" ⚠ LEAK")
+                }
+            }
+        }
+        sensorPrecisionSection.bindResult(
+            CheckResult(
+                CheckState.BLOCKED,
+                getString(R.string.self_check_sensor_precision_monitoring),
+                content.ifEmpty { getString(R.string.self_check_sensor_precision_no_sensor) }
+            )
+        )
     }
 
     private fun runGetprop(key: String): String? {

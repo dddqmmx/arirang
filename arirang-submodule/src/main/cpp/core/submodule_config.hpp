@@ -31,6 +31,14 @@ struct SensorInjectEntry {
     int32_t handle = 0;
 };
 
+// Per-sensor-type precision reduction. `level` mirrors the values defined in
+// SensorConfigPrefs: 1 = 1 decimal place, 2 = 2 decimal places, 3 = integer
+// only. Level 0 (PRECISION_ORIGINAL) is never emitted into the config.
+struct SensorPrecisionRule {
+    int32_t type = -1;
+    int32_t level = 0;
+};
+
 struct SubmoduleConfig {
     bool enabled = false;
     bool device_info_enabled = false;
@@ -81,6 +89,7 @@ struct SubmoduleConfig {
     std::vector<SensorBlockRule> sensor_blacklist;
     std::vector<SensorOverrideRule> sensor_overrides;
     std::vector<SensorInjectEntry> sensor_injections;
+    std::vector<SensorPrecisionRule> sensor_precision_rules;
     jlong sensor_config_version = 0;
     std::string sensor_config_snapshot;
 };

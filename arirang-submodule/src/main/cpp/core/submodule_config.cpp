@@ -168,6 +168,23 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
             }
         }
 
+        if (j.contains("sensorPrecisionRules") && j["sensorPrecisionRules"].is_array()) {
+            config.sensor_precision_rules.clear();
+            for (const auto& item : j["sensorPrecisionRules"]) {
+                if (!item.is_object()) continue;
+                SensorPrecisionRule rule;
+                if (item.contains("type") && item["type"].is_number()) {
+                    rule.type = item["type"].get<int32_t>();
+                }
+                if (item.contains("level") && item["level"].is_number()) {
+                    rule.level = item["level"].get<int32_t>();
+                }
+                if (rule.type >= 0 && rule.level > 0) {
+                    config.sensor_precision_rules.push_back(rule);
+                }
+            }
+        }
+
         read_long("sensorConfigVersion", config.sensor_config_version);
         read_string("sensorConfigSnapshot", config.sensor_config_snapshot);
 

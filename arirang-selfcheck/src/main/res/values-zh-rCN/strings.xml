@@ -68,6 +68,7 @@
     <string name="self_check_nav_drm">DRM</string>
     <string name="self_check_nav_settings">设置项</string>
     <string name="self_check_nav_sensors">传感器</string>
+    <string name="self_check_nav_sensor_precision">传感器精度</string>
     <string name="self_check_status_consistent">各通道一致</string>
     <string name="self_check_status_leaked">检测到旁路泄露</string>
     <string name="self_check_channel_mismatch">⚠ 不一致</string>
@@ -77,6 +78,15 @@
     <string name="self_check_drm_title">DRM 设备标识</string>
     <string name="self_check_settings_title">系统设置表</string>
     <string name="self_check_sensors_title">传感器</string>
+    <string name="self_check_sensor_precision_title">传感器精度降低</string>
+    <string name="self_check_sensor_precision_no_sensor">没有可用的加速度计或陀螺仪</string>
+    <string name="self_check_sensor_precision_original">原始精度（未检测到精度降低）</string>
+    <string name="self_check_sensor_precision_reduced">精度已降低至 %1$d 位小数</string>
+    <string name="self_check_sensor_precision_config_mismatch">配置期望级别 %1$d，但数据显示 %2$d 位小数</string>
+    <string name="self_check_sensor_precision_data_label">采样数据（加速度计）：</string>
+    <string name="self_check_sensor_precision_monitor_start">开始实时监测</string>
+    <string name="self_check_sensor_precision_monitor_stop">停止实时监测</string>
+    <string name="self_check_sensor_precision_monitoring">监测中…</string>
     <string name="self_check_props_hidden">没有可读取的系统属性</string>
     <string name="self_check_rawfiles_hidden">没有内核文件泄露可识别数据</string>
     <string name="self_check_drm_hidden">没有 DRM scheme 返回设备标识</string>

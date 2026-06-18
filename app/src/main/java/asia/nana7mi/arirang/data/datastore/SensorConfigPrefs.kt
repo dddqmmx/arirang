@@ -13,14 +13,6 @@ object SensorConfigPrefs {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_HIDE_ALL = "hide_all"
 
-    private const val KEY_DISABLE_MIC = "disable_mic"
-    private const val KEY_DISABLE_CAMERA_FRONT = "disable_camera_front"
-    private const val KEY_DISABLE_CAMERA_REAR = "disable_camera_rear"
-
-    private const val KEY_DISABLE_ACCEL = "disable_accel"
-    private const val KEY_DISABLE_GYRO = "disable_gyro"
-    private const val KEY_DISABLE_MAGNETIC = "disable_magnetic"
-
     private const val KEY_PRECISION_BY_SENSOR_TYPE = "precision_by_sensor_type"
     private const val KEY_SENSOR_ENTRIES = "sensor_entries"
     private const val KEY_VENDOR_REPLACEMENT = "vendor_replacement"
@@ -104,12 +96,6 @@ object SensorConfigPrefs {
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             hideAll = prefs.getBoolean(KEY_HIDE_ALL, false),
-            disableMic = prefs.getBoolean(KEY_DISABLE_MIC, false),
-            disableCameraFront = prefs.getBoolean(KEY_DISABLE_CAMERA_FRONT, false),
-            disableCameraRear = prefs.getBoolean(KEY_DISABLE_CAMERA_REAR, false),
-            disableAccel = prefs.getBoolean(KEY_DISABLE_ACCEL, false),
-            disableGyro = prefs.getBoolean(KEY_DISABLE_GYRO, false),
-            disableMagnetic = prefs.getBoolean(KEY_DISABLE_MAGNETIC, false),
             precisionBySensorType = precisionMap,
             sensorEntries = entries,
             vendorReplacement = prefs.getString(KEY_VENDOR_REPLACEMENT, null) ?: "",
@@ -130,12 +116,6 @@ object SensorConfigPrefs {
             putLong(KEY_LAST_MODIFIED, Date().time)
             putBoolean(KEY_ENABLED, config.enabled)
             putBoolean(KEY_HIDE_ALL, config.hideAll)
-            putBoolean(KEY_DISABLE_MIC, config.disableMic)
-            putBoolean(KEY_DISABLE_CAMERA_FRONT, config.disableCameraFront)
-            putBoolean(KEY_DISABLE_CAMERA_REAR, config.disableCameraRear)
-            putBoolean(KEY_DISABLE_ACCEL, config.disableAccel)
-            putBoolean(KEY_DISABLE_GYRO, config.disableGyro)
-            putBoolean(KEY_DISABLE_MAGNETIC, config.disableMagnetic)
             putString(KEY_PRECISION_BY_SENSOR_TYPE, precisionJson.toString())
             putString(KEY_SENSOR_ENTRIES, entriesArray.toString())
             putString(KEY_VENDOR_REPLACEMENT, config.vendorReplacement)
