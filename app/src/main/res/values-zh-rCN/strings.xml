@@ -5,7 +5,13 @@
 
     <string name="nav_home">首页</string>
     <string name="nav_settings">设置</string>
-    <string name="nav_user">用户</string>
+    <string name="nav_about">关于</string>
+    <string name="about_version_title">版本 %s</string>
+    <string name="about_developer_title">开发者</string>
+    <string name="about_developer_name">dddqmmx</string>
+    <string name="about_license_title">许可证</string>
+    <string name="about_license_type">MIT 许可证</string>
+    <string name="about_security_commitment">隐私：应用不具备联网权限</string>
     <string name="title_language">语言</string>
 
     <string name="status_title">运行状态</string>
@@ -206,7 +212,7 @@
     <string name="init_risk_item_kernel">基带或内核被篡改</string>
     <string name="init_risk_item_root">Root 权限被恶意程序控制</string>
 
-    <!-- UserFragment -->
+    <!-- AboutFragment -->
     <string name="user_region_title">地区</string>
 
     <string name="permission_allow">允许</string>

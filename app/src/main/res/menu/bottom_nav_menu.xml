@@ -9,7 +9,7 @@
         android:icon="@drawable/ic_setting"
         android:title="@string/nav_settings" />
     <item
-        android:id="@+id/nav_user"
-        android:icon="@drawable/ic_user"
-        android:title="@string/nav_user" />
+        android:id="@+id/nav_about"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:title="@string/nav_about" />
 </menu>

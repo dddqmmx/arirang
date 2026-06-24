@@ -3,7 +3,7 @@ package asia.nana7mi.arirang.ui.activity
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.ui.fragment.HomeFragment
 import asia.nana7mi.arirang.ui.fragment.SettingsFragment
-import asia.nana7mi.arirang.ui.fragment.UserFragment
+import asia.nana7mi.arirang.ui.fragment.AboutFragment
 import android.os.Bundle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -22,7 +22,7 @@ class MainActivity : BaseActivity() {
             val selectedFragment = when (item.itemId) {
                 R.id.nav_home -> HomeFragment()
                 R.id.nav_settings -> SettingsFragment()
-                R.id.nav_user -> UserFragment()
+                R.id.nav_about -> AboutFragment()
                 else -> null
             }
             selectedFragment?.let {
