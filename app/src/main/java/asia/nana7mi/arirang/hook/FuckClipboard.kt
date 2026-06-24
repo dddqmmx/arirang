@@ -17,6 +17,8 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             "com.android.shell",
             "asia.nana7mi.arirang"
         )
+        
+        val pendingUids = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
     }
 
     private fun hookClipboard(targetClass: Class<*>) {
@@ -31,10 +33,15 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
             if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
 
-            val allowed = ArirangClient.requestClipboardReadAccess(callingPackage, uid, userId)
-            if (!allowed) {
-                HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
-                result = null
+            pendingUids.add(uid)
+            try {
+                val allowed = ArirangClient.requestClipboardReadAccess(callingPackage, uid, userId)
+                if (!allowed) {
+                    HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
+                    result = null
+                }
+            } finally {
+                pendingUids.remove(uid)
             }
         }
 
@@ -47,6 +54,30 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
         return false
     }
 
+    private fun hookAnrExemption(classLoader: ClassLoader) {
+        val hookCallback = object : de.robv.android.xposed.XC_MethodHook() {
+            override fun beforeHookedMethod(param: MethodHookParam) {
+                val uid = runCatching { XposedHelpers.getIntField(param.thisObject, "uid") }
+                    .recoverCatching { XposedHelpers.getIntField(param.thisObject, "mUid") }
+                    .getOrNull()
+
+                if (uid != null && pendingUids.contains(uid)) {
+                    HookLog.i(HookLog.Module.CLIPBOARD, "Bypassing ANR for uid $uid via isDebugging spoof")
+                    param.result = true
+                }
+            }
+        }
+
+        runCatching {
+            val processRecordClass = XposedHelpers.findClass("com.android.server.am.ProcessRecord", classLoader)
+            XposedBridge.hookAllMethods(processRecordClass, "isDebugging", hookCallback)
+        }
+        runCatching {
+            val wpcClass = XposedHelpers.findClass("com.android.server.wm.WindowProcessController", classLoader)
+            XposedBridge.hookAllMethods(wpcClass, "isDebugging", hookCallback)
+        }
+    }
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
             val clipboardService = XposedHelpers.findClass("com.android.server.clipboard.ClipboardService", lpparam.classLoader)
@@ -55,6 +86,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
                 lpparam.classLoader
             )
             hookClipboard(clipboardImpl ?: clipboardService)
+            hookAnrExemption(lpparam.classLoader)
             HookLog.i(HookLog.Module.CLIPBOARD, "hooked")
         }.onFailure {
             HookLog.e(HookLog.Module.CLIPBOARD, "hook failed", it)

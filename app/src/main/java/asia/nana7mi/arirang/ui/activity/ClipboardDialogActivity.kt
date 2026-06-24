@@ -55,7 +55,7 @@ class ConfirmDialogActivity : ComponentActivity() {
 
         val pkgName = intent.getStringExtra("pkg_name") ?: "Unknown"
         val appName = resolveAppName(pkgName)
-        val timeoutMs = intent.getLongExtra("timeout_ms", 2500L)
+        val timeoutMs = intent.getLongExtra("timeout_ms", 10000L)
         val receiver = getResultReceiver()
 
         setContent {

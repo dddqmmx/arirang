@@ -24,8 +24,8 @@ class ClipboardController(private val context: Context) {
 
     companion object {
         private const val PER_USER_RANGE = 100_000
-        private const val DEFAULT_TIMEOUT_MS = 2500L
-        private const val MAX_TIMEOUT_MS = 3000L
+        private const val DEFAULT_TIMEOUT_MS = 10000L
+        private const val MAX_TIMEOUT_MS = 10000L
         private const val MAX_PENDING_REQUESTS = 8
         private const val LATE_DECISION_GRACE_MS = 15_000L
     }

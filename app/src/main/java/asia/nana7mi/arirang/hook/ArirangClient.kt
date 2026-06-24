@@ -50,7 +50,7 @@ object ArirangClient {
     private const val BIND_WAIT_MS = 300L
 
     /** 默认请求授权等待时间 */
-    private const val DEFAULT_REQUEST_TIMEOUT_MS = 2500L
+    private const val DEFAULT_REQUEST_TIMEOUT_MS = 10000L
 
     /** 配置远程读取的本地缓存时间，避免热路径频繁 Binder 调用 */
     private const val CONFIG_CACHE_TTL_MS = 300L
@@ -262,7 +262,7 @@ object ArirangClient {
                     pkgName,
                     uid,
                     userId,
-                    timeoutMs.coerceIn(200L, 3000L)
+                    timeoutMs.coerceIn(200L, 10000L)
                 ) == RESULT_ALLOW
             }
 
