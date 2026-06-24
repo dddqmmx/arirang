@@ -1,6 +1,5 @@
 package asia.nana7mi.arirang.selfcheck.util
 
-import android.util.Log
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -44,5 +43,23 @@ object CheckUtils {
         if (this == null) return "null"
         if (isBlank()) return "blank(len=$length)"
         return if (length <= 4) "len=$length,value=$this" else "len=$length,tail=${takeLast(4)}"
+    }
+
+    fun visibleListResult(
+        values: List<String>,
+        visibleStatus: String,
+        emptyText: String,
+        context: android.content.Context
+    ): asia.nana7mi.arirang.selfcheck.model.CheckResult {
+        val filtered = values.filter { it.isNotBlank() }
+        return asia.nana7mi.arirang.selfcheck.model.CheckResult(
+            if (filtered.isEmpty()) asia.nana7mi.arirang.selfcheck.model.CheckState.BLOCKED else asia.nana7mi.arirang.selfcheck.model.CheckState.VISIBLE,
+            if (filtered.isEmpty()) context.getString(asia.nana7mi.arirang.selfcheck.R.string.self_check_status_not_visible) else visibleStatus,
+            if (filtered.isEmpty()) emptyText else filtered.joinToString("\n")
+        )
+    }
+
+    fun Exception.readableMessage(): String {
+        return message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
     }
 }

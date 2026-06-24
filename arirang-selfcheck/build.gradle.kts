@@ -5,6 +5,11 @@ plugins {
 }
 
 val selfCheckApplicationId = "asia.nana7mi.arirang.selfcheck"
+val arirangApplicationId = rootProject.extra["arirangApplicationId"] as String
+val arirangSubmoduleConfigDir = rootProject.extra["arirangSubmoduleConfigDir"] as String
+val arirangSubmoduleConfigFile = rootProject.extra["arirangSubmoduleConfigFile"] as String
+
+fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 configure<ApplicationExtension> {
     namespace = selfCheckApplicationId
@@ -17,6 +22,9 @@ configure<ApplicationExtension> {
         versionCode = 2
         versionName = "0.3.1-experimental"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "TARGET_PACKAGE_NAME", buildConfigString(arirangApplicationId))
+        buildConfigField("String", "SUBMODULE_CONFIG_DIR", buildConfigString(arirangSubmoduleConfigDir))
+        buildConfigField("String", "SUBMODULE_CONFIG_FILE", buildConfigString(arirangSubmoduleConfigFile))
     }
 
     @Suppress("UnstableApiUsage")

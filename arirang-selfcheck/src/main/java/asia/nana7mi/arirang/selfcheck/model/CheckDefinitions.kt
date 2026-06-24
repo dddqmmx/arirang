@@ -4,6 +4,8 @@ import android.hardware.Sensor
 import java.util.UUID
 
 object CheckDefinitions {
+    const val PHONE_DIAG_TAG = "Arirang/SelfCheckPhoneDiag"
+
     val SENSOR_TYPES = linkedMapOf(
         Sensor.TYPE_ACCELEROMETER to "Accelerometer",
         Sensor.TYPE_GYROSCOPE to "Gyroscope",
@@ -84,5 +86,14 @@ object CheckDefinitions {
         "bluetooth_name",
         "bluetooth_address",
         "android_id"
+    )
+
+    val REQUIRED_PERMISSIONS = listOf(
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.READ_PHONE_STATE,
+        android.Manifest.permission.READ_PHONE_NUMBERS,
+        android.Manifest.permission.GET_ACCOUNTS,
+        android.Manifest.permission.BLUETOOTH_CONNECT,
+        android.Manifest.permission.NEARBY_WIFI_DEVICES
     )
 }
