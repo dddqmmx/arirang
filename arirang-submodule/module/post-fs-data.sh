@@ -155,7 +155,37 @@ if [ "$ENABLED" = "true" ]; then
         [ -n "$MODEL" ] && resetprop ro.product.model "$MODEL" && resetprop ro.product.vendor.model "$MODEL" && resetprop ro.product.system.model "$MODEL" && resetprop ro.product.odm.model "$MODEL"
         [ -n "$DEVICE" ] && resetprop ro.product.device "$DEVICE" && resetprop ro.product.vendor.device "$DEVICE"
         [ -n "$PRODUCT" ] && resetprop ro.product.name "$PRODUCT" && resetprop ro.product.vendor.name "$PRODUCT"
-        [ -n "$BOARD" ] && resetprop ro.product.board "$BOARD" && resetprop ro.board.platform "$BOARD"
+        # Keep the vendor audio HAL working while ro.board.platform is spoofed,
+        # WITHOUT exposing any platform-revealing property. When ro.board.platform
+        # is faked, libhardware's hw_get_module() can't find
+        # audio.primary.<fake>.so and falls back to audio.primary.default.so, which
+        # is only a stub -> the volume_listener effect then logs
+        # "gain_dep_calibration: service not registered" and the speaker is silent.
+        # We bind-mount the REAL platform HAL over that default stub (the same
+        # bind-over-existing-file trick used for the DRM hook), so the fallback
+        # loads the real driver and its ACDB/gain calibration registers. Apps see
+        # only the spoofed ro.board.platform; nothing exposes the real platform
+        # (unlike ro.hardware.audio.primary, which apps can read as
+        # exported_default_prop). The real platform name comes from the read-only
+        # vendor prop file, and the bind persists across audio HAL restarts.
+        if [ -n "$BOARD" ]; then
+            REAL_PLATFORM=$(grep -m1 '^ro\.board\.platform=' /vendor/build.prop 2>/dev/null | cut -d= -f2)
+            if [ -n "$REAL_PLATFORM" ] && [ "$REAL_PLATFORM" != "$BOARD" ]; then
+                for hwdir in /vendor/lib64/hw /vendor/lib/hw; do
+                    real_so="$hwdir/audio.primary.$REAL_PLATFORM.so"
+                    stub_so="$hwdir/audio.primary.default.so"
+                    if [ -f "$real_so" ] && [ -f "$stub_so" ]; then
+                        if mount --bind "$real_so" "$stub_so"; then
+                            log -p i -t arirang_post_fs_data "audio HAL: bound $REAL_PLATFORM over default in $hwdir"
+                        else
+                            log -p e -t arirang_post_fs_data "audio HAL: bind failed in $hwdir"
+                        fi
+                    fi
+                done
+            fi
+            resetprop ro.product.board "$BOARD"
+            resetprop ro.board.platform "$BOARD"
+        fi
         [ -n "$HARDWARE" ] && resetprop ro.hardware "$HARDWARE"
         [ -n "$FINGERPRINT" ] && {
             resetprop ro.build.fingerprint "$FINGERPRINT"
