@@ -57,9 +57,13 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
     private fun hookAnrExemption(classLoader: ClassLoader) {
         val hookCallback = object : de.robv.android.xposed.XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
-                val uid = runCatching { XposedHelpers.getIntField(param.thisObject, "uid") }
-                    .recoverCatching { XposedHelpers.getIntField(param.thisObject, "mUid") }
-                    .getOrNull()
+                val uid = runCatching {
+                    if (param.thisObject.javaClass.simpleName == "ProcessRecord") {
+                        XposedHelpers.getIntField(param.thisObject, "uid")
+                    } else {
+                        XposedHelpers.getIntField(param.thisObject, "mUid")
+                    }
+                }.getOrNull()
 
                 if (uid != null && pendingUids.contains(uid)) {
                     HookLog.i(HookLog.Module.CLIPBOARD, "Bypassing ANR for uid $uid via isDebugging spoof")
