@@ -67,7 +67,7 @@ object SensorConfigPrefs {
         val precisionBySensorType: Map<Int, Int> = emptyMap(),
         val sensorEntries: List<SensorEntry> = emptyList(),
         val vendorReplacement: String = "",
-        val vendorKeywords: String = "xiaomi, qti, qualcomm, samsung, huawei, oppo, vivo, oneplus, meizu, motorola, lenovo, asus, sony, mediatek, mtk, spreadtrum, unisoc, realme, nothing, google"
+        val vendorKeywords: String = ""
     )
 
     fun loadConfig(context: Context): Config {
@@ -99,7 +99,7 @@ object SensorConfigPrefs {
             precisionBySensorType = precisionMap,
             sensorEntries = entries,
             vendorReplacement = prefs.getString(KEY_VENDOR_REPLACEMENT, null) ?: "",
-            vendorKeywords = prefs.getString(KEY_VENDOR_KEYWORDS, null) ?: "xiaomi, qti, qualcomm, samsung, huawei, oppo, vivo, oneplus, meizu, motorola, lenovo, asus, sony, mediatek, mtk, spreadtrum, unisoc, realme, nothing, google"
+            vendorKeywords = prefs.getString(KEY_VENDOR_KEYWORDS, null) ?: ""
         )
     }
 
