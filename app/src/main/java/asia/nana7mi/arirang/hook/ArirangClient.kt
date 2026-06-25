@@ -49,9 +49,6 @@ object ArirangClient {
     /** getOrBind 时最大等待连接时间 */
     private const val BIND_WAIT_MS = 300L
 
-    /** 默认请求授权等待时间 */
-    private const val DEFAULT_REQUEST_TIMEOUT_MS = 10000L
-
     /** 配置远程读取的本地缓存时间，避免热路径频繁 Binder 调用 */
     private const val CONFIG_CACHE_TTL_MS = 300L
 
@@ -239,8 +236,7 @@ object ArirangClient {
     fun requestClipboardReadAccess(
         pkgName: String,
         uid: Int,
-        userId: Int,
-        timeoutMs: Long = DEFAULT_REQUEST_TIMEOUT_MS
+        userId: Int
     ): Boolean {
 
         val ctx = getSystemContext()
@@ -256,13 +252,11 @@ object ArirangClient {
         }
 
         return try {
-            // 限制 timeout 范围，避免滥用
             withCleanCallingIdentity {
                 service.requestClipboardRead(
                     pkgName,
                     uid,
-                    userId,
-                    timeoutMs.coerceIn(200L, 10000L)
+                    userId
                 ) == RESULT_ALLOW
             }
 

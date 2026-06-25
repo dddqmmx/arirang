@@ -33,7 +33,7 @@ class ArirangService : Service() {
     }
 
     private val binder = object : IArirangService.Stub() {
-        override fun requestClipboardRead(pkgName: String, uid: Int, userId: Int, timeoutMs: Long): Int {
+        override fun requestClipboardRead(pkgName: String, uid: Int, userId: Int): Int {
             val normalizedPkgName = pkgName.trim()
             val callingUid = getCallingUid()
             
@@ -50,7 +50,7 @@ class ArirangService : Service() {
                 return ClipboardAccessDecision.DENY.value
             }
 
-            return clipboardController.handleClipboardRequest(userId, normalizedPkgName, timeoutMs).value
+            return clipboardController.handleClipboardRequest(userId, normalizedPkgName).value
         }
 
         override fun onPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {

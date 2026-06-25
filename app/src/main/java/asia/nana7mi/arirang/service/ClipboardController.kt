@@ -77,7 +77,7 @@ class ClipboardController(private val context: Context) {
         }
     }
 
-    fun handleClipboardRequest(userId: Int, pkgName: String, timeoutMs: Long): ClipboardAccessDecision {
+    fun handleClipboardRequest(userId: Int, pkgName: String): ClipboardAccessDecision {
         if (!isFeatureEnabled) return ClipboardAccessDecision.ALLOW
 
         val policyKey = ClipboardPromptPrefs.scopedPolicyId(userId, pkgName)
@@ -97,15 +97,14 @@ class ClipboardController(private val context: Context) {
         pendingRequests[requestId] = pending
 
         val receiver = buildDecisionReceiver(requestId, userId, pkgName)
-        val effectiveTimeout = timeoutMs.coerceIn(200L, MAX_TIMEOUT_MS)
 
         mainHandler.post {
-            launchDialog(pkgName, receiver, effectiveTimeout)
+            launchDialog(pkgName, receiver, DEFAULT_TIMEOUT_MS)
         }
 
         return try {
             val completed = pending.latch.await(
-                if (effectiveTimeout > 0L) effectiveTimeout else DEFAULT_TIMEOUT_MS,
+                DEFAULT_TIMEOUT_MS,
                 TimeUnit.MILLISECONDS
             )
             if (!completed) {

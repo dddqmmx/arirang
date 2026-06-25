@@ -65,7 +65,7 @@ class TestActivity : AppCompatActivity() {
             thread {
                 try {
                     // This is a blocking call if it goes to ArirangService which waits for latch
-                    val decision = notify.requestClipboardRead(packageName, 10000, 0, 15000L)
+                    val decision = notify.requestClipboardRead(packageName, 10000, 0)
                     val resultResId = if (decision == 1) {
                         R.string.result_allow
                     } else {
