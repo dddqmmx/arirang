@@ -7,6 +7,7 @@ import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
+import asia.nana7mi.arirang.data.datastore.PackageVisibilityPrefs
 
 class ConfigProvider(private val context: Context) {
 
@@ -17,6 +18,7 @@ class ConfigProvider(private val context: Context) {
         private const val CONFIG_WIFI = "wifi"
         private const val CONFIG_BLUETOOTH = "bluetooth"
         private const val CONFIG_LOCATION = "location"
+        private const val CONFIG_PACKAGE_LIST = "package_list"
     }
 
     private data class HookConfigSource(
@@ -33,7 +35,8 @@ class ConfigProvider(private val context: Context) {
         CONFIG_HOOK_LOG to HookConfigSource(HookLogSettings::lastModified, HookLogSettings::buildHookSnapshot),
         CONFIG_WIFI to HookConfigSource(WifiConfigPrefs::lastModified, WifiConfigPrefs::buildHookSnapshot),
         CONFIG_BLUETOOTH to HookConfigSource(BluetoothConfigPrefs::lastModified, BluetoothConfigPrefs::buildHookSnapshot),
-        CONFIG_LOCATION to HookConfigSource(LocationConfigPrefs::lastModified, LocationConfigPrefs::buildHookSnapshot)
+        CONFIG_LOCATION to HookConfigSource(LocationConfigPrefs::lastModified, LocationConfigPrefs::buildHookSnapshot),
+        CONFIG_PACKAGE_LIST to HookConfigSource(PackageVisibilityPrefs::lastModified, PackageVisibilityPrefs::buildHookSnapshot)
     )
 
     fun readConfigVersion(configName: String): Long {

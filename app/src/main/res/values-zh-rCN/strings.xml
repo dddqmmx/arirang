@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Arirang</string>
     <string name="title_activity_clipboard_setting">剪切板设置</string>
@@ -73,7 +74,7 @@
 
     <string name="title_activity_init">初始化</string>
 
-    <!-- Newly extracted strings -->
+    
     <string name="refresh_all_data">刷新所有数据</string>
     <string name="native_android_api">Native Android API</string>
     <string name="native_cache_waiting">原生(缓存): 等待中...</string>
@@ -190,7 +191,7 @@
     <string name="bluetooth_scan_result_title">周边设备 %1$d</string>
     <string name="bluetooth_apply_defaults">应用默认值</string>
 
-    <!-- InitActivity Adaptation -->
+    
     <string name="init_select_language">选择语言</string>
     <string name="init_select_region">选择地区</string>
     <string name="init_welcome_title">欢迎使用</string>
@@ -212,7 +213,7 @@
     <string name="init_risk_item_kernel">基带或内核被篡改</string>
     <string name="init_risk_item_root">Root 权限被恶意程序控制</string>
 
-    <!-- AboutFragment -->
+    
     <string name="user_region_title">地区</string>
 
     <string name="permission_allow">允许</string>
@@ -251,7 +252,7 @@
     <string name="clear_all">全部取消</string>
     <string name="invert_selection">反选</string>
 
-    <!-- Confirm Dialog -->
+    
     <string name="clipboard_access_warning">剪贴板访问警告</string>
     <string name="clipboard_access_desc">这个应用正在尝试读取剪贴板</string>
     <string name="allow_once">允许一次</string>
@@ -259,7 +260,7 @@
     <string name="always_deny">始终拒绝</string>
     <string name="this_deny_close">本次拒绝</string>
 
-    <!-- Test Activity -->
+    
     <string name="test_dialog_title">测试弹窗功能</string>
     <string name="test_dialog_desc">点击下方按钮可以在前台或者延时在后台弹出交互弹窗进行测试</string>
     <string name="test_dialog_foreground">前台测试弹窗</string>
@@ -377,5 +378,6 @@
     <string name="sensor_type_magnetic_field">磁场传感器</string>
     <string name="sensor_type_gravity">重力传感器</string>
     <string name="sensor_type_linear_acceleration">线性加速度传感器</string>
-</resources>
-
+    
+    <string name="feature_app_list">应用列表</string>
+    </resources>

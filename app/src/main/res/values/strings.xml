@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Arirang</string>
     <string name="title_activity_clipboard_setting">Clipboard Settings</string>
@@ -78,7 +79,7 @@
 
     <string name="title_activity_init">Initialization</string>
 
-    <!-- Newly extracted strings -->
+    
     <string name="refresh_all_data">Refresh All Data</string>
     <string name="native_android_api">Native Android API</string>
     <string name="native_cache_waiting">Native (Cache): Waiting...</string>
@@ -197,7 +198,7 @@
     <string name="bluetooth_scan_result_title">Nearby Device %1$d</string>
     <string name="bluetooth_apply_defaults">Apply defaults</string>
 
-    <!-- InitActivity Adaptation -->
+    
     <string name="init_select_language">Select Language</string>
     <string name="init_select_region">Select Region</string>
     <string name="init_welcome_title">Welcome</string>
@@ -256,7 +257,7 @@
     <string name="clear_all">Clear All</string>
     <string name="invert_selection">Invert Selection</string>
 
-    <!-- Confirm Dialog -->
+    
     <string name="clipboard_access_warning">Clipboard Access Warning</string>
     <string name="clipboard_access_desc">This app is accessing the clipboard</string>
     <string name="allow_once">Allow Once</string>
@@ -264,7 +265,7 @@
     <string name="always_deny">Always Deny</string>
     <string name="this_deny_close">Deny Once</string>
 
-    <!-- Test Activity -->
+    
     <string name="test_dialog_title">Test Dialog Functionality</string>
     <string name="test_dialog_desc">Click the buttons below to test interaction popups in the foreground or delayed in the background</string>
     <string name="test_dialog_foreground">Foreground Test Dialog</string>
@@ -378,5 +379,6 @@
     <string name="sensor_type_magnetic_field">Magnetic Field</string>
     <string name="sensor_type_gravity">Gravity</string>
     <string name="sensor_type_linear_acceleration">Linear Acceleration</string>
-</resources>
-
+    
+    <string name="feature_app_list">App List</string>
+    </resources>
