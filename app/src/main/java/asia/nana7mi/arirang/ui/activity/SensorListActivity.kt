@@ -184,7 +184,7 @@ class SensorListActivity : ComponentActivity() {
                             )
                             OutlinedTextField(
                                 value = config.vendorKeywords,
-                                onValueChange = { config = config.copy(vendorKeywords = it) },
+                                onValueChange = { config = config.copy(vendorKeywords = it.replace(" ", "")) },
                                 label = { Text(stringResource(R.string.sensor_vendor_keywords_hint)) },
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -196,15 +196,15 @@ class SensorListActivity : ComponentActivity() {
                             )
                             OutlinedTextField(
                                 value = config.vendorReplacement,
-                                onValueChange = { config = config.copy(vendorReplacement = it) },
+                                onValueChange = { config = config.copy(vendorReplacement = it.replace(" ", "")) },
                                 label = { Text(stringResource(R.string.sensor_vendor_replace_hint)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             FilledTonalButton(
                                 onClick = {
-                                    val replacement = config.vendorReplacement
-                                    val keywords = config.vendorKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                    val replacement = config.vendorReplacement.replace(" ", "")
+                                    val keywords = config.vendorKeywords.split(",").map { it.replace(" ", "") }.filter { it.isNotEmpty() }
                                     val updated = config.sensorEntries.map { entry ->
                                         entry.copy(
                                             vendor = SensorConfigPrefs.applyCaseAwareReplace(entry.vendor, replacement, keywords),
