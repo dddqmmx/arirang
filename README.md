@@ -20,7 +20,7 @@ The goal of this design is to:
 Arirang provides a native Zygisk extension module named
 `arirang-submodule`.
 
-This submodule is a required beta-stage native capability extension for
+This submodule is a native capability extension for
 implementing functionality that cannot be achieved reliably through the
 LSPosed module or framework-level Java hooks alone.
 
@@ -99,8 +99,13 @@ Use at your own risk.
   Configure one or more nearby Wi-Fi scan result SSID/BSSID pairs, or return an empty scan list.
   Allows customizing or hiding nearby Wi-Fi network information exposed to applications.
 
-- **Package List Management (In Development)**  
+- **Package List Management (In Experimental)**  
   Hide installed applications (Invisible / Whitelist modes).
+
+- **Sensor List Management (Experimental)**
+  Configure the sensor list exposed to applications by hiding or rewriting selected
+  sensors, and reduce the reported precision of supported sensor data to limit
+  fingerprinting and improve privacy.
 
 - **Hook Log Controls (Available)**  
   Enable or disable LSPosed log output per hook module, including core, clipboard,
@@ -143,7 +148,7 @@ Use at your own risk.
 
 ## 📦 Installation
 
-1. Install the latest `Arirang` APK  
+1. Install the latest `Arirang` APK and `arirang-submodule`
 2. Optional: install the latest `Arirang Self-Check` APK if you want to verify
    what information ordinary apps can see after hooks are enabled.
 3. Open your Xposed Manager (e.g., LSPosed)  
@@ -152,10 +157,6 @@ Use at your own risk.
    - System / Android framework (required)
    - `com.android.phone`
    - `com.google.android.gms`
-
-#### Install `arirang-submodule` (Required for Native Features)
-
-Some native framework fallback features require the Zygisk helper module.
 
 1. Download `arirang-submodule.zip`
 2. Flash the ZIP through:
