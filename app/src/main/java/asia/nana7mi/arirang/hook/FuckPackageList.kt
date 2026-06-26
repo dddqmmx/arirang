@@ -50,6 +50,21 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     }
 
     private val pmHooked = AtomicBoolean(false)
+    private val isInternalCall = ThreadLocal<Boolean>()
+
+    private inline fun <T> withInternalCall(block: () -> T): T {
+        val previous = isInternalCall.get()
+        isInternalCall.set(true)
+        return try {
+            block()
+        } finally {
+            if (previous == null) {
+                isInternalCall.remove()
+            } else {
+                isInternalCall.set(previous)
+            }
+        }
+    }
 
     private fun findDeclaringClass(clazz: Class<*>, methodName: String, vararg parameterTypes: Class<*>): Class<*>? {
         var current: Class<*>? = clazz
@@ -107,6 +122,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "getInstalledApplications",
             Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "getInstalledApplications") { item ->
                     (item as? ApplicationInfo)?.packageName
                 }
@@ -118,6 +134,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "getInstalledPackages",
             Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "getInstalledPackages") { item ->
                     (item as? PackageInfo)?.packageName
                 }
@@ -129,13 +146,21 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "getPackageInfo",
             String::class.java, Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             beforeHookedMethod {
-                val packageName = args[0] as? String ?: return@beforeHookedMethod
-                config.loadIfUpdated()
-                val callingUid = Binder.getCallingUid()
-                if (!config.shouldKeepForUid(callingUid, packageName)) {
-                    val callingPackages = config.getPackagesForUid(callingUid)
-                    XposedBridge.log("Arirang/package_list/D: Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
-                    result = null
+                runCatching {
+                    if (isInternalCall.get() == true) return@beforeHookedMethod
+                    val packageName = args[0] as? String ?: return@beforeHookedMethod
+                    val callingUid = Binder.getCallingUid()
+                    if (callingUid < 10000) return@beforeHookedMethod
+                    config.loadIfUpdated()
+                    if (!config.enabled) return@beforeHookedMethod
+
+                    val callingPackages = getPackagesForUid(this.thisObject, callingUid)
+                    if (!config.shouldKeepForPackages(callingUid, callingPackages, packageName)) {
+                        XposedBridge.log("Arirang/package_list/D: Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
+                        result = null
+                    }
+                }.onFailure {
+                    XposedBridge.log("Arirang/package_list/E: getPackageInfo hook failed: ${it.message}")
                 }
             }
         )
@@ -145,6 +170,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "queryIntentActivities",
             Intent::class.java, String::class.java, Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "queryIntentActivities") { item ->
                     val resolveInfo = item as? ResolveInfo ?: return@filterParceledListSlice null
                     runCatching {
@@ -166,6 +192,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "queryIntentReceivers",
             Intent::class.java, String::class.java, Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "queryIntentReceivers") { item ->
                     val resolveInfo = item as? ResolveInfo ?: return@filterParceledListSlice null
                     runCatching {
@@ -181,6 +208,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "queryIntentServices",
             Intent::class.java, String::class.java, Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "queryIntentServices") { item ->
                     val resolveInfo = item as? ResolveInfo ?: return@filterParceledListSlice null
                     runCatching {
@@ -196,6 +224,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             pmImplClass, "queryIntentContentProviders",
             Intent::class.java, String::class.java, Long::class.javaPrimitiveType !!, Int::class.javaPrimitiveType !!,
             afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "queryIntentContentProviders") { item ->
                     val providerInfo = item as? ProviderInfo
                         ?: XposedHelpers.getObjectField(item, "providerInfo") as? ProviderInfo
@@ -206,6 +235,117 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 }
             }
         )
+
+        // 8. Hook getPackagesForUid
+        hookMethodIfExists(
+            pmImplClass, "getPackagesForUid",
+            Int::class.javaPrimitiveType !!,
+            afterHookedMethod {
+                runCatching {
+                    if (isInternalCall.get() == true) return@afterHookedMethod
+                    val pkgs = result as? Array<*> ?: return@afterHookedMethod
+                    val callingUid = Binder.getCallingUid()
+                    if (callingUid < 10000) return@afterHookedMethod
+                    config.loadIfUpdated()
+                    if (!config.enabled) return@afterHookedMethod
+
+                    val targetUid = args[0] as Int
+                    val targetPackages = pkgs.mapNotNull { it as? String }
+                    val callingPackages = if (targetUid == callingUid) {
+                        targetPackages
+                    } else {
+                        getPackagesForUid(this.thisObject, callingUid)
+                    }
+
+                    val filtered = targetPackages.filter { pkg ->
+                        val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
+                            isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
+                        if (!keep) {
+                            XposedBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in getPackagesForUid")
+                        }
+                        keep
+                    }.toTypedArray()
+
+                    if (filtered.size != pkgs.size) {
+                        result = if (filtered.isEmpty()) null else filtered
+                    }
+                }.onFailure {
+                    XposedBridge.log("Arirang/package_list/E: getPackagesForUid hook failed: ${it.message}")
+                }
+            }
+        )
+
+        // 9. Hook getNameForUid
+        hookMethodIfExists(
+            pmImplClass, "getNameForUid",
+            Int::class.javaPrimitiveType !!,
+            afterHookedMethod {
+                runCatching {
+                    if (isInternalCall.get() == true) return@afterHookedMethod
+                    val targetUid = args[0] as Int
+                    val name = result as? String ?: return@afterHookedMethod
+                    val callingUid = Binder.getCallingUid()
+                    if (callingUid < 10000 || targetUid == callingUid) return@afterHookedMethod
+                    config.loadIfUpdated()
+                    if (!config.enabled) return@afterHookedMethod
+
+                    val targetPackages = getPackagesForUid(this.thisObject, targetUid)
+                    val callingPackages = getPackagesForUid(this.thisObject, callingUid)
+                    val visibleTargetPackages = if (targetPackages.isEmpty()) {
+                        listOf(name).filter { pkg ->
+                            config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
+                                isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
+                        }
+                    } else {
+                        targetPackages.filter { pkg ->
+                            config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
+                                isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
+                        }
+                    }
+
+                    if (visibleTargetPackages.isEmpty()) {
+                        XposedBridge.log("Arirang/package_list/D: Filtered name '$name' for caller ${callingPackages.firstOrNull() ?: callingUid} in getNameForUid")
+                        result = null
+                    } else {
+                        result = visibleTargetPackages.first()
+                    }
+                }.onFailure {
+                    XposedBridge.log("Arirang/package_list/E: getNameForUid hook failed: ${it.message}")
+                }
+            }
+        )
+
+        // 10. Hook queryContentProviders
+        hookMethodIfExists(
+            pmImplClass, "queryContentProviders",
+            String::class.java, Int::class.javaPrimitiveType !!, Long::class.javaPrimitiveType !!, String::class.java,
+            afterHookedMethod {
+                if (isInternalCall.get() == true) return@afterHookedMethod
+                filterParceledListSlice(this, "queryContentProviders") { item ->
+                    (item as? ProviderInfo)?.packageName
+                }
+            }
+        )
+    }
+
+    private fun getPackagesForUid(pmObject: Any, uid: Int): List<String> {
+        if (uid <= 0) return emptyList()
+        return withInternalCall {
+            runCatching {
+                (XposedHelpers.callMethod(pmObject, "getPackagesForUid", uid) as? Array<*>)
+                    ?.mapNotNull { it as? String }
+                    .orEmpty()
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    private fun isInstalledPackageForCaller(pmObject: Any, callingUid: Int, packageName: String): Boolean {
+        val userId = callingUid / 100000
+        return withInternalCall {
+            runCatching {
+                XposedHelpers.callMethod(pmObject, "getPackageInfo", packageName, 0L, userId) != null
+            }.getOrDefault(true)
+        }
     }
 
     private fun filterParceledListSlice(
@@ -213,27 +353,48 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         methodName: String,
         getPackageName: (Any) -> String?
     ) {
-        val parceledListSlice = param.result ?: return
-        val list = XposedHelpers.callMethod(parceledListSlice, "getList") as? List<*> ?: return
-        
-        config.loadIfUpdated()
-        if (!config.enabled) return
+        runCatching {
+            val parceledListSlice = param.result ?: return
+            val list = XposedHelpers.callMethod(parceledListSlice, "getList") as? List<*> ?: return
 
-        val callingUid = Binder.getCallingUid()
-        val callingPackages = config.getPackagesForUid(callingUid)
-        val filtered = list.filter { item ->
-            if (item == null) return@filter false
-            val pkg = getPackageName(item) ?: return@filter true
-            val keep = config.shouldKeepForUid(callingUid, pkg)
-            if (!keep) {
-                XposedBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
+            val callingUid = Binder.getCallingUid()
+            if (callingUid < 10000) return
+
+            config.loadIfUpdated()
+            if (!config.enabled) return
+
+            val callingPackages = getPackagesForUid(param.thisObject, callingUid)
+            val filtered = list.filter { item ->
+                if (item == null) return@filter false
+                val pkg = getPackageName(item) ?: return@filter true
+                val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg)
+                if (!keep) {
+                    XposedBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
+                }
+                keep
             }
-            keep
+            param.result = XposedHelpers.newInstance(parceledListSlice.javaClass, filtered)
+        }.onFailure {
+            XposedBridge.log("Arirang/package_list/E: $methodName hook failed: ${it.message}")
         }
-        param.result = XposedHelpers.newInstance(parceledListSlice.javaClass, filtered)
     }
 
-    private class PackageListConfig(private val prefsName: String) {
+    class Template(
+        val id: String,
+        val name: String,
+        val parentId: String?,
+        val visiblePackages: Set<String>,
+        val isBlacklist: Boolean
+    )
+
+    class AppRule(
+        val packageName: String,
+        val mode: String,
+        val templateId: String?,
+        val visiblePackages: Set<String>
+    )
+
+    private inner class PackageListConfig(private val prefsName: String) {
         var enabled = false
         private var defaultMode = "ALL_VISIBLE"
         private var defaultTemplateId: String? = null
@@ -247,26 +408,11 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             HookConfigFile.xSharedPreferences(prefsName)
         }
 
-        class Template(
-            val id: String,
-            val name: String,
-            val parentId: String?,
-            val visiblePackages: Set<String>,
-            val isBlacklist: Boolean
-        )
-
-        class AppRule(
-            val packageName: String,
-            val mode: String,
-            val templateId: String?,
-            val visiblePackages: Set<String>
-        )
-
         fun loadIfUpdated() {
             val snapshot = ArirangClient.readConfigSnapshot(
                 configName = "package_list",
                 force = false,
-                allowBind = true,
+                allowBind = false,
                 logName = "Package List"
             )
 
@@ -426,28 +572,19 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             }
         }
 
-        fun getPackagesForUid(uid: Int): List<String> {
-            if (uid <= 0) return emptyList()
-            return runCatching {
-                ArirangClient.getSystemContext()
-                    ?.packageManager
-                    ?.getPackagesForUid(uid)
-                    ?.toList()
-            }.getOrNull() ?: emptyList()
-        }
-
-        fun shouldKeepForUid(callingUid: Int, targetPackage: String): Boolean {
+        fun shouldKeepForPackages(
+            callingUid: Int,
+            callingPackages: List<String>,
+            targetPackage: String
+        ): Boolean {
             if (!enabled) return true
             if (callingUid < 10000) return true
             if (targetPackage == "android" || targetPackage == asia.nana7mi.arirang.BuildConfig.APPLICATION_ID) return true
-            
-            val callingPackages = getPackagesForUid(callingUid)
+
             if (callingPackages.isEmpty()) return true
             if (callingPackages.contains(asia.nana7mi.arirang.BuildConfig.APPLICATION_ID)) return true
-            
+
             return callingPackages.all { shouldKeep(it, targetPackage) }
         }
     }
 }
-
-
