@@ -51,18 +51,18 @@ information, sensors, and installed packages.
 
 ## ⚠️ Warning
 
-This software is in an early development stage and may cause system instability, crashes, or unexpected behavior.
+This software is **still under active development** and should be considered **unstable**. It may cause crashes, unexpected behavior, data inconsistency, or other system instability.
+
+The project is currently undergoing **manual code review and defect remediation**, but this process is **still in progress** and **does not imply that the software is stable or production-ready**.
 
 This project does **not** prohibit the use of AI-generated code.
 
-During early prototyping and experimental development, a considerable amount of code was generated or assisted by large language models (LLMs).  
-Some parts of the codebase may therefore contain:
-- Inconsistent implementations
-- Redundant abstractions
-- Experimental structures
-- Non-optimal patterns
+During early prototyping and experimental development, a considerable amount of code was generated or assisted by large language models (LLMs). As a result, parts of the codebase may still contain:
 
-As the project matures, these sections are gradually being rewritten, simplified, or replaced with manually reviewed implementations.
+* Incomplete or incorrect implementations
+* Logic defects and edge-case issues
+* Redundant or experimental structures
+* Non-optimal or inconsistent code patterns
 
 Use at your own risk.
 
