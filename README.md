@@ -148,7 +148,7 @@ Use at your own risk.
 
 ## 📦 Installation
 
-1. Install the latest `Arirang` APK and `arirang-submodule`
+1. Install the latest `Arirang` APK
 2. Optional: install the latest `Arirang Self-Check` APK if you want to verify
    what information ordinary apps can see after hooks are enabled.
 3. Open your Xposed Manager (e.g., LSPosed)  
