@@ -20,33 +20,24 @@ The goal of this design is to:
 Arirang provides a native Zygisk extension module named
 `arirang-submodule`.
 
-This submodule is a required beta-stage capability extension layer for
-functionality that cannot be reliably implemented through LSPosed or
-framework-level Java hooks alone.
+This submodule is a required beta-stage native capability extension for
+implementing functionality that cannot be achieved reliably through the
+LSPosed module or framework-level Java hooks alone.
 
-The current implementation attempts to avoid injecting hooks directly into
-applications whenever possible. Native fallback hooks are instead installed at
-the Zygote/framework boundary so child processes inherit rewritten framework
-behavior rather than receiving per-application hook installation.
+It complements the LSPosed module by providing lower-level native
+implementations where Java-layer hooks are insufficient or unavailable.
 
-However, due to current technical limitations, some features may still require
-application-side injection to function correctly.
+Depending on the feature, the submodule may be used to:
 
-Depending on the feature, the submodule may be:
-
-* Required to implement certain low-level behaviors
-* Used to strengthen spoofing consistency and anti-detection capabilities
-* Used to extend privacy protection into native framework surfaces such as
+* Implement low-level native behaviors beyond the scope of LSPosed
+* Strengthen spoofing consistency and anti-detection capabilities
+* Extend privacy protection to native framework surfaces such as
   `SystemProperties` and `MediaDrm`
 
-It is believed that this is not an unsolvable problem, and future versions may
-further reduce or completely eliminate the need for direct application
-injection as more functionality is migrated into system framework services or
-lower-level framework surfaces.
+The long-term goal is to keep higher-level functionality within the LSPosed
+module whenever practical, while using this submodule as the required native
+extension layer for capabilities that require native framework integration.
 
-The long-term goal remains to move functionality into system framework services
-where possible and keep this submodule as the deeper native fallback layer for
-surfaces that do not expose a suitable system service hook point.
 
 ## 🔎 Privacy Self-Check App
 
