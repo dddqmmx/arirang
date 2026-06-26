@@ -7,6 +7,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import asia.nana7mi.arirang.util.ZipUtils
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.system.exitProcess
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +33,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
@@ -96,6 +106,47 @@ private fun SettingsScreen(
         }
     }
 
+    val exportConfigLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    val dirsToZip = listOf(
+                        File(context.filesDir.parentFile, "shared_prefs"),
+                        context.filesDir
+                    )
+                    ZipUtils.zipFiles(dirsToZip, outputStream)
+                }
+                Toast.makeText(context, R.string.save_success, Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Export failed: ${it.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val importConfigLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val destDir = context.filesDir.parentFile ?: context.filesDir
+                    ZipUtils.unzipFiles(inputStream, destDir)
+                }
+                Toast.makeText(context, R.string.import_success_restart, Toast.LENGTH_LONG).show()
+                val packageManager = context.packageManager
+                val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+                val componentName = intent?.component
+                val mainIntent = Intent.makeRestartActivityTask(componentName)
+                context.startActivity(mainIntent)
+                exitProcess(0)
+            }.onFailure {
+                Toast.makeText(context, "Import failed: ${it.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val savedLanguage = AppPreferences.getLanguage(context) ?: "system"
     val currentLanguage = languageNames.getOrElse(languageCodes.indexOf(savedLanguage)) { savedLanguage }
 
@@ -131,6 +182,29 @@ private fun SettingsScreen(
                     summary = stringResource(R.string.advanced_settings_summary),
                     icon = Icons.Default.Settings,
                     onClick = onNavigateToAdvanced
+                )
+            }
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.backup_restore_title)) {
+                SettingCard(
+                    title = stringResource(R.string.export_config_title),
+                    summary = stringResource(R.string.export_config_summary),
+                    icon = Icons.Default.Save,
+                    onClick = {
+                        val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                        val fileName = "arirang_config_${dateFormat.format(Date())}.zip"
+                        exportConfigLauncher.launch(fileName)
+                    }
+                )
+                SettingCard(
+                    title = stringResource(R.string.import_config_title),
+                    summary = stringResource(R.string.import_config_summary),
+                    icon = Icons.Default.Restore,
+                    onClick = {
+                        importConfigLauncher.launch(arrayOf("application/zip"))
+                    }
                 )
             }
         }

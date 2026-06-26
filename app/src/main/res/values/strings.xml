@@ -72,6 +72,12 @@
     <string name="global_settings_title">Global Control</string>
     <string name="advanced_settings_title">Advanced</string>
     <string name="advanced_settings_summary">Architectural and low-level performance tweaks</string>
+    <string name="backup_restore_title">Backup &amp; Restore</string>
+    <string name="export_config_title">Export configurations</string>
+    <string name="export_config_summary">Backup application configuration files to a ZIP archive</string>
+    <string name="import_config_title">Import configurations</string>
+    <string name="import_config_summary">Restore configurations from a backup ZIP archive</string>
+    <string name="import_success_restart">Import successful. The app will now restart to apply changes.</string>
     <string name="restrict_hot_switching_title">Restrict Hot-Switching</string>
     <string name="restrict_hot_switching_summary">Only install hooks if feature is enabled at app start. Prevents background overhead but requires restart to apply changes</string>
 
