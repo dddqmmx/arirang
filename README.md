@@ -123,25 +123,6 @@ Use at your own risk.
 
 - **Multi-language Support**
   English, Simplified Chinese, and Japanese translations are included.
-
-## 📸 Screenshots
-
-| Main | Clipboard | Clipboard Dialog |
-| --- | --- | --- |
-| <img src="screenshorts/main.png" width="240" alt="Main screen"> | <img src="screenshorts/clipboard.png" width="240" alt="Clipboard protection screen"> | <img src="screenshorts/clipboard-dialog.png" width="240" alt="Clipboard confirmation dialog"> |
-
-| Device Info | SIM Mocking | Privacy Self-Check |
-| --- | --- | --- |
-| <img src="screenshorts/device.png" width="240" alt="Device info masking screen"> | <img src="screenshorts/sim.png" width="240" alt="SIM mocking screen"> | <img src="screenshorts/self-check.png" width="240" alt="Privacy self-check screen"> |
-
-| Location | Unique Identifiers | Wi-Fi |
-| --- | --- | --- |
-| <img src="screenshorts/location.png" width="240" alt="Location masking screen"> | <img src="screenshorts/unique-identifier.png" width="240" alt="Unique identifier masking screen"> | <img src="screenshorts/wifi.png" width="240" alt="Wi-Fi information masking screen"> |
-
-| Settings |
-| --- |
-| <img src="screenshorts/setting.png" width="240" alt="Settings screen"> |
-
 ## 🛠 Requirements
 
 - Rooted Android device
@@ -173,3 +154,21 @@ Use at your own risk.
 ## 🤝 Contributing
 
 Contributions, issues, and feature requests are welcome.
+
+## 📸 Screenshots
+
+| Main | Clipboard | Clipboard Dialog |
+| --- | --- | --- |
+| <img src="screenshorts/main.png" width="240" alt="Main screen"> | <img src="screenshorts/clipboard.png" width="240" alt="Clipboard protection screen"> | <img src="screenshorts/clipboard-dialog.png" width="240" alt="Clipboard confirmation dialog"> |
+
+| Device Info | SIM Mocking | Privacy Self-Check |
+| --- | --- | --- |
+| <img src="screenshorts/device.png" width="240" alt="Device info masking screen"> | <img src="screenshorts/sim.png" width="240" alt="SIM mocking screen"> | <img src="screenshorts/self-check.png" width="240" alt="Privacy self-check screen"> |
+
+| Location | Unique Identifiers | Wi-Fi |
+| --- | --- | --- |
+| <img src="screenshorts/location.png" width="240" alt="Location masking screen"> | <img src="screenshorts/unique-identifier.png" width="240" alt="Unique identifier masking screen"> | <img src="screenshorts/wifi.png" width="240" alt="Wi-Fi information masking screen"> |
+
+| Settings |
+| --- |
+| <img src="screenshorts/setting.png" width="240" alt="Settings screen"> |
