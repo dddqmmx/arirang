@@ -13,7 +13,11 @@
     <string name="about_license_title">License</string>
     <string name="about_license_type">MIT License</string>
     <string name="about_security_commitment">Privacy: No Internet access</string>
+    <string name="about_source_code_title">Source Code</string>
+    <string name="about_source_code_content">GitHub Repository</string>
     <string name="title_language">Language</string>
+    <string name="back">Back</string>
+    <string name="reset">Reset</string>
 
     <string name="status_title">Status</string>
     <string name="status_activated">Module Activated</string>
@@ -77,6 +81,8 @@
     <string name="export_config_summary">Backup application configuration files to a ZIP archive</string>
     <string name="import_config_title">Import configurations</string>
     <string name="import_config_summary">Restore configurations from a backup ZIP archive</string>
+    <string name="export_failed_message">Export failed: %1$s</string>
+    <string name="import_failed_message">Import failed: %1$s</string>
     <string name="import_success_restart">Import successful. The app will now restart to apply changes.</string>
     <string name="restrict_hot_switching_title">Restrict Hot-Switching</string>
     <string name="restrict_hot_switching_summary">Only install hooks if feature is enabled at app start. Prevents background overhead but requires restart to apply changes</string>
@@ -270,6 +276,8 @@
     <string name="always_allow">Always Allow</string>
     <string name="always_deny">Always Deny</string>
     <string name="this_deny_close">Deny Once</string>
+    <string name="clipboard_access_allowed">%1$s allowed clipboard access</string>
+    <string name="clipboard_access_denied">%1$s denied clipboard access</string>
 
     
     <string name="test_dialog_title">Test Dialog Functionality</string>
@@ -368,6 +376,7 @@
     <string name="sensor_add">Add Sensor</string>
     <string name="sensor_remove">Remove</string>
     <string name="sensor_edit_title">Edit Sensor</string>
+    <string name="sensor_new_default_name">New Sensor</string>
     <string name="sensor_field_name">Sensor Name</string>
     <string name="sensor_field_vendor">Vendor</string>
     <string name="sensor_field_type">Sensor Type</string>
@@ -383,8 +392,38 @@
     <string name="sensor_type_accelerometer">Accelerometer</string>
     <string name="sensor_type_gyroscope">Gyroscope</string>
     <string name="sensor_type_magnetic_field">Magnetic Field</string>
+    <string name="sensor_type_orientation">Orientation</string>
+    <string name="sensor_type_light">Light</string>
+    <string name="sensor_type_pressure">Pressure</string>
+    <string name="sensor_type_temperature">Temperature</string>
+    <string name="sensor_type_proximity">Proximity</string>
     <string name="sensor_type_gravity">Gravity</string>
     <string name="sensor_type_linear_acceleration">Linear Acceleration</string>
+    <string name="sensor_type_rotation_vector">Rotation Vector</string>
+    <string name="sensor_type_relative_humidity">Relative Humidity</string>
+    <string name="sensor_type_ambient_temperature">Ambient Temperature</string>
+    <string name="sensor_type_magnetic_field_uncalibrated">Magnetic Field (Uncalibrated)</string>
+    <string name="sensor_type_game_rotation_vector">Game Rotation Vector</string>
+    <string name="sensor_type_gyroscope_uncalibrated">Gyroscope (Uncalibrated)</string>
+    <string name="sensor_type_significant_motion">Significant Motion</string>
+    <string name="sensor_type_step_detector">Step Detector</string>
+    <string name="sensor_type_step_counter">Step Counter</string>
+    <string name="sensor_type_geomagnetic_rotation_vector">Geomagnetic Rotation Vector</string>
+    <string name="sensor_type_heart_rate">Heart Rate</string>
+    <string name="sensor_type_pose_6dof">Pose 6DOF</string>
+    <string name="sensor_type_stationary_detect">Stationary Detect</string>
+    <string name="sensor_type_motion_detect">Motion Detect</string>
+    <string name="sensor_type_heart_beat">Heart Beat</string>
+    <string name="sensor_type_low_latency_offbody_detect">Low Latency Offbody Detect</string>
+    <string name="sensor_type_accelerometer_uncalibrated">Accelerometer (Uncalibrated)</string>
+    <string name="sensor_type_hinge_angle">Hinge Angle</string>
+    <string name="sensor_type_head_tracker">Head Tracker</string>
+    <string name="sensor_type_accelerometer_limited_axes">Accelerometer (Limited Axes)</string>
+    <string name="sensor_type_gyroscope_limited_axes">Gyroscope (Limited Axes)</string>
+    <string name="sensor_type_accelerometer_limited_axes_uncalibrated">Accelerometer (Limited, Uncalibrated)</string>
+    <string name="sensor_type_gyroscope_limited_axes_uncalibrated">Gyroscope (Limited, Uncalibrated)</string>
+    <string name="sensor_type_heading">Heading</string>
+    <string name="sensor_type_generic">Sensor</string>
     
     <string name="feature_app_list">App List</string>
     </resources>

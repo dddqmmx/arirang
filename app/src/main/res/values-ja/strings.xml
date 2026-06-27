@@ -34,7 +34,7 @@
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">Bluetooth</string>
 
-    <string name="feature_background_network">バック通信</string>
+    <string name="feature_background_network">バックグラウンド通信</string>
     <string name="feature_force_proxy">強制プロキシ</string>
 
     <string name="clipboard_permission_title">クリップボード読み取り権限</string>
@@ -68,7 +68,7 @@
     <string name="log_module_unique_id">一意識別子</string>
     <string name="log_module_notify">Hook サービスブリッジ</string>
 
-    <string name="slot_title_text">%1$d. SIMストック</string>
+    <string name="slot_title_text">%1$d. SIMスロット</string>
 
     <string name="title_activity_init">初期化</string>
 
@@ -118,6 +118,7 @@
     <string name="unique_field_serial">Serial</string>
     <string name="unique_field_type_allocation_code">Type Allocation Code</string>
     <string name="unique_randomize">ランダム生成</string>
+    <string name="unique_randomize_all">すべてランダム生成</string>
     <string name="unique_add_imei_slot">IMEI スロットを追加</string>
     <string name="unique_import_imei">現在の IMEI をインポート</string>
     <string name="unique_import_imei_empty">読み取り可能な IMEI は返されませんでした</string>
@@ -201,11 +202,11 @@
     <string name="init_button_next">次へ</string>
     <string name="btn_cancel">キャンセル</string>
     <string name="init_button_enter">アプリに入る</string>
-    <string name="init_security_check_title">実行环境チェック</string>
+    <string name="init_security_check_title">実行環境チェック</string>
     <string name="init_core_dependency_title">コア依存関係</string>
     <string name="init_core_dependency_desc">本ソフトウェアは Xposed に依存しています。サポートされている環境以外では機能しません</string>
     <string name="init_precondition_title">前提条件</string>
-    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保护を提供します</string>
+    <string name="init_precondition_desc">本ソフトウェアは万能ではありません。「システム自体が信頼できる」という前提の下でプライバシー保護を提供します</string>
     <string name="init_risk_cases_title">例えば：</string>
     <string name="init_risk_item_backdoor">システムにバックドアがある</string>
     <string name="init_risk_item_rom">信頼できないROMソース</string>
@@ -257,13 +258,15 @@
     <string name="always_allow">常に許可</string>
     <string name="always_deny">常に拒否</string>
     <string name="this_deny_close">今回は拒否</string>
+    <string name="clipboard_access_allowed">%1$s はクリップボードアクセスを許可しました</string>
+    <string name="clipboard_access_denied">%1$s はクリップボードアクセスを拒否しました</string>
 
     
     <string name="test_dialog_title">ダイアログ機能のテスト</string>
-    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対话ポップアップをテストします</string>
+    <string name="test_dialog_desc">下のボタンをクリックして、フォアグラウンドまたはバックグラウンドでの対話ポップアップをテストします</string>
     <string name="test_dialog_foreground">フォアグラウンドテストダイアログ</string>
     <string name="test_dialog_background">バックグラウンドテストダイアログ (3秒遅延)</string>
-    <string name="test_dialog_result">対话结果がここに表示されます</string>
+    <string name="test_dialog_result">対話結果がここに表示されます</string>
 
     <string name="service_connected">サービスが接続されました</string>
     <string name="requesting_foreground">リクエスト中 (フォアグラウンド)...</string>
@@ -326,7 +329,13 @@
     <string name="device_field_time">ビルド時刻</string>
     <string name="advanced_settings_summary">アーキテクチャと低レベルのパフォーマンス調整</string>
     <string name="advanced_settings_title">詳細設定</string>
-    <string name="feature_unique_identifier">一意の識別子</string>
+    <string name="about_source_code_title">ソースコード</string>
+    <string name="about_source_code_content">GitHub リポジトリ</string>
+    <string name="back">戻る</string>
+    <string name="reset">リセット</string>
+    <string name="export_failed_message">エクスポートに失敗しました: %1$s</string>
+    <string name="import_failed_message">インポートに失敗しました: %1$s</string>
+    <string name="feature_unique_identifier">一意識別子</string>
     <string name="global_settings_title">グローバル制御</string>
     <string name="restrict_hot_switching_summary">アプリの起動時に機能が有効になっている場合にのみフックをインストールします。バックグラウンドのオーバーヘッドを防ぎますが、変更を適用するには再起動が必要です</string>
     <string name="restrict_hot_switching_title">ホットスイッチングを制限</string>
@@ -346,6 +355,7 @@
     <string name="sensor_field_name">センサー名</string>
     <string name="sensor_field_type">センサータイプ</string>
     <string name="sensor_field_vendor">ベンダー</string>
+    <string name="sensor_new_default_name">新しいセンサー</string>
     <string name="sensor_hidden">非表示</string>
     <string name="sensor_hide_all">すべてのセンサーを非表示</string>
     <string name="sensor_hide_all_summary">すべてのセンサーの列挙に対して空のリストを返します</string>
@@ -375,8 +385,38 @@
     <string name="sensor_type_accelerometer">加速度センサー</string>
     <string name="sensor_type_gyroscope">ジャイロスコープ</string>
     <string name="sensor_type_magnetic_field">磁気センサー</string>
+    <string name="sensor_type_orientation">方位センサー</string>
+    <string name="sensor_type_light">照度センサー</string>
+    <string name="sensor_type_pressure">気圧センサー</string>
+    <string name="sensor_type_temperature">温度センサー</string>
+    <string name="sensor_type_proximity">近接センサー</string>
     <string name="sensor_type_gravity">重力センサー</string>
     <string name="sensor_type_linear_acceleration">線形加速度センサー</string>
+    <string name="sensor_type_rotation_vector">回転ベクトルセンサー</string>
+    <string name="sensor_type_relative_humidity">相対湿度センサー</string>
+    <string name="sensor_type_ambient_temperature">周囲温度センサー</string>
+    <string name="sensor_type_magnetic_field_uncalibrated">未校正磁気センサー</string>
+    <string name="sensor_type_game_rotation_vector">ゲーム回転ベクトルセンサー</string>
+    <string name="sensor_type_gyroscope_uncalibrated">未校正ジャイロスコープ</string>
+    <string name="sensor_type_significant_motion">大きな動きセンサー</string>
+    <string name="sensor_type_step_detector">歩行検出センサー</string>
+    <string name="sensor_type_step_counter">歩数カウンター</string>
+    <string name="sensor_type_geomagnetic_rotation_vector">地磁気回転ベクトルセンサー</string>
+    <string name="sensor_type_heart_rate">心拍センサー</string>
+    <string name="sensor_type_pose_6dof">6DoF 姿勢センサー</string>
+    <string name="sensor_type_stationary_detect">静止検出センサー</string>
+    <string name="sensor_type_motion_detect">動き検出センサー</string>
+    <string name="sensor_type_heart_beat">心拍検出センサー</string>
+    <string name="sensor_type_low_latency_offbody_detect">低遅延オフボディ検出</string>
+    <string name="sensor_type_accelerometer_uncalibrated">未校正加速度センサー</string>
+    <string name="sensor_type_hinge_angle">ヒンジ角度センサー</string>
+    <string name="sensor_type_head_tracker">ヘッドトラッカー</string>
+    <string name="sensor_type_accelerometer_limited_axes">制限軸加速度センサー</string>
+    <string name="sensor_type_gyroscope_limited_axes">制限軸ジャイロスコープ</string>
+    <string name="sensor_type_accelerometer_limited_axes_uncalibrated">制限軸未校正加速度センサー</string>
+    <string name="sensor_type_gyroscope_limited_axes_uncalibrated">制限軸未校正ジャイロスコープ</string>
+    <string name="sensor_type_heading">ヘディングセンサー</string>
+    <string name="sensor_type_generic">センサー</string>
     
     <string name="feature_app_list">アプリリスト</string>
     </resources>

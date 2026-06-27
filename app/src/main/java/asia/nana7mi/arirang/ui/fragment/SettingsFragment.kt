@@ -120,7 +120,7 @@ private fun SettingsScreen(
                 }
                 Toast.makeText(context, R.string.save_success, Toast.LENGTH_SHORT).show()
             }.onFailure {
-                Toast.makeText(context, "Export failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.export_failed_message, it.message.orEmpty()), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -142,7 +142,7 @@ private fun SettingsScreen(
                 context.startActivity(mainIntent)
                 exitProcess(0)
             }.onFailure {
-                Toast.makeText(context, "Import failed: ${it.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.import_failed_message, it.message.orEmpty()), Toast.LENGTH_SHORT).show()
             }
         }
     }

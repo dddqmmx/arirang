@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
 import android.widget.Toast
+import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.ui.activity.ConfirmDialogActivity
 
 class ClipboardRequestReceiver : BroadcastReceiver() {
@@ -21,10 +22,10 @@ class ClipboardRequestReceiver : BroadcastReceiver() {
                     resultCode == ConfirmDialogActivity.RESULT_ALLOW_ALWAYS
                 ) {
                     // 用户允许
-                    Toast.makeText(context, "$callingPackage 允许访问剪切板", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.clipboard_access_allowed, callingPackage), Toast.LENGTH_SHORT).show()
                 } else {
                     // 用户拒绝
-                    Toast.makeText(context, "$callingPackage 拒绝访问剪切板", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.clipboard_access_denied, callingPackage), Toast.LENGTH_SHORT).show()
                 }
             }
         }

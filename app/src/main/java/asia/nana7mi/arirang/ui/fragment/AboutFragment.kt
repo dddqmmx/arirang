@@ -100,8 +100,8 @@ private fun AboutScreen() {
 
         item {
             InfoCard(
-                title = "Source Code",
-                content = "GitHub Repository",
+                title = stringResource(R.string.about_source_code_title),
+                content = stringResource(R.string.about_source_code_content),
                 icon = Icons.Default.Code,
                 onClick = {
                     val intent = Intent(Intent.ACTION_VIEW, "https://github.com/dddqmmx/arirang".toUri())

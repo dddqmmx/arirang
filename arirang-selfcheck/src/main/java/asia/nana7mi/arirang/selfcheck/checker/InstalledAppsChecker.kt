@@ -99,7 +99,7 @@ class InstalledAppsChecker : SelfChecker {
             }.getOrDefault(EnumResult.failed())
 
             // 8. getPackagesForUid - UID scan (THE ATTACK SURFACE)
-            results["getPackagesForUid ⭐"] = runCatching {
+            results["getPackagesForUid"] = runCatching {
                 val found = mutableSetOf<String>()
                 // System UIDs: 0-2000
                 for (uid in 0..2000) {
@@ -169,7 +169,7 @@ class InstalledAppsChecker : SelfChecker {
             val bestMethods = results.filter { it.value.pkgs.size == maxCount }.keys
 
             // Detect if getPackagesForUid finds anything extra vs baseline
-            val uidExtra = (results["getPackagesForUid ⭐"]?.pkgs.orEmpty())
+            val uidExtra = (results["getPackagesForUid"]?.pkgs.orEmpty())
                 .filter { it !in baselinePkgs }
 
             // Detect cross-method discrepancies:

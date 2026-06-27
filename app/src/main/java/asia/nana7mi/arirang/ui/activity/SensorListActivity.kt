@@ -152,7 +152,7 @@ class SensorListActivity : ComponentActivity() {
                                 )
                             }
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.btn_cancel)) // using cancel as a placeholder for reset/refresh text if not available, but actually we can just not provide string. Or let's use "Reset"
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.reset))
                         }
                         SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                     },
@@ -409,7 +409,7 @@ class SensorListActivity : ComponentActivity() {
         // ── Add sensor dialog ──
         if (showAddDialog) {
             SensorEditDialog(
-                entry = SensorEntry(name = "New Sensor", vendor = "", type = 1, isCustom = true),
+                entry = SensorEntry(name = stringResource(R.string.sensor_new_default_name), vendor = "", type = 1, isCustom = true),
                 onDismiss = { showAddDialog = false },
                 onSave = { newEntry ->
                     config = config.copy(sensorEntries = config.sensorEntries + newEntry.copy(isCustom = true))
@@ -532,41 +532,44 @@ class SensorListActivity : ComponentActivity() {
     // Sensor type label
     // ──────────────────────────────────────────────
 
-    private fun sensorTypeLabel(type: Int): String = when (type) {
-        Sensor.TYPE_ACCELEROMETER -> "Accelerometer"
-        Sensor.TYPE_MAGNETIC_FIELD -> "Magnetic Field"
-        Sensor.TYPE_ORIENTATION -> "Orientation"
-        Sensor.TYPE_GYROSCOPE -> "Gyroscope"
-        Sensor.TYPE_LIGHT -> "Light"
-        Sensor.TYPE_PRESSURE -> "Pressure"
-        Sensor.TYPE_TEMPERATURE -> "Temperature"
-        Sensor.TYPE_PROXIMITY -> "Proximity"
-        Sensor.TYPE_GRAVITY -> "Gravity"
-        Sensor.TYPE_LINEAR_ACCELERATION -> "Linear Acceleration"
-        Sensor.TYPE_ROTATION_VECTOR -> "Rotation Vector"
-        Sensor.TYPE_RELATIVE_HUMIDITY -> "Relative Humidity"
-        Sensor.TYPE_AMBIENT_TEMPERATURE -> "Ambient Temperature"
-        Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED -> "Magnetic Field (Uncalibrated)"
-        Sensor.TYPE_GAME_ROTATION_VECTOR -> "Game Rotation Vector"
-        Sensor.TYPE_GYROSCOPE_UNCALIBRATED -> "Gyroscope (Uncalibrated)"
-        Sensor.TYPE_SIGNIFICANT_MOTION -> "Significant Motion"
-        Sensor.TYPE_STEP_DETECTOR -> "Step Detector"
-        Sensor.TYPE_STEP_COUNTER -> "Step Counter"
-        Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR -> "Geomagnetic Rotation Vector"
-        Sensor.TYPE_HEART_RATE -> "Heart Rate"
-        Sensor.TYPE_POSE_6DOF -> "Pose 6DOF"
-        Sensor.TYPE_STATIONARY_DETECT -> "Stationary Detect"
-        Sensor.TYPE_MOTION_DETECT -> "Motion Detect"
-        Sensor.TYPE_HEART_BEAT -> "Heart Beat"
-        Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT -> "Low Latency Offbody Detect"
-        Sensor.TYPE_ACCELEROMETER_UNCALIBRATED -> "Accelerometer (Uncalibrated)"
-        Sensor.TYPE_HINGE_ANGLE -> "Hinge Angle"
-        Sensor.TYPE_HEAD_TRACKER -> "Head Tracker"
-        Sensor.TYPE_ACCELEROMETER_LIMITED_AXES -> "Accelerometer (Limited Axes)"
-        Sensor.TYPE_GYROSCOPE_LIMITED_AXES -> "Gyroscope (Limited Axes)"
-        Sensor.TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED -> "Accelerometer (Limited, Uncalibrated)"
-        Sensor.TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED -> "Gyroscope (Limited, Uncalibrated)"
-        Sensor.TYPE_HEADING -> "Heading"
-        else -> "Sensor"
-    }
+    @Composable
+    private fun sensorTypeLabel(type: Int): String = stringResource(
+        when (type) {
+            Sensor.TYPE_ACCELEROMETER -> R.string.sensor_type_accelerometer
+            Sensor.TYPE_MAGNETIC_FIELD -> R.string.sensor_type_magnetic_field
+            Sensor.TYPE_ORIENTATION -> R.string.sensor_type_orientation
+            Sensor.TYPE_GYROSCOPE -> R.string.sensor_type_gyroscope
+            Sensor.TYPE_LIGHT -> R.string.sensor_type_light
+            Sensor.TYPE_PRESSURE -> R.string.sensor_type_pressure
+            Sensor.TYPE_TEMPERATURE -> R.string.sensor_type_temperature
+            Sensor.TYPE_PROXIMITY -> R.string.sensor_type_proximity
+            Sensor.TYPE_GRAVITY -> R.string.sensor_type_gravity
+            Sensor.TYPE_LINEAR_ACCELERATION -> R.string.sensor_type_linear_acceleration
+            Sensor.TYPE_ROTATION_VECTOR -> R.string.sensor_type_rotation_vector
+            Sensor.TYPE_RELATIVE_HUMIDITY -> R.string.sensor_type_relative_humidity
+            Sensor.TYPE_AMBIENT_TEMPERATURE -> R.string.sensor_type_ambient_temperature
+            Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED -> R.string.sensor_type_magnetic_field_uncalibrated
+            Sensor.TYPE_GAME_ROTATION_VECTOR -> R.string.sensor_type_game_rotation_vector
+            Sensor.TYPE_GYROSCOPE_UNCALIBRATED -> R.string.sensor_type_gyroscope_uncalibrated
+            Sensor.TYPE_SIGNIFICANT_MOTION -> R.string.sensor_type_significant_motion
+            Sensor.TYPE_STEP_DETECTOR -> R.string.sensor_type_step_detector
+            Sensor.TYPE_STEP_COUNTER -> R.string.sensor_type_step_counter
+            Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR -> R.string.sensor_type_geomagnetic_rotation_vector
+            Sensor.TYPE_HEART_RATE -> R.string.sensor_type_heart_rate
+            Sensor.TYPE_POSE_6DOF -> R.string.sensor_type_pose_6dof
+            Sensor.TYPE_STATIONARY_DETECT -> R.string.sensor_type_stationary_detect
+            Sensor.TYPE_MOTION_DETECT -> R.string.sensor_type_motion_detect
+            Sensor.TYPE_HEART_BEAT -> R.string.sensor_type_heart_beat
+            Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT -> R.string.sensor_type_low_latency_offbody_detect
+            Sensor.TYPE_ACCELEROMETER_UNCALIBRATED -> R.string.sensor_type_accelerometer_uncalibrated
+            Sensor.TYPE_HINGE_ANGLE -> R.string.sensor_type_hinge_angle
+            Sensor.TYPE_HEAD_TRACKER -> R.string.sensor_type_head_tracker
+            Sensor.TYPE_ACCELEROMETER_LIMITED_AXES -> R.string.sensor_type_accelerometer_limited_axes
+            Sensor.TYPE_GYROSCOPE_LIMITED_AXES -> R.string.sensor_type_gyroscope_limited_axes
+            Sensor.TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED -> R.string.sensor_type_accelerometer_limited_axes_uncalibrated
+            Sensor.TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED -> R.string.sensor_type_gyroscope_limited_axes_uncalibrated
+            Sensor.TYPE_HEADING -> R.string.sensor_type_heading
+            else -> R.string.sensor_type_generic
+        }
+    )
 }

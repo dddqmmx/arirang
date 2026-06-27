@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Arirang</string>
-    <string name="title_activity_clipboard_setting">剪切板设置</string>
+    <string name="title_activity_clipboard_setting">剪贴板设置</string>
     <string name="title_activity_language_settings">语言设置</string>
 
     <string name="nav_home">首页</string>
@@ -23,7 +23,7 @@
     <string name="category_anonymization">匿名化</string>
     <string name="category_control">控制</string>
 
-    <string name="feature_clipboard">剪切板读取</string>
+    <string name="feature_clipboard">剪贴板读取</string>
     <string name="feature_sensor">传感器</string>
 
     <string name="feature_device_info">设备信息</string>
@@ -38,9 +38,9 @@
     <string name="feature_background_network">后台联网</string>
     <string name="feature_force_proxy">强制代理</string>
 
-    <string name="clipboard_permission_title">剪切板读取权限</string>
+    <string name="clipboard_permission_title">剪贴板读取权限</string>
     <string name="clipboard_overlay_permission_title">需要悬浮窗权限</string>
-    <string name="clipboard_overlay_permission_message">剪切板的实时拦截需要显示在其他应用上层，请授予权限</string>
+    <string name="clipboard_overlay_permission_message">剪贴板的实时拦截需要显示在其他应用上层，请授予权限</string>
     <string name="grant_permission">授予</string>
     <string name="not_now">暂不授予</string>
     <string name="keep_original_setting">不授予</string>
@@ -119,6 +119,7 @@
     <string name="unique_field_serial">Serial</string>
     <string name="unique_field_type_allocation_code">Type Allocation Code</string>
     <string name="unique_randomize">随机生成</string>
+    <string name="unique_randomize_all">全部随机生成</string>
     <string name="unique_add_imei_slot">添加 IMEI 槽位</string>
     <string name="unique_import_imei">导入当前 IMEI</string>
     <string name="unique_import_imei_empty">没有读取到可用的 IMEI</string>
@@ -136,9 +137,9 @@
     <string name="location_app_config_entry">应用位置</string>
     <string name="location_app_config_entry_summary">为单个应用设置独立坐标</string>
     <string name="location_search_apps">搜索应用</string>
-    <string name="location_filter_user_apps">用户软件</string>
-    <string name="location_filter_system_apps">系统软件</string>
-    <string name="location_filter_all_apps">所有软件</string>
+    <string name="location_filter_user_apps">用户应用</string>
+    <string name="location_filter_system_apps">系统应用</string>
+    <string name="location_filter_all_apps">所有应用</string>
     <string name="location_app_configured">%1$s, %2$s</string>
     <string name="location_app_not_configured">未配置</string>
     <string name="location_edit_app_location">应用位置</string>
@@ -180,7 +181,7 @@
     <string name="bluetooth_section_scan_result">周边设备</string>
     <string name="bluetooth_field_name">设备名称</string>
     <string name="bluetooth_field_address">MAC 地址</string>
-    <string name="bluetooth_hide_all_connected_summary">获取连接设备时会返回空值</string>
+    <string name="bluetooth_hide_all_connected_summary">向被 Hook 的应用返回空的已连接设备列表</string>
     <string name="bluetooth_hide_all_scan_results">隐藏所有周边设备</string>
     <string name="bluetooth_hide_all_scan_results_summary">向被 Hook 的应用返回空的扫描列表</string>
     <string name="bluetooth_add_connected_device">新增已连接设备</string>
@@ -201,12 +202,12 @@
     <string name="init_extreme_warning">⚠ 极致安全模式已启用</string>
     <string name="init_button_next">继续</string>
     <string name="btn_cancel">取消</string>
-    <string name="init_button_enter">进入软件</string>
+    <string name="init_button_enter">进入应用</string>
     <string name="init_security_check_title">运行环境检查</string>
     <string name="init_core_dependency_title">核心依赖</string>
-    <string name="init_core_dependency_desc">本软件依赖 Xposed 运行\n若未在受支持环境下运行，任何功能都无法生效</string>
+    <string name="init_core_dependency_desc">本应用依赖 Xposed 运行\n若未在受支持环境下运行，任何功能都无法生效</string>
     <string name="init_precondition_title">使用前提</string>
-    <string name="init_precondition_desc">本软件不是万能的，只能在“系统本身可信”的前提下提供隐私保护，而对本就不可信的系统无能为力</string>
+    <string name="init_precondition_desc">本应用不是万能的，只能在“系统本身可信”的前提下提供隐私保护，而对本就不可信的系统无能为力</string>
     <string name="init_risk_cases_title">如以下情况：</string>
     <string name="init_risk_item_backdoor">系统已被植入后门</string>
     <string name="init_risk_item_rom">ROM 来源不可信</string>
@@ -259,6 +260,8 @@
     <string name="always_allow">始终允许</string>
     <string name="always_deny">始终拒绝</string>
     <string name="this_deny_close">本次拒绝</string>
+    <string name="clipboard_access_allowed">%1$s 已允许访问剪贴板</string>
+    <string name="clipboard_access_denied">%1$s 已拒绝访问剪贴板</string>
 
     
     <string name="test_dialog_title">测试弹窗功能</string>
@@ -281,7 +284,7 @@
 
     <string name="feature_not_available">暂未开放</string>
     <string name="reset_all">重置所有设定</string>
-    <string name="reset_all_confirm">确定要重置所有剪切板设定吗？这将清除所有应用特定的策略并恢复默认行为</string>
+    <string name="reset_all_confirm">确定要重置所有剪贴板设定吗？这将清除所有应用特定的策略并恢复默认行为</string>
 
     <string name="sim_preset_title">选择运营商预设</string>
     <string name="sim_preset_button">选择国家/运营商预设</string>
@@ -356,6 +359,7 @@
     <string name="sensor_add">添加传感器</string>
     <string name="sensor_remove">删除</string>
     <string name="sensor_edit_title">编辑传感器</string>
+    <string name="sensor_new_default_name">新传感器</string>
     <string name="sensor_field_name">传感器名称</string>
     <string name="sensor_field_vendor">厂商</string>
     <string name="sensor_field_type">传感器类型</string>
@@ -367,7 +371,7 @@
     <string name="sensor_precision_low">低精度（保留1位小数）</string>
     <string name="sensor_precision_medium">中等精度（保留2位小数）</string>
     <string name="sensor_precision_high">高精度降低（仅保留整数）</string>
-    <string name="bluetooth_hide_all_connected">隐藏所有已接设备</string>
+    <string name="bluetooth_hide_all_connected">隐藏所有已连接设备</string>
     <string name="global_settings_title">全局设定</string>
     <string name="advanced_settings_title">高级设置</string>
     <string name="advanced_settings_summary">架构相关的底层设定</string>
@@ -376,14 +380,50 @@
     <string name="export_config_summary">将应用的所有配置文件打包备份为ZIP文档</string>
     <string name="import_config_title">导入配置文件</string>
     <string name="import_config_summary">从备份的ZIP文档中恢复所有的配置文件</string>
-    <string name="import_success_restart">导入成功，应用即将重启以应用新的配置</string>
+    <string name="export_failed_message">导出失败：%1$s</string>
+    <string name="import_failed_message">导入失败：%1$s</string>
+    <string name="import_success_restart">导入成功。应用新配置需要重启才能生效。</string>
     <string name="restrict_hot_switching_title">限制实时配置文件</string>
+    <string name="about_source_code_title">源代码</string>
+    <string name="about_source_code_content">GitHub 仓库</string>
+    <string name="back">返回</string>
+    <string name="reset">重置</string>
 
     <string name="sensor_type_accelerometer">加速度传感器</string>
     <string name="sensor_type_gyroscope">陀螺仪</string>
     <string name="sensor_type_magnetic_field">磁场传感器</string>
+    <string name="sensor_type_orientation">方向传感器</string>
+    <string name="sensor_type_light">光线传感器</string>
+    <string name="sensor_type_pressure">气压传感器</string>
+    <string name="sensor_type_temperature">温度传感器</string>
+    <string name="sensor_type_proximity">距离传感器</string>
     <string name="sensor_type_gravity">重力传感器</string>
     <string name="sensor_type_linear_acceleration">线性加速度传感器</string>
+    <string name="sensor_type_rotation_vector">旋转矢量传感器</string>
+    <string name="sensor_type_relative_humidity">相对湿度传感器</string>
+    <string name="sensor_type_ambient_temperature">环境温度传感器</string>
+    <string name="sensor_type_magnetic_field_uncalibrated">未校准磁场传感器</string>
+    <string name="sensor_type_game_rotation_vector">游戏旋转矢量传感器</string>
+    <string name="sensor_type_gyroscope_uncalibrated">未校准陀螺仪</string>
+    <string name="sensor_type_significant_motion">显著运动传感器</string>
+    <string name="sensor_type_step_detector">步伐检测器</string>
+    <string name="sensor_type_step_counter">计步器</string>
+    <string name="sensor_type_geomagnetic_rotation_vector">地磁旋转矢量传感器</string>
+    <string name="sensor_type_heart_rate">心率传感器</string>
+    <string name="sensor_type_pose_6dof">6DoF 姿态传感器</string>
+    <string name="sensor_type_stationary_detect">静止检测器</string>
+    <string name="sensor_type_motion_detect">运动检测器</string>
+    <string name="sensor_type_heart_beat">心跳传感器</string>
+    <string name="sensor_type_low_latency_offbody_detect">低延迟离身检测器</string>
+    <string name="sensor_type_accelerometer_uncalibrated">未校准加速度传感器</string>
+    <string name="sensor_type_hinge_angle">铰链角度传感器</string>
+    <string name="sensor_type_head_tracker">头部追踪传感器</string>
+    <string name="sensor_type_accelerometer_limited_axes">有限轴加速度传感器</string>
+    <string name="sensor_type_gyroscope_limited_axes">有限轴陀螺仪</string>
+    <string name="sensor_type_accelerometer_limited_axes_uncalibrated">有限轴未校准加速度传感器</string>
+    <string name="sensor_type_gyroscope_limited_axes_uncalibrated">有限轴未校准陀螺仪</string>
+    <string name="sensor_type_heading">航向传感器</string>
+    <string name="sensor_type_generic">传感器</string>
     
     <string name="feature_app_list">应用列表</string>
     </resources>
