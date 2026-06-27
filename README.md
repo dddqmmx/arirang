@@ -169,6 +169,14 @@ Contributions, issues, and feature requests are welcome.
 | --- | --- | --- |
 | <img src="screenshorts/location.png" width="240" alt="Location masking screen"> | <img src="screenshorts/unique-identifier.png" width="240" alt="Unique identifier masking screen"> | <img src="screenshorts/wifi.png" width="240" alt="Wi-Fi information masking screen"> |
 
-| Settings |
+| Bluetooth | Sensors | Sensor Details |
+| --- | --- | --- |
+| <img src="screenshorts/bluetooth.png" width="240" alt="Bluetooth information masking screen"> | <img src="screenshorts/sensor-list.png" width="240" alt="Sensor list screen"> | <img src="screenshorts/sensor.png" width="240" alt="Sensor details screen"> |
+
+| App List | App Location | Settings |
+| --- | --- | --- |
+| <img src="screenshorts/app-list.png" width="240" alt="App list screen"> | <img src="screenshorts/app-location.png" width="240" alt="Per-app location settings screen"> | <img src="screenshorts/setting.png" width="240" alt="Settings screen"> |
+
+| About |
 | --- |
-| <img src="screenshorts/setting.png" width="240" alt="Settings screen"> |
+| <img src="screenshorts/about.png" width="240" alt="About screen"> |
