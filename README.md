@@ -104,8 +104,11 @@ Use at your own risk.
   Supports hiding or spoofing the list of bonded (paired) devices and nearby
   scan results, with per-device name resolution for remote devices.
 
-- **Package List Management (Experimental)**  
-  Hide installed applications (Invisible / Whitelist modes).
+- **Package Visibility Management (Experimental)**
+  Filter package visibility at the system PackageManager service layer. Supports
+  global defaults, per-caller app rules, custom visible lists, and inheritable
+  whitelist / blacklist templates across installed-app lists, package lookups,
+  intent/provider queries, and UID-to-package-name resolution.
 
 - **Sensor List Management (Experimental)**
   Configure the sensor list exposed to applications by hiding or rewriting selected
