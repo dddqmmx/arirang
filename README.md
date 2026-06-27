@@ -99,7 +99,12 @@ Use at your own risk.
   Configure one or more nearby Wi-Fi scan result SSID/BSSID pairs, or return an empty scan list.
   Allows customizing or hiding nearby Wi-Fi network information exposed to applications.
 
-- **Package List Management (In Experimental)**  
+- **Bluetooth Info Masking (Experimental)**  
+  Configure the local Bluetooth device name and MAC address returned to apps.
+  Supports hiding or spoofing the list of bonded (paired) devices and nearby
+  scan results, with per-device name resolution for remote devices.
+
+- **Package List Management (Experimental)**  
   Hide installed applications (Invisible / Whitelist modes).
 
 - **Sensor List Management (Experimental)**
