@@ -7,10 +7,20 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#ifndef MAP_FIXED_NOREPLACE
+// Linux 4.17+. On older kernels the bit is ignored and mmap falls back to
+// treating the address as a hint, which is exactly the behaviour we want.
+#define MAP_FIXED_NOREPLACE 0x100000
+#endif
+
 namespace arirang {
 namespace {
 
 constexpr size_t kHookSize = 16; // 4 instructions: LDR x16,#8 ; BR x16 ; <8-byte addr>
+constexpr size_t kTrampolineSize = kHookSize + 16; // saved prologue + jump back
+
+constexpr uint32_t kLdrX16Pc8 = 0x58000050u; // LDR x16, [pc, #8]
+constexpr uint32_t kBrX16 = 0xd61f0200u; // BR x16
 
 bool instruction_is_pc_relative(uint32_t instr) {
     // ADR  : 0_immlo[2]_10000_immhi[19]_Rd
@@ -50,11 +60,35 @@ bool reprotect_page(void *addr, size_t length) {
                     PROT_READ | PROT_EXEC) == 0;
 }
 
-void write_absolute_jump(uint32_t *dst, void *destination) {
-    // LDR x16, [pc, #8] ; BR x16 ; <abs addr>
-    dst[0] = 0x58000050u;
-    dst[1] = 0xd61f0200u;
+// Build "LDR x16,[pc,#8] ; BR x16 ; <abs addr>" into freshly allocated, not yet
+// reachable memory. Store order is irrelevant because nothing can branch here
+// until the caller publishes the stub.
+void build_absolute_jump(uint32_t *dst, void *destination) {
+    dst[0] = kLdrX16Pc8;
+    dst[1] = kBrX16;
     std::memcpy(&dst[2], &destination, sizeof(destination));
+}
+
+// Patch the same 16-byte absolute jump over a LIVE function prologue, ordering
+// the stores so the entry instruction (word 0) becomes visible LAST. A thread
+// that *enters* the function during patching therefore observes either the
+// original first instruction or the finished jump — never a half-written LDR
+// pointing at an as-yet-unwritten address word.
+//
+// A thread already suspended *inside* the 16-byte prologue when the patch lands
+// cannot be protected without stopping every thread; that residual race is
+// inherent to multi-instruction inline hooking and is accepted here. Callers
+// that cannot tolerate it should use inline_hook_branch (single-instruction).
+void publish_live_absolute_jump(uint32_t *dst, void *destination) {
+    const uintptr_t addr = reinterpret_cast<uintptr_t>(destination);
+    auto *words = reinterpret_cast<volatile uint32_t *>(dst);
+    words[2] = static_cast<uint32_t>(addr);        // address low  (unreachable
+    words[3] = static_cast<uint32_t>(addr >> 32);  // address high   until word0 runs)
+    words[1] = kBrX16;
+    // Publish words 1..3 before the entry word so no thread can observe a new
+    // LDR over a stale address.
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&dst[0], kLdrX16Pc8, __ATOMIC_RELEASE);
 }
 
 } // namespace
@@ -72,7 +106,9 @@ bool inline_hook_install(void *target, void *handler, void **out_trampoline) {
         }
     }
 
-    void *tramp = mmap(nullptr, kHookSize + 16, PROT_READ | PROT_WRITE | PROT_EXEC,
+    // Map the trampoline RW, fill it, then flip to RX. Never hold an RWX
+    // mapping, which W^X / SELinux execmem policies routinely reject.
+    void *tramp = mmap(nullptr, kTrampolineSize, PROT_READ | PROT_WRITE,
                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (tramp == MAP_FAILED) {
         log_warn("inline_hook: mmap failed for trampoline");
@@ -81,19 +117,29 @@ bool inline_hook_install(void *target, void *handler, void **out_trampoline) {
 
     std::memcpy(tramp, target, kHookSize);
     auto *tail = reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(tramp) + kHookSize);
-    write_absolute_jump(tail, reinterpret_cast<uint8_t *>(target) + kHookSize);
-    __builtin___clear_cache(static_cast<char *>(tramp),
-                            static_cast<char *>(tramp) + kHookSize + 16);
+    build_absolute_jump(tail, reinterpret_cast<uint8_t *>(target) + kHookSize);
 
-    if (!unprotect_page(target, kHookSize)) {
-        log_warn("inline_hook: mprotect rwx failed");
-        munmap(tramp, kHookSize + 16);
+    if (mprotect(tramp, kTrampolineSize, PROT_READ | PROT_EXEC) != 0) {
+        log_warn("inline_hook: mprotect RX failed for trampoline");
+        munmap(tramp, kTrampolineSize);
         return false;
     }
-    write_absolute_jump(target_words, handler);
+    __builtin___clear_cache(static_cast<char *>(tramp),
+                            static_cast<char *>(tramp) + kTrampolineSize);
+
+    // The target stays R+X (executable) while we add write permission: dropping
+    // EXEC on a page other threads may be executing would fault them.
+    if (!unprotect_page(target, kHookSize)) {
+        log_warn("inline_hook: mprotect rwx failed");
+        munmap(tramp, kTrampolineSize);
+        return false;
+    }
+    publish_live_absolute_jump(target_words, handler);
     __builtin___clear_cache(static_cast<char *>(target),
                             static_cast<char *>(target) + kHookSize);
-    reprotect_page(target, kHookSize);
+    if (!reprotect_page(target, kHookSize)) {
+        log_warn("inline_hook: failed to restore R+X on target page; left writable");
+    }
 
     *out_trampoline = tramp;
     return true;
@@ -115,9 +161,12 @@ bool inline_hook_branch(void *target, void *handler) {
         for (int dir : {1, -1}) {
             const uintptr_t hint = (target_addr + dir * offset) &
                                    ~static_cast<uintptr_t>(page_size - 1);
+            // MAP_FIXED_NOREPLACE places the page exactly at `hint` (or fails)
+            // on modern kernels, so we usually succeed on the first in-range
+            // hint instead of repeatedly mapping and unmapping far addresses.
             void *result = mmap(reinterpret_cast<void *>(hint), static_cast<size_t>(page_size),
-                                PROT_READ | PROT_WRITE | PROT_EXEC,
-                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                                PROT_READ | PROT_WRITE,
+                                MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
             if (result == MAP_FAILED) continue;
             const intptr_t diff = reinterpret_cast<intptr_t>(result) -
                                   static_cast<intptr_t>(target_addr);
@@ -134,11 +183,15 @@ bool inline_hook_branch(void *target, void *handler) {
         return false;
     }
 
-    // Trampoline: LDR x16, [pc, #8] ; BR x16 ; <8-byte handler address>
+    // Trampoline: LDR x16, [pc, #8] ; BR x16 ; <8-byte handler address>.
+    // Filled while RW, then flipped to RX (never RWX).
     auto *tramp_words = reinterpret_cast<uint32_t *>(tramp);
-    tramp_words[0] = 0x58000050u; // LDR x16, [pc, #8]
-    tramp_words[1] = 0xd61f0200u; // BR x16
-    std::memcpy(&tramp_words[2], &handler, sizeof(handler));
+    build_absolute_jump(tramp_words, handler);
+    if (mprotect(tramp, static_cast<size_t>(page_size), PROT_READ | PROT_EXEC) != 0) {
+        log_warn("inline_hook_branch: mprotect RX failed for trampoline");
+        munmap(tramp, static_cast<size_t>(page_size));
+        return false;
+    }
     __builtin___clear_cache(static_cast<char *>(tramp),
                             static_cast<char *>(tramp) + 16);
 
@@ -159,10 +212,14 @@ bool inline_hook_branch(void *target, void *handler) {
         munmap(tramp, static_cast<size_t>(page_size));
         return false;
     }
-    *reinterpret_cast<uint32_t *>(target) = b_instr;
+    // Single aligned 32-bit store: a thread fetching the entry word sees either
+    // the original instruction or the complete branch, never a torn value.
+    __atomic_store_n(reinterpret_cast<uint32_t *>(target), b_instr, __ATOMIC_RELEASE);
     __builtin___clear_cache(static_cast<char *>(target),
                             static_cast<char *>(target) + 4);
-    reprotect_page(target, 4);
+    if (!reprotect_page(target, 4)) {
+        log_warn("inline_hook_branch: failed to restore R+X on target page; left writable");
+    }
 
     log_info(std::string("inline_hook_branch: patched target @ ") +
              std::to_string(target_addr) + " -> trampoline @ " +

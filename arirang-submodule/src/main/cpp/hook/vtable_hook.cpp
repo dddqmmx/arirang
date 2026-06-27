@@ -117,6 +117,9 @@ bool looks_like_relative_vtable_slot(uintptr_t slot, const std::vector<MapEntry>
     for (intptr_t delta : { -4, 4, -8, 8 }) {
         const uintptr_t neighbour =
             static_cast<uintptr_t>(static_cast<intptr_t>(slot) + delta);
+        // Guard against underflow from the negative deltas wrapping near null:
+        // skip neighbours too low to hold a readable int32 (also drops bogus
+        // near-zero addresses before we dereference them).
         if (static_cast<intptr_t>(neighbour) < static_cast<intptr_t>(sizeof(int32_t))) continue;
         bool readable = false;
         for (const auto &e : maps) {
@@ -130,6 +133,32 @@ bool looks_like_relative_vtable_slot(uintptr_t slot, const std::vector<MapEntry>
         const uintptr_t dest =
             static_cast<uintptr_t>(static_cast<intptr_t>(neighbour) + rel);
         if (address_in_executable_region(dest, maps)) return true;
+    }
+    return false;
+}
+
+// A real vtable / method-table holds several consecutive function pointers, so
+// require that at least one immediately-neighbouring 8-byte slot also points
+// into executable code. This stops the absolute scan from rewriting an isolated
+// global function-pointer variable that merely happens to hold the target
+// address (action-at-a-distance bugs that are very hard to trace).
+bool looks_like_absolute_vtable_slot(uintptr_t slot, const std::vector<MapEntry> &maps) {
+    for (intptr_t delta : { -static_cast<intptr_t>(kPointerSize),
+                            static_cast<intptr_t>(kPointerSize) }) {
+        const uintptr_t neighbour =
+            static_cast<uintptr_t>(static_cast<intptr_t>(slot) + delta);
+        if (static_cast<intptr_t>(neighbour) < static_cast<intptr_t>(kPointerSize)) continue;
+        bool readable = false;
+        for (const auto &e : maps) {
+            if (e.readable && neighbour >= e.start && neighbour + kPointerSize <= e.end) {
+                readable = true;
+                break;
+            }
+        }
+        if (!readable) continue;
+        const uintptr_t value =
+            reinterpret_cast<uintptr_t>(*reinterpret_cast<void **>(neighbour));
+        if (address_in_executable_region(value, maps)) return true;
     }
     return false;
 }
@@ -188,6 +217,11 @@ bool vtable_hook_install(const char *library_path,
                 void *const slot = reinterpret_cast<void *>(addr);
                 void *const value = *reinterpret_cast<void **>(slot);
                 if (reinterpret_cast<uintptr_t>(value) != target) continue;
+                if (!looks_like_absolute_vtable_slot(addr, maps)) {
+                    log_info(std::string("vtable_hook: skipping isolated pointer @ ") +
+                             std::to_string(addr) + " (no executable neighbour)");
+                    continue;
+                }
 
                 const bool already_writable = entry.writable;
                 if (!already_writable && !set_page_writable(addr, true)) {
