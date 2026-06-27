@@ -61,6 +61,7 @@ import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
 import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
 import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import java.security.SecureRandom
 
 class BluetoothConfigActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -497,7 +498,8 @@ class BluetoothConfigActivity : ComponentActivity() {
                     BluetoothTextField(
                         label = stringResource(R.string.bluetooth_field_address),
                         value = device.address,
-                        onValueChange = { onDeviceChange(device.copy(address = it)) }
+                        onValueChange = { onDeviceChange(device.copy(address = it)) },
+                        onRandom = { onDeviceChange(device.copy(address = randomMacAddress())) }
                     )
                 }
             }
@@ -508,14 +510,33 @@ class BluetoothConfigActivity : ComponentActivity() {
     private fun BluetoothTextField(
         label: String,
         value: String,
-        onValueChange: (String) -> Unit
+        onValueChange: (String) -> Unit,
+        onRandom: (() -> Unit)? = null
     ) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             label = { Text(label) },
+            trailingIcon = {
+                if (onRandom != null) {
+                    IconButton(onClick = onRandom) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
+                    }
+                }
+            },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+
+    companion object {
+        private val macRandom = SecureRandom()
+
+        private fun randomMacAddress(): String = buildString {
+            repeat(6) { i ->
+                if (i > 0) append(':')
+                append("%02X".format(macRandom.nextInt(256)))
+            }
+        }
     }
 }

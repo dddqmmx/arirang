@@ -61,6 +61,7 @@ import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
 import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
 import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import java.security.SecureRandom
 
 class WifiConfigActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -197,7 +198,8 @@ class WifiConfigActivity : ComponentActivity() {
                         WifiTextField(
                             label = stringResource(R.string.wifi_field_current_bssid),
                             value = config.currentBssid,
-                            onValueChange = { config = config.copy(currentBssid = it) }
+                            onValueChange = { config = config.copy(currentBssid = it) },
+                            onRandom = { config = config.copy(currentBssid = randomBssid()) }
                         )
                     }
                 }
@@ -427,7 +429,8 @@ class WifiConfigActivity : ComponentActivity() {
                     WifiTextField(
                         label = stringResource(R.string.wifi_field_scan_bssid),
                         value = network.bssid,
-                        onValueChange = { onNetworkChange(network.copy(bssid = it)) }
+                        onValueChange = { onNetworkChange(network.copy(bssid = it)) },
+                        onRandom = { onNetworkChange(network.copy(bssid = randomBssid())) }
                     )
                 }
             }
@@ -438,14 +441,33 @@ class WifiConfigActivity : ComponentActivity() {
     private fun WifiTextField(
         label: String,
         value: String,
-        onValueChange: (String) -> Unit
+        onValueChange: (String) -> Unit,
+        onRandom: (() -> Unit)? = null
     ) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             label = { Text(label) },
+            trailingIcon = {
+                if (onRandom != null) {
+                    IconButton(onClick = onRandom) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
+                    }
+                }
+            },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+
+    companion object {
+        private val bssidRandom = SecureRandom()
+
+        private fun randomBssid(): String = buildString {
+            repeat(6) { i ->
+                if (i > 0) append(':')
+                append("%02X".format(bssidRandom.nextInt(256)))
+            }
+        }
     }
 }
