@@ -15,7 +15,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
 // through the normal Settings.Secure path instead of per-app hooks.
-class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.providers.settings", "org.derpfest.settingsstorage")) {
+class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.providers.settings")) {
 
     private companion object {
         private const val KEY_ENABLED = "enabled"
@@ -28,12 +28,6 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         val classLoader = lpparam.classLoader
-        
-        // Target any settings provider
-        val isSettingsProvider = lpparam.packageName.contains("providers.settings") || 
-                                 lpparam.packageName.contains("settingsstorage")
-
-        if (!isSettingsProvider) return
 
         HookLog.i(HookLog.Module.SETTINGS, "Installing settings hook for ${lpparam.packageName}")
 
@@ -41,13 +35,8 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
             val lmsClass = XposedHelpers.findClassIfExists(
                 "com.android.providers.settings.SettingsProvider",
                 classLoader
-            ) ?: XposedHelpers.findClassIfExists(
-                "org.derpfest.settingsstorage.SettingsProvider", // Speculative
-                classLoader
-            ) ?: return
-
+            )?: return
             hookCall(lmsClass)
-
         } catch (t: Throwable) {
             HookLog.e(HookLog.Module.SETTINGS, "hook failed for ${lpparam.packageName}", t)
         }
