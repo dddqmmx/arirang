@@ -130,7 +130,7 @@ Use at your own risk.
 
 - Rooted Android device
 - **LSPosed** or compatible Xposed framework
-- Android 14 or later
+- Android 15 or later
 - Android 16 is the current recommended target for testing
 - Magisk, KernelSU / KernelSU Next, or APatch (required for native submodule features)
 - Zygisk (required for native submodule features)
