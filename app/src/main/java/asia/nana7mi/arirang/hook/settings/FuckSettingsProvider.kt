@@ -92,6 +92,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
                     bundle.putString(Settings.NameValueTable.VALUE, bluetoothName)
                     result = bundle
                     HookLog.i(HookLog.Module.SETTINGS, "spoof Settings.Global.$request -> $bluetoothName")
+                    return@beforeHookedMethod
                 }
             }
         )
