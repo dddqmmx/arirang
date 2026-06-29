@@ -38,6 +38,9 @@ fi
 BIND_TARGET=$(cat "$LANDING_BINDPATH")
 
 # Wait for the Widevine HAL daemon to come up.
+# Device/vendor builds use different service names for the same DRM stack.
+# Try newest Widevine HIDL first, then common vendor aliases. Clearkey is kept
+# as a development fallback on AOSP-like images where Widevine is absent.
 HAL_PID=""
 i=0
 while [ $i -lt 60 ]; do
@@ -60,6 +63,9 @@ fi
 log -p i -t "$LOG_TAG" "injecting $BIND_TARGET into pid=$HAL_PID"
 
 # Invoke injector. Output goes to logcat via stderr piped through log.
+# BIND_TARGET is the vendor-visible bind-mount path, not the module-private
+# /data/adb/modules/.../lib path. The vendor linker namespace may reject the
+# module-private path even though root can read it.
 "$INJECTOR" "$HAL_PID" "$BIND_TARGET" 2>&1 \
     | while IFS= read -r line; do log -p i -t "$LOG_TAG" "$line"; done
 

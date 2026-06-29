@@ -1,8 +1,8 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -19,7 +19,7 @@ internal class BluetoothScanHooks(
         )
         var anyHooked = false
         names.distinct().forEach { className ->
-            val scanControllerClass = XposedHelpers.findClassIfExists(className, classLoader)
+            val scanControllerClass = BaseHookModule.findClassIfExists(className, classLoader)
                 ?: return@forEach
 
             if (!hookedClasses.add(scanControllerClass)) {
@@ -31,7 +31,7 @@ internal class BluetoothScanHooks(
                 if ((method.name == "onScanResult" || method.name == "onScanResultInternal") &&
                     method.parameterTypes.size >= 5
                 ) {
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                    BaseHookModule.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
                         result = null
@@ -41,7 +41,7 @@ internal class BluetoothScanHooks(
                 if ((method.name == "onBatchScanReports" || method.name == "onBatchScanReportsInternal") &&
                     method.parameterTypes.size >= 3
                 ) {
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                    BaseHookModule.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
                         result = null
@@ -54,14 +54,14 @@ internal class BluetoothScanHooks(
     }
 
     fun hookGattService(classLoader: ClassLoader): Boolean {
-        val gattServiceClass = XposedHelpers.findClassIfExists(GATT_SERVICE_CLASS, classLoader)
+        val gattServiceClass = BaseHookModule.findClassIfExists(GATT_SERVICE_CLASS, classLoader)
             ?: return false
 
         if (!hookedClasses.add(gattServiceClass)) return true
 
         gattServiceClass.declaredMethods.forEach { method ->
             if (method.name == "onScanResult" && method.parameterTypes.size == 2) {
-                XposedBridge.hookMethod(method, beforeHookedMethod {
+                BaseHookModule.hookMethod(method, beforeHookedMethod {
                     val config = currentConfig()
                     if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
                     result = null

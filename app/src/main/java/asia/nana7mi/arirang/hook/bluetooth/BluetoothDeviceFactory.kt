@@ -1,7 +1,8 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import android.bluetooth.BluetoothDevice
-import de.robv.android.xposed.XposedHelpers
 
 /**
  * Creates a [BluetoothDevice] with a spoofed address.
@@ -12,17 +13,17 @@ import de.robv.android.xposed.XposedHelpers
  */
 internal fun createFakeBluetoothDevice(device: BluetoothDeviceProfile): BluetoothDevice? {
     val bt = runCatching {
-        XposedHelpers.newInstance(BluetoothDevice::class.java, device.address)
+        BaseHookModule.newInstance(BluetoothDevice::class.java, device.address)
     }.getOrNull() ?: runCatching {
-        XposedHelpers.newInstance(
+        BaseHookModule.newInstance(
             BluetoothDevice::class.java,
             device.address,
             0 // ADDRESS_TYPE_PUBLIC
         )
     }.getOrNull() ?: return null
 
-    runCatching { XposedHelpers.setObjectField(bt, "mName", device.name) }
-    runCatching { XposedHelpers.setObjectField(bt, "mAlias", device.name) }
+    runCatching { BaseHookModule.setObjectField(bt, "mName", device.name) }
+    runCatching { BaseHookModule.setObjectField(bt, "mAlias", device.name) }
 
     return bt as BluetoothDevice?
 }

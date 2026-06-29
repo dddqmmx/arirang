@@ -47,6 +47,9 @@ bool init_aosp_helpers() {
     if (initialized) return success;
     initialized = true;
 
+    // Sensor and Vector are private framework C++ types. Instead of re-
+    // implementing android::String8 / VectorImpl ownership rules, delegate the
+    // few constructors/mutators we need to the real libutils symbols.
     s_libutils = dlopen("libutils.so", RTLD_NOW);
     if (s_libutils == nullptr) {
         log_warn(std::string("sensor_spoofer: dlopen libutils.so failed: ") + dlerror());
@@ -260,6 +263,8 @@ void apply_overrides(Sensor &sensor, const SubmoduleConfig &config) {
 
 void inject_sensors(Vector *list, const SubmoduleConfig &config) {
     for (const auto &entry : config.sensor_injections) {
+        // Vector::push_back copies the item bytes through VectorImpl::add, so
+        // the stack-local Sensor may be destroyed immediately after insertion.
         Sensor injection;
         injection.setType(entry.type);
         injection.setHandle(entry.handle);
@@ -278,6 +283,9 @@ void apply_rules(Vector *list) {
     if (config == nullptr || !config->enabled || list == nullptr || !s_active_process) return;
 
     if (list->item_size() != sizeof(Sensor)) {
+        // A size mismatch means our local mirror in sensor_aosp_types.hpp no
+        // longer matches the framework build. Mutating the vector would be
+        // unsafe, so fail open and leave the original list untouched.
         log_warn(std::string("sensor_spoofer: size mismatch, expected=") +
                  std::to_string(sizeof(Sensor)) + " got=" +
                  std::to_string(list->item_size()) + ", skipping");
@@ -360,6 +368,9 @@ void patch_vtable(void *sensor_service) {
     uintptr_t slot1 = reinterpret_cast<uintptr_t>(&vtable[kGetSensorListSlot / sizeof(void *)]);
     uintptr_t slot2 = reinterpret_cast<uintptr_t>(&vtable[kGetDynamicSensorListSlot / sizeof(void *)]);
 
+    // The slot offsets are AOSP-derived for BnSensorServer. We capture them on
+    // first real onTransact call because that gives us the actual service object
+    // instance and its final vtable after construction.
     s_orig_get_sensor_list = reinterpret_cast<GetSensorListFn>(vtable[kGetSensorListSlot / sizeof(void *)]);
     s_orig_get_dynamic_sensor_list = reinterpret_cast<GetSensorListFn>(vtable[kGetDynamicSensorListSlot / sizeof(void *)]);
 
@@ -476,6 +487,9 @@ ssize_t hook_send_objects(void *tube, const void *events, size_t count, size_t o
             for (size_t i = 0; i < count; ++i) {
                 const int level = precision_level_for_type(*config, evs[i].type);
                 if (level <= 0) continue;
+                // Only the first three float channels are rounded. That covers
+                // accelerometer/gyro/magnetic/vector-style sensors while keeping
+                // event metadata, timestamps, and flags unchanged.
                 evs[i].data[0] = round_to_level(evs[i].data[0], level);
                 evs[i].data[1] = round_to_level(evs[i].data[1], level);
                 evs[i].data[2] = round_to_level(evs[i].data[2], level);
@@ -567,6 +581,9 @@ void install_sensor_spoofer(
              std::to_string(reinterpret_cast<uintptr_t>(on_transact)));
 
     void *trampoline = nullptr;
+    // onTransact is used only as a discovery hook for the live service object.
+    // After the first transaction patches the vtable, regular getSensorList
+    // calls go directly through the vtable hooks above.
     if (!inline_hook_install(on_transact, reinterpret_cast<void *>(hook_on_transact), &trampoline)) {
         log_warn("sensor_spoofer: failed to inline-hook BnSensorServer::onTransact");
         return;

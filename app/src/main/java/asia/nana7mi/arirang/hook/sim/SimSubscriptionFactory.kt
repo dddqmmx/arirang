@@ -1,9 +1,10 @@
 package asia.nana7mi.arirang.hook.sim
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.util.callOneArgIfCompatible
 
-import de.robv.android.xposed.XposedHelpers
 
 internal fun copyOrRewriteSubscriptionInfo(
     subscriptionInfo: Any?,
@@ -26,9 +27,9 @@ internal fun createSubscriptionInfo(
 ): Any? {
     return runCatching {
         val subscriptionInfoClass = template?.javaClass
-            ?: XposedHelpers.findClassIfExists("android.telephony.SubscriptionInfo", classLoader)
+            ?: BaseHookModule.findClassIfExists("android.telephony.SubscriptionInfo", classLoader)
             ?: return@runCatching null
-        val builderClass = XposedHelpers.findClassIfExists(
+        val builderClass = BaseHookModule.findClassIfExists(
             "android.telephony.SubscriptionInfo\$Builder",
             classLoader ?: subscriptionInfoClass.classLoader
         ) ?: return@runCatching null

@@ -10,8 +10,6 @@ import asia.nana7mi.arirang.hook.util.getFieldValue
 import android.os.Binder
 import android.os.Process
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -89,8 +87,8 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         if (phoneConfigBindHookInstalled) return
         phoneConfigBindHookInstalled = true
 
-        val applicationClass = XposedHelpers.findClassIfExists("android.app.Application", classLoader) ?: return
-        XposedBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
+        val applicationClass = BaseHookModule.findClassIfExists("android.app.Application", classLoader) ?: return
+        BaseHookModule.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
             val app = thisObject as? android.app.Application ?: return@afterHookedMethod
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 ArirangClient.autoBindCurrentUser(app)
@@ -101,7 +99,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookServiceStateSurfaces(classLoader: ClassLoader) {
-        val serviceStateClass = XposedHelpers.findClassIfExists(
+        val serviceStateClass = BaseHookModule.findClassIfExists(
             "android.telephony.ServiceState",
             classLoader
         ) ?: return
@@ -117,12 +115,12 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "com.android.phone.PhoneInterfaceManager",
             "com.android.server.TelephonyRegistry"
         ).forEach { className ->
-            val targetClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return@forEach
+            val targetClass = BaseHookModule.findClassIfExists(className, classLoader) ?: return@forEach
 
             targetClass.declaredMethods
                 .filter { it.returnType == serviceStateClass }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, afterHookedMethod {
+                    BaseHookModule.hookMethod(method, afterHookedMethod {
                         val config = hookConfig
                         if (!config.enabled) return@afterHookedMethod
                         rewriteServiceState(result, config.primaryProfile)
@@ -132,7 +130,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             targetClass.declaredMethods
                 .filter { method -> method.parameterTypes.any { it == serviceStateClass } }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, hookedMethod(
+                    BaseHookModule.hookMethod(method, hookedMethod(
                         before = {
                             val config = hookConfig
                             if (config.enabled) {
@@ -151,7 +149,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookPhoneInterfaceManager(classLoader: ClassLoader) {
-        val phoneInterfaceManagerClass = XposedHelpers.findClassIfExists(
+        val phoneInterfaceManagerClass = BaseHookModule.findClassIfExists(
             "com.android.phone.PhoneInterfaceManager",
             classLoader
         ) ?: run {
@@ -272,7 +270,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             phoneInterfaceManagerClass.declaredMethods
                 .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, afterHookedMethod {
+                    BaseHookModule.hookMethod(method, afterHookedMethod {
                         val config = hookConfig
                         if (!config.enabled) return@afterHookedMethod
                         rewriteNestedTelephonyObject(result, config.primaryProfile)
@@ -328,7 +326,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookTelephonyManagerUniqueIdentifierReaders(classLoader: ClassLoader) {
-        val telephonyManagerClass = XposedHelpers.findClassIfExists(
+        val telephonyManagerClass = BaseHookModule.findClassIfExists(
             "android.telephony.TelephonyManager",
             classLoader
         ) ?: return
@@ -370,7 +368,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookTelephonyObjectReaders(classLoader: ClassLoader) {
-        val telephonyManagerClass = XposedHelpers.findClassIfExists(
+        val telephonyManagerClass = BaseHookModule.findClassIfExists(
             "android.telephony.TelephonyManager",
             classLoader
         ) ?: return
@@ -384,7 +382,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             telephonyManagerClass.declaredMethods
                 .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
                 .forEach { method ->
-                    XposedBridge.hookMethod(method, afterHookedMethod {
+                    BaseHookModule.hookMethod(method, afterHookedMethod {
                         val config = hookConfig
                         if (!config.enabled) return@afterHookedMethod
                         rewriteNestedTelephonyObject(result, config.primaryProfile)
@@ -394,7 +392,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookOperatorInfoSurfaces(classLoader: ClassLoader) {
-        val operatorInfoClass = XposedHelpers.findClassIfExists(
+        val operatorInfoClass = BaseHookModule.findClassIfExists(
             "android.telephony.OperatorInfo",
             classLoader
         ) ?: return
@@ -413,7 +411,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookNetworkRegistrationInfoSurfaces(classLoader: ClassLoader) {
-        val networkRegistrationInfoClass = XposedHelpers.findClassIfExists(
+        val networkRegistrationInfoClass = BaseHookModule.findClassIfExists(
             "android.telephony.NetworkRegistrationInfo",
             classLoader
         ) ?: return
@@ -435,7 +433,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     method.returnType.name.startsWith("android.telephony.CellIdentity")
             }
             .forEach { method ->
-                XposedBridge.hookMethod(method, afterHookedMethod {
+                BaseHookModule.hookMethod(method, afterHookedMethod {
                     val config = hookConfig
                     if (!config.enabled) return@afterHookedMethod
                     rewriteNestedTelephonyObject(result, config.primaryProfile)
@@ -455,7 +453,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass.declaredMethods
             .filter { it.name == methodName && it.parameterTypes.isEmpty() && !Modifier.isAbstract(it.modifiers) }
             .forEach { method ->
-                XposedBridge.hookMethod(method, hookedMethod(
+                BaseHookModule.hookMethod(method, hookedMethod(
                     before = {
                         val config = hookConfig
                         if (config.enabled) {
@@ -479,7 +477,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass.declaredMethods
             .filter { it.name == "toString" && it.parameterTypes.isEmpty() && !Modifier.isAbstract(it.modifiers) }
             .forEach { method ->
-                XposedBridge.hookMethod(method, hookedMethod(
+                BaseHookModule.hookMethod(method, hookedMethod(
                     before = {
                         val config = hookConfig
                         if (config.enabled) {
@@ -502,7 +500,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "com.android.server.telephony.SubscriptionController",
             "com.android.internal.telephony.subscription.SubscriptionManagerService",
             "com.android.internal.telephony.SubscriptionController"
-        ).mapNotNull { XposedHelpers.findClassIfExists(it, classLoader) }
+        ).mapNotNull { BaseHookModule.findClassIfExists(it, classLoader) }
 
         if (serviceClasses.isEmpty()) {
             HookLog.w(HookLog.Module.SIM, "Subscription service not found for SIM proof")
@@ -598,7 +596,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "android.telephony.CellInfoTdscdma",
             "android.telephony.CellInfoLte",
             "android.telephony.CellInfoNr"
-        ).mapNotNull { XposedHelpers.findClassIfExists(it, classLoader) }
+        ).mapNotNull { BaseHookModule.findClassIfExists(it, classLoader) }
             .forEach { cellInfoClass ->
                 cellInfoClass.declaredMethods
                     .filter { method -> !Modifier.isAbstract(method.modifiers) }
@@ -607,7 +605,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                             method.returnType.name.startsWith("android.telephony.CellIdentity")
                     }
                     .forEach { method ->
-                        XposedBridge.hookMethod(method, afterHookedMethod {
+                        BaseHookModule.hookMethod(method, afterHookedMethod {
                             val config = hookConfig
                             if (!config.enabled) return@afterHookedMethod
                             rewriteNestedTelephonyObject(result, config.primaryProfile)
@@ -628,7 +626,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             "android.telephony.CellIdentityTdscdma",
             "android.telephony.CellIdentityLte",
             "android.telephony.CellIdentityNr"
-        ).mapNotNull { XposedHelpers.findClassIfExists(it, classLoader) }
+        ).mapNotNull { BaseHookModule.findClassIfExists(it, classLoader) }
             .forEach { cellIdentityClass ->
                 cellIdentityClass.declaredMethods
                     .filter { method -> !Modifier.isAbstract(method.modifiers) }
@@ -648,7 +646,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                         )
                     }
                     .forEach { method ->
-                        XposedBridge.hookMethod(method, hookedMethod(
+                        BaseHookModule.hookMethod(method, hookedMethod(
                             before = {
                                 val config = hookConfig
                                 if (config.enabled) {
@@ -676,7 +674,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 cellIdentityClass.declaredMethods
                     .filter { it.name == "toString" && it.parameterTypes.isEmpty() }
                     .forEach { method ->
-                        XposedBridge.hookMethod(method, hookedMethod(
+                        BaseHookModule.hookMethod(method, hookedMethod(
                             before = {
                                 val config = hookConfig
                                 if (config.enabled) {
@@ -718,7 +716,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         ).forEach { methodName ->
             if (targetClass.declaredMethods.none { it.name == methodName }) return@forEach
 
-            XposedBridge.hookAllMethods(targetClass, methodName, hookedMethod(
+            BaseHookModule.hookAllMethods(targetClass, methodName, hookedMethod(
                 before = {
                     val config = hookConfig
                     if (config.enabled && shouldRewriteForCaller(externalClientsOnly) && shouldShortCircuitInternalSubscriptionIdRead()) {
@@ -744,7 +742,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         if (methods.isEmpty()) return
 
         methods.forEach { method ->
-            XposedBridge.hookMethod(method, afterHookedMethod {
+            BaseHookModule.hookMethod(method, afterHookedMethod {
                 if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return@afterHookedMethod
                 result = rewriteSubscriptionResult(
                     result = result,
@@ -768,7 +766,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         if (methods.isEmpty()) return
 
         methods.forEach { method ->
-            XposedBridge.hookMethod(method, hookedMethod(
+            BaseHookModule.hookMethod(method, hookedMethod(
                 before = {
                     if (beforeOriginal) {
                         val config = hookConfig
@@ -822,7 +820,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
-        val targetClass = XposedHelpers.findClassIfExists(className, classLoader) ?: return
+        val targetClass = BaseHookModule.findClassIfExists(className, classLoader) ?: return
         hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, beforeOriginal, shouldHandle, resultProvider)
     }
 
@@ -850,7 +848,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                         "install TAC hook ${targetClass.name}.${method.name}(${method.parameterTypes.joinToString { it.simpleName }}) beforeOriginal=$beforeOriginal"
                     )
                 }
-                XposedBridge.hookMethod(method, hookedMethod(
+                BaseHookModule.hookMethod(method, hookedMethod(
                     before = {
                         if (beforeOriginal) {
                             val config = hookConfig

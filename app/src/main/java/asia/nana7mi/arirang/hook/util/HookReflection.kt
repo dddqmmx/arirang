@@ -1,6 +1,7 @@
 package asia.nana7mi.arirang.hook.util
 
-import de.robv.android.xposed.XposedHelpers
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import java.lang.reflect.Field
 
 internal fun findFieldInHierarchy(clazz: Class<*>, fieldName: String): Field? {
@@ -27,7 +28,7 @@ internal fun setFieldValueIfExists(instance: Any, fieldName: String, value: Any?
     runCatching {
         val field = findFieldInHierarchy(instance.javaClass, fieldName) ?: return@runCatching
         val normalizedValue = field.type.coerceReflectiveValue(value)
-        XposedHelpers.setObjectField(instance, fieldName, normalizedValue)
+        BaseHookModule.setObjectField(instance, fieldName, normalizedValue)
     }
 }
 

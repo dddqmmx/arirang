@@ -1,11 +1,12 @@
 package asia.nana7mi.arirang.hook.location
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.util.callNoArg
 import asia.nana7mi.arirang.hook.util.getFieldValue
 
 import android.location.LocationManager
-import de.robv.android.xposed.XposedHelpers
 
 internal object LocationCallerResolver {
     fun providerFromArgs(args: Array<Any?>): String {
@@ -116,14 +117,14 @@ internal object LocationCallerResolver {
     private fun packageNameFromWorkSource(value: Any?): String? {
         val workSource = value?.takeIf { it.javaClass.name == "android.os.WorkSource" } ?: return null
         return runCatching {
-            val size = XposedHelpers.callMethod(workSource, "size") as? Int ?: return@runCatching null
+            val size = BaseHookModule.callMethod(workSource, "size") as? Int ?: return@runCatching null
             repeat(size) { index ->
-                (XposedHelpers.callMethod(workSource, "getName", index) as? String)
+                (BaseHookModule.callMethod(workSource, "getName", index) as? String)
                     ?.takeIf { it.isLikelyPackageName() && it != GMS_PACKAGE }
                     ?.let { return it }
             }
             repeat(size) { index ->
-                val uid = XposedHelpers.callMethod(workSource, "getUid", index) as? Int ?: return@repeat
+                val uid = BaseHookModule.callMethod(workSource, "getUid", index) as? Int ?: return@repeat
                 packageNameForUid(uid)
                     ?.takeIf { it != GMS_PACKAGE }
                     ?.let { return it }

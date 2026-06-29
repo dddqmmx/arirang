@@ -1,10 +1,10 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import android.bluetooth.BluetoothDevice
 import asia.nana7mi.arirang.hook.core.HookLog
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -17,7 +17,7 @@ internal class BluetoothAdapterHooks(
     private var spoofedDeviceMap: Map<String, BluetoothDeviceProfile> = emptyMap()
 
     fun hookAdapterService(classLoader: ClassLoader): Boolean {
-        val serviceClass = XposedHelpers.findClassIfExists(
+        val serviceClass = BaseHookModule.findClassIfExists(
             ADAPTER_SERVICE_CLASS,
             classLoader
         ) ?: run {
@@ -35,7 +35,7 @@ internal class BluetoothAdapterHooks(
                     method.parameterTypes.isEmpty() &&
                     method.returnType == String::class.java -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getAddress()")
-                    XposedBridge.hookMethod(method, afterHookedMethod {
+                    BaseHookModule.hookMethod(method, afterHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@afterHookedMethod
                         result = SPOOFED_LOCAL_MAC
@@ -45,7 +45,7 @@ internal class BluetoothAdapterHooks(
                 method.name == "getBondedDevices" &&
                     method.returnsListOfBluetoothDevice() -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getBondedDevices()")
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                    BaseHookModule.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
                         if (config.hideConnectedDevices) {
@@ -61,7 +61,7 @@ internal class BluetoothAdapterHooks(
                     method.parameterTypes.size == 1 &&
                     BluetoothDevice::class.java.isAssignableFrom(method.parameterTypes[0]) -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getRemoteName()")
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                    BaseHookModule.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
                         val device = args[0] as? BluetoothDevice ?: return@beforeHookedMethod
@@ -76,10 +76,10 @@ internal class BluetoothAdapterHooks(
     }
 
     fun hookAdapterProperties(classLoader: ClassLoader): Boolean {
-        val propertiesClass = XposedHelpers.findClassIfExists(
+        val propertiesClass = BaseHookModule.findClassIfExists(
             ADAPTER_PROPERTIES_CLASS,
             classLoader
-        ) ?: XposedHelpers.findClassIfExists(
+        ) ?: BaseHookModule.findClassIfExists(
             "com.android.bluetooth.btservice.AdapterProperties",
             classLoader
         ) ?: run {
@@ -96,7 +96,7 @@ internal class BluetoothAdapterHooks(
                     method.parameterTypes.isEmpty() &&
                     method.returnType == String::class.java -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking ${propertiesClass.name}.getName()")
-                    XposedBridge.hookMethod(method, afterHookedMethod {
+                    BaseHookModule.hookMethod(method, afterHookedMethod {
                         val config = currentConfig()
                         val original = result as? String
                         if (!config.enabled) {
@@ -118,7 +118,7 @@ internal class BluetoothAdapterHooks(
                     method.parameterTypes.isEmpty() &&
                     method.returnType == ByteArray::class.java -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking ${propertiesClass.name}.getAddress()")
-                    XposedBridge.hookMethod(method, afterHookedMethod {
+                    BaseHookModule.hookMethod(method, afterHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@afterHookedMethod
                         result = macToBytes(SPOOFED_LOCAL_MAC)
@@ -126,7 +126,7 @@ internal class BluetoothAdapterHooks(
                 }
 
                 method.name == "getBondedDevices" && method.returnsBluetoothDeviceCollection() -> {
-                    XposedBridge.hookMethod(method, beforeHookedMethod {
+                    BaseHookModule.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
                         if (config.hideConnectedDevices) {

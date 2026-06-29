@@ -10,8 +10,6 @@ import android.content.pm.ResolveInfo
 import android.content.pm.ProviderInfo
 import android.os.Binder
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedHelpers
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,7 +23,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
-            val smClass = XposedHelpers.findClassIfExists("android.os.ServiceManager", lpparam.classLoader)
+            val smClass = BaseHookModule.findClassIfExists("android.os.ServiceManager", lpparam.classLoader)
                 ?: throw ClassNotFoundException("ServiceManager not found")
 
             // Find addService method
@@ -35,20 +33,20 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     it.parameterTypes[0] == String::class.java
             } ?: throw NoSuchMethodException("addService not found")
 
-            XposedBridge.log("Arirang/package_list/I: Hooking ServiceManager.addService to capture package manager class")
+            BaseHookModule.log("Arirang/package_list/I: Hooking ServiceManager.addService to capture package manager class")
 
-            XposedBridge.hookMethod(addServiceMethod, beforeHookedMethod {
+            BaseHookModule.hookMethod(addServiceMethod, beforeHookedMethod {
                 if (args.getOrNull(0) == "package") {
                     val binder = args.getOrNull(1) ?: return@beforeHookedMethod
                     val pmClass = binder.javaClass
-                    XposedBridge.log("Arirang/package_list/I: Package manager service registered with class: ${pmClass.name}. Hooking methods...")
+                    BaseHookModule.log("Arirang/package_list/I: Package manager service registered with class: ${pmClass.name}. Hooking methods...")
                     hookPackageManagerService(pmClass)
                 }
             })
 
             HookLog.i(HookLog.Module.PACKAGE_LIST, "ServiceManager hook installed successfully")
         }.onFailure {
-            XposedBridge.log("Arirang/package_list/E: Failed to install ServiceManager hook: ${it.message}\n${it.stackTraceToString()}")
+            BaseHookModule.log("Arirang/package_list/E: Failed to install ServiceManager hook: ${it.message}\n${it.stackTraceToString()}")
         }
     }
 
@@ -94,15 +92,15 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         
         val declaringClass = findDeclaringClass(pmClass, methodName, *parameterTypes)
         if (declaringClass == null) {
-            XposedBridge.log("Arirang/package_list/W: Method $methodName not found in ${pmClass.name} hierarchy")
+            BaseHookModule.log("Arirang/package_list/W: Method $methodName not found in ${pmClass.name} hierarchy")
             return
         }
         
         runCatching {
-            XposedHelpers.findAndHookMethod(declaringClass, methodName, *parameterTypesAndCallback)
-            XposedBridge.log("Arirang/package_list/I: Successfully hooked $methodName on ${declaringClass.name}")
+            BaseHookModule.findAndHookMethod(declaringClass, methodName, *parameterTypesAndCallback)
+            BaseHookModule.log("Arirang/package_list/I: Successfully hooked $methodName on ${declaringClass.name}")
         }.onFailure {
-            XposedBridge.log("Arirang/package_list/E: Failed to hook $methodName on ${declaringClass.name}: ${it.message}")
+            BaseHookModule.log("Arirang/package_list/E: Failed to hook $methodName on ${declaringClass.name}: ${it.message}")
         }
     }
 
@@ -115,9 +113,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 .map { method ->
                     "${method.name}(${method.parameterTypes.joinToString { it.name }}) -> ${method.returnType.name}"
                 }
-            XposedBridge.log("Arirang/package_list/I: Declared matching methods: \n" + methods.joinToString("\n"))
+            BaseHookModule.log("Arirang/package_list/I: Declared matching methods: \n" + methods.joinToString("\n"))
         }.onFailure {
-            XposedBridge.log("Arirang/package_list/E: Failed to dump methods: ${it.message}")
+            BaseHookModule.log("Arirang/package_list/E: Failed to dump methods: ${it.message}")
         }
 
         // 1. Hook getInstalledApplications
@@ -159,11 +157,11 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
 
                     val callingPackages = getPackagesForUid(this.thisObject, callingUid)
                     if (!config.shouldKeepForPackages(callingUid, callingPackages, packageName)) {
-                        XposedBridge.log("Arirang/package_list/D: Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
+                        BaseHookModule.log("Arirang/package_list/D: Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
                         result = null
                     }
                 }.onFailure {
-                    XposedBridge.log("Arirang/package_list/E: getPackageInfo hook failed: ${it.message}")
+                    BaseHookModule.log("Arirang/package_list/E: getPackageInfo hook failed: ${it.message}")
                 }
             }
         )
@@ -177,14 +175,14 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 filterParceledListSlice(this, "queryIntentActivities") { item ->
                     val resolveInfo = item as? ResolveInfo ?: return@filterParceledListSlice null
                     runCatching {
-                        val activityInfo = XposedHelpers.getObjectField(resolveInfo, "activityInfo")
-                        XposedHelpers.getObjectField(activityInfo, "packageName") as String
+                        val activityInfo = BaseHookModule.getObjectField(resolveInfo, "activityInfo")
+                        BaseHookModule.getObjectField(activityInfo, "packageName") as String
                     }.getOrNull() ?: runCatching {
-                        val serviceInfo = XposedHelpers.getObjectField(resolveInfo, "serviceInfo")
-                        XposedHelpers.getObjectField(serviceInfo, "packageName") as String
+                        val serviceInfo = BaseHookModule.getObjectField(resolveInfo, "serviceInfo")
+                        BaseHookModule.getObjectField(serviceInfo, "packageName") as String
                     }.getOrNull() ?: runCatching {
-                        val providerInfo = XposedHelpers.getObjectField(resolveInfo, "providerInfo")
-                        XposedHelpers.getObjectField(providerInfo, "packageName") as String
+                        val providerInfo = BaseHookModule.getObjectField(resolveInfo, "providerInfo")
+                        BaseHookModule.getObjectField(providerInfo, "packageName") as String
                     }.getOrNull()
                 }
             }
@@ -199,8 +197,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 filterParceledListSlice(this, "queryIntentReceivers") { item ->
                     val resolveInfo = item as? ResolveInfo ?: return@filterParceledListSlice null
                     runCatching {
-                        val activityInfo = XposedHelpers.getObjectField(resolveInfo, "activityInfo")
-                        XposedHelpers.getObjectField(activityInfo, "packageName") as String
+                        val activityInfo = BaseHookModule.getObjectField(resolveInfo, "activityInfo")
+                        BaseHookModule.getObjectField(activityInfo, "packageName") as String
                     }.getOrNull()
                 }
             }
@@ -215,8 +213,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 filterParceledListSlice(this, "queryIntentServices") { item ->
                     val resolveInfo = item as? ResolveInfo ?: return@filterParceledListSlice null
                     runCatching {
-                        val serviceInfo = XposedHelpers.getObjectField(resolveInfo, "serviceInfo")
-                        XposedHelpers.getObjectField(serviceInfo, "packageName") as String
+                        val serviceInfo = BaseHookModule.getObjectField(resolveInfo, "serviceInfo")
+                        BaseHookModule.getObjectField(serviceInfo, "packageName") as String
                     }.getOrNull()
                 }
             }
@@ -230,10 +228,10 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 if (isInternalCall.get() == true) return@afterHookedMethod
                 filterParceledListSlice(this, "queryIntentContentProviders") { item ->
                     val providerInfo = item as? ProviderInfo
-                        ?: XposedHelpers.getObjectField(item, "providerInfo") as? ProviderInfo
+                        ?: BaseHookModule.getObjectField(item, "providerInfo") as? ProviderInfo
                         ?: return@filterParceledListSlice null
                     runCatching {
-                        XposedHelpers.getObjectField(providerInfo, "packageName") as String
+                        BaseHookModule.getObjectField(providerInfo, "packageName") as String
                     }.getOrNull()
                 }
             }
@@ -264,7 +262,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                         val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
                             isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
                         if (!keep) {
-                            XposedBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in getPackagesForUid")
+                            BaseHookModule.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in getPackagesForUid")
                         }
                         keep
                     }.toTypedArray()
@@ -273,7 +271,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                         result = if (filtered.isEmpty()) null else filtered
                     }
                 }.onFailure {
-                    XposedBridge.log("Arirang/package_list/E: getPackagesForUid hook failed: ${it.message}")
+                    BaseHookModule.log("Arirang/package_list/E: getPackagesForUid hook failed: ${it.message}")
                 }
             }
         )
@@ -307,13 +305,13 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     }
 
                     if (visibleTargetPackages.isEmpty()) {
-                        XposedBridge.log("Arirang/package_list/D: Filtered name '$name' for caller ${callingPackages.firstOrNull() ?: callingUid} in getNameForUid")
+                        BaseHookModule.log("Arirang/package_list/D: Filtered name '$name' for caller ${callingPackages.firstOrNull() ?: callingUid} in getNameForUid")
                         result = null
                     } else {
                         result = visibleTargetPackages.first()
                     }
                 }.onFailure {
-                    XposedBridge.log("Arirang/package_list/E: getNameForUid hook failed: ${it.message}")
+                    BaseHookModule.log("Arirang/package_list/E: getNameForUid hook failed: ${it.message}")
                 }
             }
         )
@@ -335,7 +333,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         if (uid <= 0) return emptyList()
         return withInternalCall {
             runCatching {
-                (XposedHelpers.callMethod(pmObject, "getPackagesForUid", uid) as? Array<*>)
+                (BaseHookModule.callMethod(pmObject, "getPackagesForUid", uid) as? Array<*>)
                     ?.mapNotNull { it as? String }
                     .orEmpty()
             }.getOrDefault(emptyList())
@@ -346,7 +344,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         val userId = callingUid / 100000
         return withInternalCall {
             runCatching {
-                XposedHelpers.callMethod(pmObject, "getPackageInfo", packageName, 0L, userId) != null
+                BaseHookModule.callMethod(pmObject, "getPackageInfo", packageName, 0L, userId) != null
             }.getOrDefault(true)
         }
     }
@@ -358,7 +356,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     ) {
         runCatching {
             val parceledListSlice = param.result ?: return
-            val list = XposedHelpers.callMethod(parceledListSlice, "getList") as? List<*> ?: return
+            val list = BaseHookModule.callMethod(parceledListSlice, "getList") as? List<*> ?: return
 
             val callingUid = Binder.getCallingUid()
             if (callingUid < 10000) return
@@ -372,13 +370,13 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 val pkg = getPackageName(item) ?: return@filter true
                 val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg)
                 if (!keep) {
-                    XposedBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
+                    BaseHookModule.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
                 }
                 keep
             }
-            param.result = XposedHelpers.newInstance(parceledListSlice.javaClass, filtered)
+            param.result = BaseHookModule.newInstance(parceledListSlice.javaClass, filtered)
         }.onFailure {
-            XposedBridge.log("Arirang/package_list/E: $methodName hook failed: ${it.message}")
+            BaseHookModule.log("Arirang/package_list/E: $methodName hook failed: ${it.message}")
         }
     }
 

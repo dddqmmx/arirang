@@ -5,6 +5,8 @@ MODULE_ZIP="${1:-}"
 ROOT_METHOD=""
 REBOOT=false
 
+# This script runs on-device via adb shell. It intentionally avoids Bash-only
+# syntax because Android /system/bin/sh is mksh/toybox depending on the build.
 if [ -z "$MODULE_ZIP" ]; then
   echo "usage: install_module.sh <module.zip> [magisk|ksu|kernelsu|ap|apatch] [--reboot]" >&2
   exit 2
@@ -37,6 +39,8 @@ find_cmd() {
 }
 
 install_with_kernelsu() {
+  # KernelSU and KernelSU Next have used different ksud locations. Probe all
+  # known paths before giving up so Gradle install tasks work across variants.
   KSUD="$(find_cmd ksud)"
   if [ -z "$KSUD" ] && [ -x /data/adb/ksud ]; then
     KSUD=/data/adb/ksud
@@ -76,6 +80,9 @@ install_with_apatch() {
 
 case "$ROOT_METHOD" in
   "")
+    # Auto-detect in the most common order. A caller can pass an explicit
+    # backend when multiple root managers are installed or a device needs a
+    # particular implementation.
     if install_with_magisk; then
       :
     elif install_with_kernelsu; then

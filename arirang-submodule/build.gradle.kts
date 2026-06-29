@@ -103,6 +103,10 @@ val configureNative by tasks.registering(Exec::class) {
             "-DCMAKE_TOOLCHAIN_FILE=$toolchain",
             "-DANDROID_ABI=arm64-v8a",
             "-DANDROID_PLATFORM=android-31",
+            // These are generated into arirang_build_config.hpp and must stay
+            // in sync with the app module. The native code uses them to locate
+            // the manager app's runtime config without hard-coding app paths in
+            // C++ sources.
             "-DARIRANG_APPLICATION_ID=$arirangApplicationId",
             "-DARIRANG_SUBMODULE_CONFIG_DIR=$arirangSubmoduleConfigDir",
             "-DARIRANG_SUBMODULE_CONFIG_FILE=$arirangSubmoduleConfigFile",
@@ -128,6 +132,9 @@ val buildNative by tasks.registering(Exec::class) {
 
 val stageModule by tasks.registering(Copy::class) {
     dependsOn(buildNative)
+    // Stage the exact Magisk/KernelSU/APatch module root. Files copied here are
+    // zipped without an extra directory level, so paths must match the runtime
+    // module layout expected by post-fs-data.sh and service.sh.
     from("module/module.prop") {
         into("")
     }
@@ -142,6 +149,8 @@ val stageModule by tasks.registering(Copy::class) {
     }
     from(nativeBuildDir.map { it.file("libarirang_zygisk.so") }) {
         into("zygisk")
+        // Root managers discover the Zygisk library by ABI-specific filename.
+        // Do not rename this to the CMake target name.
         rename { "arm64-v8a.so" }
     }
     // Hook .so is staged inside the module's own private directory and
@@ -152,6 +161,8 @@ val stageModule by tasks.registering(Copy::class) {
         into("lib")
     }
     from(nativeBuildDir.map { it.file("arirang_injector") }) {
+        // service.sh executes this directly from the module directory after
+        // boot, so keep it outside zygisk/ and lib/.
         into("bin")
     }
     into(stageDir)

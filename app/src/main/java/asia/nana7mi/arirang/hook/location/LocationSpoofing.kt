@@ -1,10 +1,11 @@
 package asia.nana7mi.arirang.hook.location
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.SystemClock
-import de.robv.android.xposed.XposedHelpers
 import java.util.Locale
 import kotlin.math.abs
 
@@ -32,7 +33,7 @@ internal fun fakeLocation(
 }
 
 internal fun rewriteLocationResult(locationResult: Any, profile: LocationProfile): Boolean {
-    runCatching { XposedHelpers.callMethod(locationResult, "getLocations") }
+    runCatching { BaseHookModule.callMethod(locationResult, "getLocations") }
         .getOrNull()
         ?.takeIf { it.containsLocation() }
         ?.let {
@@ -128,7 +129,7 @@ private fun Location.applyProfile(profile: LocationProfile, providerName: String
     bearingAccuracyDegrees = MOCK_BEARING_ACCURACY
 
     runCatching {
-        XposedHelpers.callMethod(this, "setIsFromMockProvider", false)
+        BaseHookModule.callMethod(this, "setIsFromMockProvider", false)
     }
 
     extras = Bundle(extras ?: Bundle()).apply {

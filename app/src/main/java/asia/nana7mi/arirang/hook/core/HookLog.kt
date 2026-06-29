@@ -1,10 +1,10 @@
 package asia.nana7mi.arirang.hook.core
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 import org.json.JSONObject
 
 object HookLog {
@@ -68,7 +68,7 @@ object HookLog {
 
     private fun write(module: Module, level: String, message: String) {
         if (resolvingConfig.get() == true || !isEnabled(module)) return
-        XposedBridge.log("Arirang/${module.key}/$level: $message")
+        BaseHookModule.log("Arirang/${module.key}/$level: $message")
     }
 
     private fun currentSwitches(): Map<String, Boolean> {
@@ -85,7 +85,7 @@ object HookLog {
             try {
                 val updated = buildMap {
                     val json = runCatching { hookLogSnapshotJson() }.onFailure {
-                        XposedBridge.log("Arirang/HookLog/E: failed to read hook log snapshot: ${it.message}")
+                        BaseHookModule.log("Arirang/HookLog/E: failed to read hook log snapshot: ${it.message}")
                     }.getOrNull()
                     readSwitch("all")?.let { put("all", it) }
                     readSwitch("debug")?.let { put("debug", it) }
@@ -131,8 +131,8 @@ object HookLog {
 
     private fun readSwitch(key: String): Boolean? {
         val value = runCatching {
-            XposedHelpers.callStaticMethod(
-                XposedHelpers.findClass("android.os.SystemProperties", null),
+            BaseHookModule.callStaticMethod(
+                BaseHookModule.findClass("android.os.SystemProperties", null),
                 "get",
                 PROPERTY_PREFIX + key,
                 ""

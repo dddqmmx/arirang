@@ -25,6 +25,10 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
     try {
         auto j = nlohmann::json::parse(json_str);
 
+        // Keep parsing intentionally tolerant: unknown keys are ignored and
+        // malformed values leave the existing default in place. The app and the
+        // native submodule can then roll forward independently without making
+        // old modules fail closed on new config snapshots.
         auto read_string = [&](const char* key, std::string& field) {
             if (j.contains(key) && j[key].is_string()) {
                 field = j[key].get<std::string>();
@@ -59,6 +63,8 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         read_string("buildFingerprint", config.build_fingerprint);
         read_long("buildTime", config.build_time);
         
+        // These are mirrored from the app-side SIM config because native code
+        // can intercept libc property reads before framework hooks run.
         read_string("gsmSimOperatorIsoCountry", config.gsm_sim_operator_iso_country);
         read_string("gsmOperatorIsoCountry", config.gsm_operator_iso_country);
         read_string("gsmSimOperatorNumeric", config.gsm_sim_operator_numeric);
@@ -74,6 +80,9 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         read_string("appSetId", config.app_set_id);
         read_string("serial", config.serial);
         
+        // Raw config snapshots are embedded so Zygisk-loaded code can serve
+        // app/runtime hooks through the companion socket without requiring the
+        // target process to read the app private directory directly.
         read_long("simConfigVersion", config.sim_config_version);
         read_string("simConfigSnapshot", config.sim_config_snapshot);
         read_long("uniqueIdentifierConfigVersion", config.unique_identifier_config_version);
@@ -205,6 +214,10 @@ void apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
 }
 
 bool load_config_from_disk(SubmoduleConfig &config) {
+    // Device-encrypted storage is available earlier during boot. Credential-
+    // encrypted storage becomes available after user unlock. Try DE first so
+    // post-fs-data/service paths can work before unlock, then fall back to CE
+    // for older installs or manual debug copies.
     std::string json = read_file(kConfigPathDe, kMaxConfigSize);
     const char *path = kConfigPathDe;
     if (json.empty()) {
@@ -221,6 +234,9 @@ bool load_config_from_disk(SubmoduleConfig &config) {
 }
 
 void load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config) {
+    // Zygisk modules cannot safely assume the target process can open the app's
+    // private config files. The companion runs in the module manager context
+    // and sends a length-prefixed JSON snapshot over the Zygisk socket.
     int fd = api->connectCompanion();
     if (fd < 0) {
         log_warn("connectCompanion failed; using defaults");
@@ -245,6 +261,9 @@ void load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config) {
 }
 
 void companion_handler(int fd) {
+    // Protocol: uint32 byte length followed by exactly that many UTF-8 JSON
+    // bytes. A zero length is a valid "no config" response and lets callers use
+    // defaults without blocking module load.
     std::string content = read_file(kConfigPathDe, kMaxConfigSize);
     if (content.empty()) {
         content = read_file(kConfigPathCe, kMaxConfigSize);

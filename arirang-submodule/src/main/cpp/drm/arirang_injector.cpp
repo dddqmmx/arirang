@@ -131,6 +131,10 @@ const MapEntry *find_first_executable(const std::vector<MapEntry> &maps,
 uintptr_t resolve_dlopen_in_target(pid_t pid) {
     auto maps = read_maps(pid);
 
+    // Resolve the symbol in our own process first, then translate by offset
+    // into the target process. Android's linker is mapped at a different base
+    // per process, but the relative offset of dlopen inside the same linker
+    // image is stable.
     void* sym_addr = dlsym(RTLD_DEFAULT, "dlopen");
     if (!sym_addr) {
         die_no_errno("dlsym(RTLD_DEFAULT, dlopen) failed");
@@ -148,6 +152,9 @@ uintptr_t resolve_dlopen_in_target(pid_t pid) {
     basename = basename ? basename + 1 : info.dli_fname;
 
     const MapEntry* remote = nullptr;
+    // Prefer the same mapped object that supplied our local dlopen. On Android
+    // this is normally linker64 or the runtime APEX linker. If basename lookup
+    // fails due to path differences, fall back to known linker paths.
     for (const auto& e : maps) {
         if (e.path.find(basename) != std::string::npos) {
             if (!remote || e.start < remote->start) {
@@ -174,6 +181,9 @@ uintptr_t resolve_dlopen_in_target(pid_t pid) {
 }
 
 const MapEntry *find_rw_scratch(const std::vector<MapEntry> &maps) {
+    // Reuse existing writable memory instead of making a remote mmap call.
+    // That keeps the remote call setup to a single dlopen invocation and avoids
+    // needing to resolve two libc/linker symbols in the target.
     for (const auto &e : maps) {
         if (e.perms[0] == 'r' && e.perms[1] == 'w' &&
             e.path.find("[anon:libc_malloc]") != std::string::npos) {
@@ -238,6 +248,9 @@ int do_inject(pid_t pid, const char *so_path) {
     if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) die("PTRACE_ATTACH");
     wait_for_stop(pid, "attach");
 
+    // Registers and scratch bytes are restored even if dlopen returns NULL.
+    // The only lasting side effect intended here is the dynamic library mapping
+    // created by a successful dlopen.
     user_regs_struct saved{};
     get_regs(pid, &saved);
 
@@ -277,6 +290,9 @@ int do_inject(pid_t pid, const char *so_path) {
 
     set_regs(pid, &regs);
 
+    // We do not plant a breakpoint instruction. LR=0 makes the remote call
+    // fault after dlopen returns, which gives us a reliable stop point while
+    // leaving target code pages untouched.
     if (ptrace(PTRACE_CONT, pid, 0, 0) < 0) die("PTRACE_CONT");
     wait_for_stop(pid, "remote call");
 
@@ -301,6 +317,9 @@ int do_inject(pid_t pid, const char *so_path) {
 }
 
 int do_config(const char *path, const char *key) {
+    // service.sh uses this lightweight JSON accessor to avoid carrying shell
+    // JSON parsing assumptions. It intentionally supports only top-level keys,
+    // matching the flat config snapshot written by the manager app.
     std::string content = read_file(path);
     if (content.empty()) return 10;
     try {

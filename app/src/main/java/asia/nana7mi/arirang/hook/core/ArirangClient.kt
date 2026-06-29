@@ -1,5 +1,7 @@
 package asia.nana7mi.arirang.hook.core
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -16,7 +18,6 @@ import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.hook.IArirangService
 import asia.nana7mi.arirang.service.ArirangService
-import de.robv.android.xposed.XposedHelpers
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -365,7 +366,7 @@ object ArirangClient {
 
         try {
             // 获取 SYSTEM UserHandle (通常为 User 0)
-            val systemUser = XposedHelpers.getStaticObjectField(
+            val systemUser = BaseHookModule.getStaticObjectField(
                 UserHandle::class.java,
                 "SYSTEM"
             ) as UserHandle
@@ -460,19 +461,19 @@ object ArirangClient {
     private fun unstopPackage() {
         try {
             withCleanCallingIdentity {
-                val b = XposedHelpers.callStaticMethod(
+                val b = BaseHookModule.callStaticMethod(
                     Class.forName("android.os.ServiceManager"),
                     "getService",
                     "package"
                 ) as IBinder
-                val ipm = XposedHelpers.callStaticMethod(
+                val ipm = BaseHookModule.callStaticMethod(
                     Class.forName("android.content.pm.IPackageManager\$Stub"),
                     "asInterface",
                     b
                 )
                 // setPackageStoppedState(packageName, stopped, userId)
                 // UserId 0 是主用户
-                XposedHelpers.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
+                BaseHookModule.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
             }
             HookLog.i(HookLog.Module.NOTIFY, "Success to unstop package $TARGET_PKG")
         } catch (t: Throwable) {
@@ -545,9 +546,9 @@ object ArirangClient {
     private fun hostAppContext(): Context? {
         return runCatching {
             val atClass = Class.forName("android.app.ActivityThread")
-            val at = XposedHelpers.callStaticMethod(atClass, "currentActivityThread")
+            val at = BaseHookModule.callStaticMethod(atClass, "currentActivityThread")
                 ?: return null
-            XposedHelpers.callMethod(at, "getApplication") as? Context
+            BaseHookModule.callMethod(at, "getApplication") as? Context
         }.getOrNull()
     }
 
@@ -555,12 +556,12 @@ object ArirangClient {
     fun getSystemContext(): Context? {
         return try {
             val atClass = Class.forName("android.app.ActivityThread")
-            val at = XposedHelpers.callStaticMethod(
+            val at = BaseHookModule.callStaticMethod(
                 atClass,
                 "currentActivityThread"
             ) ?: return null
 
-            XposedHelpers.callMethod(at, "getSystemContext") as Context
+            BaseHookModule.callMethod(at, "getSystemContext") as Context
 
         } catch (_: Throwable) {
             null

@@ -44,6 +44,9 @@ const SubmoduleConfig *current_config() {
     if (active_config == nullptr) return nullptr;
     const long long now = monotonic_ms();
     if (now - last_config_reload_ms > 1000) {
+        // Native property reads are common, so do not hit disk on every call.
+        // A one-second refresh window is enough for UI-driven config changes
+        // while keeping libc/JNI property hooks cheap.
         if (load_config_from_disk(runtime_config)) {
             active_config = &runtime_config;
         }
@@ -54,6 +57,9 @@ const SubmoduleConfig *current_config() {
 
 const std::string *replacement_for_property(const SubmoduleConfig &config, const char *key) {
     if (config.device_info_enabled) {
+        // Android exposes build identity through multiple partition-scoped
+        // property namespaces. Spoof all known mirrors so apps cannot recover
+        // the original identity by reading vendor/system/product variants.
         // Brand
         if (std::strcmp(key, "ro.product.brand") == 0 ||
             std::strcmp(key, "ro.product.vendor.brand") == 0 ||
@@ -166,6 +172,8 @@ jstring native_get_with_default(JNIEnv *env, jclass clazz, jstring key, jstring 
     const std::string *replacement = replacement_for_property(*config, chars);
     env->ReleaseStringUTFChars(key, chars);
     if (replacement != nullptr && !replacement->empty()) {
+        // Return a fresh Java string; the config storage remains native-owned
+        // and may be replaced by a later disk reload.
         return env->NewStringUTF(replacement->c_str());
     }
 
@@ -198,6 +206,8 @@ int fake_system_property_get(const char *name, char *value) {
     if (active_process && config != nullptr && config->enabled && name != nullptr) {
         const std::string *replacement = replacement_for_property(*config, name);
         if (replacement != nullptr && !replacement->empty()) {
+            // __system_property_get requires a NUL-terminated value no longer
+            // than PROP_VALUE_MAX, even when the replacement came from JSON.
             std::strncpy(value, replacement->c_str(), PROP_VALUE_MAX);
             value[PROP_VALUE_MAX - 1] = '\0';
             return static_cast<int>(std::strlen(value));
@@ -217,6 +227,8 @@ void fake_read_callback_handler(void *cookie, const char *name, const char *valu
     if (active_process && config != nullptr && config->enabled && name != nullptr) {
         const std::string *replacement = replacement_for_property(*config, name);
         if (replacement != nullptr && !replacement->empty()) {
+            // Preserve the original property serial. Some callers use it as a
+            // change token; changing it here would make the spoof observable.
             wrapper->callback(wrapper->cookie, name, replacement->c_str(), serial);
             return;
         }
@@ -228,6 +240,8 @@ void fake_system_property_read_callback(const prop_info *pi,
                                         void (*callback)(void *, const char *, const char *, uint32_t),
                                         void *cookie) {
     CallbackWrapper wrapper = {callback, cookie};
+    // The wrapper lives on this stack because bionic invokes the callback
+    // synchronously from __system_property_read_callback.
     original_system_property_read_callback(pi, fake_read_callback_handler, &wrapper);
 }
 
@@ -269,7 +283,9 @@ void install_system_property_spoofer(
     active_config = &runtime_config;
     active_process = should_spoof_process;
 
-    // JNI Hooks
+    // Layer 1: framework Java callers normally reach android.os.SystemProperties
+    // native_get/native_get_long. Zygisk gives us a stable JNI-native hook point
+    // before apps start caching Build.* fields.
     JNINativeMethod methods[] = {
         {
             const_cast<char *>("native_get"),
@@ -286,7 +302,9 @@ void install_system_property_spoofer(
     original_native_get_with_default = reinterpret_cast<NativeGetWithDefault>(methods[0].fnPtr);
     original_native_get_long = reinterpret_cast<NativeGetLong>(methods[1].fnPtr);
 
-    // Libc Hooks
+    // Layer 2: native libraries can bypass android.os.SystemProperties and call
+    // libc property APIs directly. Inline hooks cover the common bionic entry
+    // points used by C/C++ code and command-line helpers inside the process.
     void *libc = dlopen("libc.so", RTLD_NOW);
     if (libc != nullptr) {
         void *get_fn = dlsym(libc, "__system_property_get");
@@ -316,4 +334,3 @@ void install_system_property_spoofer(
 }
 
 } // namespace arirang
-

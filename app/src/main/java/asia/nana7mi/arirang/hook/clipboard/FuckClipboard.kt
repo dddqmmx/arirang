@@ -9,8 +9,6 @@ import android.os.Build
 import android.os.Process
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class FuckClipboard : BaseHookModule(matchSystem = true) {
@@ -32,8 +30,8 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
-            val clipboardService = XposedHelpers.findClass("com.android.server.clipboard.ClipboardService", lpparam.classLoader)
-            val clipboardImpl = XposedHelpers.findClassIfExists(
+            val clipboardService = BaseHookModule.findClass("com.android.server.clipboard.ClipboardService", lpparam.classLoader)
+            val clipboardImpl = BaseHookModule.findClassIfExists(
                 "com.android.server.clipboard.ClipboardService\$ClipboardImpl",
                 lpparam.classLoader
             )
@@ -53,7 +51,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             val userId = (args.firstOrNull { it is Int } as? Int)
                 ?.takeIf { it >= 0 }
                 ?: runCatching {
-                    XposedHelpers.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
+                    BaseHookModule.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
                 }.getOrDefault(uid / PER_USER_RANGE)
 
             if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
@@ -70,7 +68,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             }
         }
 
-        XposedBridge.hookAllMethods(targetClass, "getPrimaryClip", hookCallback)
+        BaseHookModule.hookAllMethods(targetClass, "getPrimaryClip", hookCallback)
     }
 
     private fun shouldBypass(callingPackage: String, uid: Int): Boolean {
@@ -84,9 +82,9 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             override fun beforeHookedMethod(param: MethodHookParam) {
                 val uid = runCatching {
                     if (param.thisObject.javaClass.simpleName == "ProcessRecord") {
-                        XposedHelpers.getIntField(param.thisObject, "uid")
+                        BaseHookModule.getIntField(param.thisObject, "uid")
                     } else {
-                        XposedHelpers.getIntField(param.thisObject, "mUid")
+                        BaseHookModule.getIntField(param.thisObject, "mUid")
                     }
                 }.getOrNull()
 
@@ -98,12 +96,12 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
         }
 
         runCatching {
-            val processRecordClass = XposedHelpers.findClass("com.android.server.am.ProcessRecord", classLoader)
-            XposedBridge.hookAllMethods(processRecordClass, "isDebugging", hookCallback)
+            val processRecordClass = BaseHookModule.findClass("com.android.server.am.ProcessRecord", classLoader)
+            BaseHookModule.hookAllMethods(processRecordClass, "isDebugging", hookCallback)
         }
         runCatching {
-            val wpcClass = XposedHelpers.findClass("com.android.server.wm.WindowProcessController", classLoader)
-            XposedBridge.hookAllMethods(wpcClass, "isDebugging", hookCallback)
+            val wpcClass = BaseHookModule.findClass("com.android.server.wm.WindowProcessController", classLoader)
+            BaseHookModule.hookAllMethods(wpcClass, "isDebugging", hookCallback)
         }
     }
 }

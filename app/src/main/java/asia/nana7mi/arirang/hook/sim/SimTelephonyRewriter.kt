@@ -1,9 +1,10 @@
 package asia.nana7mi.arirang.hook.sim
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import asia.nana7mi.arirang.hook.util.getFieldValue
 import asia.nana7mi.arirang.hook.util.setFieldValueIfExists
 
-import de.robv.android.xposed.XposedHelpers
 
 internal fun rewriteSubscriptionInfo(subscriptionInfo: Any?, profile: SimProfile) {
     if (subscriptionInfo == null) return
@@ -61,7 +62,7 @@ internal fun rewriteServiceState(serviceState: Any?, profile: SimProfile) {
     rewriteServiceStateNestedLists(serviceState, profile)
 
     runCatching {
-        XposedHelpers.callMethod(
+        BaseHookModule.callMethod(
             serviceState,
             "setOperatorName",
             profile.alphaLong,

@@ -1,9 +1,10 @@
 package asia.nana7mi.arirang.hook.gms
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import android.os.Parcel
 import asia.nana7mi.arirang.hook.core.HookLog
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -18,7 +19,7 @@ internal class GmsAdvertisingIdHooks(
 
         logClassHierarchyMethods("Advertising ID service", ownerClass)
         hookStringGetters(ownerClass)
-        XposedBridge.hookAllMethods(transactClass, "onTransact", beforeHookedMethod {
+        BaseHookModule.hookAllMethods(transactClass, "onTransact", beforeHookedMethod {
             spoofAdvertisingIdIfMatched(this)
         })
         HookLog.i(HookLog.Module.GMS, "hooked GMS Advertising ID service ${ownerClass.name}/${transactClass.name}")
@@ -36,7 +37,7 @@ internal class GmsAdvertisingIdHooks(
 
         methods.forEach { method ->
             method.isAccessible = true
-            XposedBridge.hookMethod(method, afterHookedMethod {
+            BaseHookModule.hookMethod(method, afterHookedMethod {
                 val gaid = currentConfig().gaid.takeIf { it.isNotBlank() } ?: return@afterHookedMethod
                 result = gaid
                 HookLog.i(HookLog.Module.GMS, "GAID spoofed from ${ownerClass.name}.${method.name}()")

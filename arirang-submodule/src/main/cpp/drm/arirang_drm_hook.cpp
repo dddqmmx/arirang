@@ -121,6 +121,10 @@ std::vector<uint8_t> hex_to_bytes(const std::string &hex) {
 }
 
 std::string read_spoof_id_hex() {
+    // The persistent path is inside the module directory. The tmpfs fallback is
+    // the path prepared in post-fs-data.sh for vendor/HAL namespace access.
+    // Keeping both here lets the hook survive partial staging failures while
+    // still preferring the canonical module-owned file.
     int fd = open(kSpoofIdPath, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
         // Fallback to the tmpfs path written by post-fs-data.sh
@@ -163,6 +167,9 @@ void reload_spoof_bytes() {
 }
 
 bool addr_looks_readable(const void *p) {
+    // This is intentionally only a cheap sanity guard. We avoid probing memory
+    // with mincore/process_vm_readv inside the HAL process because the hook sits
+    // on a DRM hot path and should not introduce extra syscalls for every call.
     return p != nullptr && reinterpret_cast<uintptr_t>(p) > 0x1000ULL;
 }
 
@@ -247,6 +254,9 @@ bool install_hook_in_library(const char *library_path);
 void *worker(void *) {
     reload_spoof_bytes();
 
+    // The hook library is LD_PRELOAD'd before Widevine necessarily loads its
+    // plugin implementation. Poll with RTLD_NOLOAD so we only inspect objects
+    // already mapped by the daemon and never force-load DRM plugins ourselves.
     for (int attempt = 0; attempt < 120; ++attempt) {
         for (const char *const *p = kCandidateLibraries; *p != nullptr; ++p) {
             const char *path = *p;
@@ -336,6 +346,9 @@ HidlReturnVoid arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, H
     }
 
     bool spoof = false;
+    // HIDL passes android::hardware::hidl_string, not std::string. The layout
+    // wrapper above models only the fields used by this comparison, so do not
+    // call string helpers or constructors on it.
     if (name.mBuffer != nullptr && name.mSize == 14 /* "deviceUniqueId" */ &&
         std::memcmp(name.mBuffer, "deviceUniqueId", 14) == 0) {
         spoof = true;
@@ -363,6 +376,9 @@ HidlReturnVoid arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, H
             pthread_rwlock_unlock(&g_spoof_lock);
 
             if (!bytes.empty()) {
+                // hidl::vec here borrows bytes.data(); the callback is invoked
+                // synchronously before this stack frame exits, so owns=false is
+                // required to avoid the HAL trying to free our vector storage.
                 hidl::vec<uint8_t> spoofed_vec(bytes.data(), static_cast<uint32_t>(bytes.size()), false);
                 (*original_cb)(status, spoofed_vec);
                 arirang::log_info("arirang_drm_hook: spoofed deviceUniqueId byte[] (HIDL)");
@@ -391,6 +407,9 @@ extern "C" void arirang_drm_aidl_post(void * /*this_ptr*/, const void *name_ptr,
     pthread_rwlock_unlock(&g_spoof_lock);
     if (bytes.empty()) return;
 
+    // AIDL returns the vector by out-parameter. We call the real HAL first so
+    // status/error handling remains untouched, then replace only the successful
+    // byte vector when the requested key is deviceUniqueId.
     overwrite_vector_bytes(vec_ptr, bytes);
     arirang::log_info("arirang_drm_hook: spoofed deviceUniqueId byte[]");
 }
@@ -416,6 +435,10 @@ AIDL_ScopedAStatus arirang_drm_aidl_entry(void* this_ptr, void* name_ptr, void* 
     }
 
     auto func = reinterpret_cast<AIDL_ScopedAStatus (*)(void*, void*, void*)>(g_trampoline);
+    // Keep this as a post-call wrapper. Pre-call short-circuiting would require
+    // constructing ndk::ScopedAStatus exactly as libbinder_ndk expects; letting
+    // the original implementation produce it avoids ABI drift across Android
+    // releases.
     AIDL_ScopedAStatus ret = func(this_ptr, name_ptr, vec_ptr);
     arirang_drm_aidl_post(this_ptr, name_ptr, vec_ptr);
     return ret;
@@ -423,6 +446,9 @@ AIDL_ScopedAStatus arirang_drm_aidl_entry(void* this_ptr, void* name_ptr, void* 
 
 extern "C" __attribute__((constructor)) void arirang_drm_hook_init() {
     arirang::log_info("arirang_drm_hook: constructor entered");
+    // Do all symbol scanning off the loader's constructor path. Running dlopen,
+    // dl_iterate_phdr, and vtable patching directly from a constructor risks
+    // loader-lock reentrancy while the HAL is still resolving dependencies.
     pthread_t tid;
     if (pthread_create(&tid, nullptr, worker, nullptr) == 0) {
         pthread_detach(tid);

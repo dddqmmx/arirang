@@ -1,5 +1,7 @@
 package asia.nana7mi.arirang.hook.core
 
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+
 import asia.nana7mi.arirang.data.datastore.GlobalConfigPrefs
 import asia.nana7mi.arirang.hook.activation.XposedActivation
 import asia.nana7mi.arirang.hook.bluetooth.FuckBluetooth
@@ -13,7 +15,6 @@ import asia.nana7mi.arirang.hook.sim.FuckSim
 import asia.nana7mi.arirang.hook.system.SystemServerHook
 import asia.nana7mi.arirang.hook.wifi.FuckWifi
 import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class HookManager : IXposedHookLoadPackage {
@@ -43,7 +44,7 @@ class HookManager : IXposedHookLoadPackage {
         val prefs = HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
         val restrictHotSwitching = prefs.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false)
 
-        XposedBridge.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
+        BaseHookModule.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
         modules
             .filter { it.matches(lpparam.packageName) }
             .filter { !restrictHotSwitching || it.isEnabled() }

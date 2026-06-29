@@ -10,7 +10,6 @@ import android.content.Context
 import android.os.Bundle
 import android.provider.Settings
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
-import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
@@ -32,7 +31,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         HookLog.i(HookLog.Module.SETTINGS, "Installing settings hook for ${lpparam.packageName}")
 
         try {
-            val lmsClass = XposedHelpers.findClassIfExists(
+            val lmsClass = BaseHookModule.findClassIfExists(
                 "com.android.providers.settings.SettingsProvider",
                 classLoader
             )?: return
@@ -43,7 +42,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
     }
 
     private fun hookCall(lmsClass: Class<*>) {
-        XposedHelpers.findAndHookMethod(
+        BaseHookModule.findAndHookMethod(
             lmsClass, "call",
             String::class.java,
             String::class.java,
@@ -61,7 +60,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
                 // Handle Android ID (Secure)
                 val callMethodGetSecure = runCatching {
-                    XposedHelpers.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_SECURE") as String
+                    BaseHookModule.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_SECURE") as String
                 }.getOrNull() ?: "get_secure"
 
                 if (method == callMethodGetSecure && request == Settings.Secure.ANDROID_ID) {
@@ -83,7 +82,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
                 // Handle Bluetooth Name (Global)
                 val callMethodGetGlobal = runCatching {
-                    XposedHelpers.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_GLOBAL") as String
+                    BaseHookModule.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_GLOBAL") as String
                 }.getOrNull() ?: "get_global"
 
                 if (method == callMethodGetGlobal && (request == "bluetooth_name" || request == "device_name")) {
@@ -100,7 +99,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
     private fun readAndroidIdFromConfig(settingsProvider: Any?): String? {
         val context = runCatching {
-            XposedHelpers.callMethod(settingsProvider, "getContext") as? Context
+            BaseHookModule.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
         val snapshot = ArirangClient.readConfigSnapshot(
             configName = "unique_identifier",
@@ -123,7 +122,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
     private fun readBluetoothNameFromConfig(settingsProvider: Any?): String? {
         val context = runCatching {
-            XposedHelpers.callMethod(settingsProvider, "getContext") as? Context
+            BaseHookModule.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
         val snapshot = ArirangClient.readConfigSnapshot(
             configName = "bluetooth",
