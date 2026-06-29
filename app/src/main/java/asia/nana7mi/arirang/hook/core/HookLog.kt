@@ -1,6 +1,5 @@
 package asia.nana7mi.arirang.hook.core
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
 
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
@@ -68,7 +67,7 @@ object HookLog {
 
     private fun write(module: Module, level: String, message: String) {
         if (resolvingConfig.get() == true || !isEnabled(module)) return
-        BaseHookModule.log("Arirang/${module.key}/$level: $message")
+        HookBridge.log("Arirang/${module.key}/$level: $message")
     }
 
     private fun currentSwitches(): Map<String, Boolean> {
@@ -85,7 +84,7 @@ object HookLog {
             try {
                 val updated = buildMap {
                     val json = runCatching { hookLogSnapshotJson() }.onFailure {
-                        BaseHookModule.log("Arirang/HookLog/E: failed to read hook log snapshot: ${it.message}")
+                        HookBridge.log("Arirang/HookLog/E: failed to read hook log snapshot: ${it.message}")
                     }.getOrNull()
                     readSwitch("all")?.let { put("all", it) }
                     readSwitch("debug")?.let { put("debug", it) }
@@ -131,8 +130,8 @@ object HookLog {
 
     private fun readSwitch(key: String): Boolean? {
         val value = runCatching {
-            BaseHookModule.callStaticMethod(
-                BaseHookModule.findClass("android.os.SystemProperties", null),
+            HookBridge.callStaticMethod(
+                HookBridge.findClass("android.os.SystemProperties", null),
                 "get",
                 PROPERTY_PREFIX + key,
                 ""

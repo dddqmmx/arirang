@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.wifi
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import asia.nana7mi.arirang.hook.core.HookLog
 import de.robv.android.xposed.XC_MethodHook
@@ -15,7 +15,7 @@ internal class WifiServiceHooks(
 
     fun hookWifiService(classLoader: ClassLoader) {
         val serviceClasses = WIFI_SERVICE_CLASS_NAMES.mapNotNull { className ->
-            BaseHookModule.findClassIfExists(className, classLoader).also { foundClass ->
+            HookBridge.findClassIfExists(className, classLoader).also { foundClass ->
                 HookLog.d(
                     HookLog.Module.WIFI,
                     "lookup $className in $classLoader -> ${foundClass?.name ?: "null"}"
@@ -36,7 +36,7 @@ internal class WifiServiceHooks(
 
     fun hookWifiServiceInstance(wifiService: Any) {
         val impl = runCatching {
-            BaseHookModule.getObjectField(wifiService, "mImpl")
+            HookBridge.getObjectField(wifiService, "mImpl")
         }.getOrNull() ?: wifiService.javaClass.declaredFields
             .firstNotNullOfOrNull { field ->
                 runCatching {
@@ -63,7 +63,7 @@ internal class WifiServiceHooks(
 
     private fun hookScanRequestProxyFromWifiServiceImpl(wifiServiceImpl: Any) {
         val scanRequestProxy = runCatching {
-            BaseHookModule.getObjectField(wifiServiceImpl, "mScanRequestProxy")
+            HookBridge.getObjectField(wifiServiceImpl, "mScanRequestProxy")
         }.getOrNull()
 
         if (scanRequestProxy == null) {
@@ -100,7 +100,7 @@ internal class WifiServiceHooks(
         candidateMethods
             .filter { it.returnsList() }
             .forEach { method ->
-                BaseHookModule.hookMethod(method, beforeHookedMethod {
+                HookBridge.hookMethod(method, beforeHookedMethod {
                     val config = currentConfig()
                     if (!config.enabled) return@beforeHookedMethod
                     HookLog.i(HookLog.Module.WIFI, "spoof ScanRequestProxy.getScanResults via ${method.signature()}")
@@ -135,7 +135,7 @@ internal class WifiServiceHooks(
         candidateMethods.forEach { method ->
             when {
                 method.name == "getConnectionInfo" && method.returnsWifiInfo() -> {
-                    BaseHookModule.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
                         HookLog.i(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
@@ -145,7 +145,7 @@ internal class WifiServiceHooks(
                 }
 
                 method.name == "getScanResults" && method.returnsScanResults() -> {
-                    BaseHookModule.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
                         if (!config.enabled) return@beforeHookedMethod
                         HookLog.i(HookLog.Module.WIFI, "spoof getScanResults via ${method.signature()}")

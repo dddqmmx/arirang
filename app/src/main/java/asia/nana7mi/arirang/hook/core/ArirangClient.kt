@@ -1,6 +1,5 @@
 package asia.nana7mi.arirang.hook.core
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
 
 import android.annotation.SuppressLint
 import android.content.ComponentName
@@ -366,7 +365,7 @@ object ArirangClient {
 
         try {
             // 获取 SYSTEM UserHandle (通常为 User 0)
-            val systemUser = BaseHookModule.getStaticObjectField(
+            val systemUser = HookBridge.getStaticObjectField(
                 UserHandle::class.java,
                 "SYSTEM"
             ) as UserHandle
@@ -461,19 +460,19 @@ object ArirangClient {
     private fun unstopPackage() {
         try {
             withCleanCallingIdentity {
-                val b = BaseHookModule.callStaticMethod(
+                val b = HookBridge.callStaticMethod(
                     Class.forName("android.os.ServiceManager"),
                     "getService",
                     "package"
                 ) as IBinder
-                val ipm = BaseHookModule.callStaticMethod(
+                val ipm = HookBridge.callStaticMethod(
                     Class.forName("android.content.pm.IPackageManager\$Stub"),
                     "asInterface",
                     b
                 )
                 // setPackageStoppedState(packageName, stopped, userId)
                 // UserId 0 是主用户
-                BaseHookModule.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
+                HookBridge.callMethod(ipm, "setPackageStoppedState", TARGET_PKG, false, 0)
             }
             HookLog.i(HookLog.Module.NOTIFY, "Success to unstop package $TARGET_PKG")
         } catch (t: Throwable) {
@@ -546,9 +545,9 @@ object ArirangClient {
     private fun hostAppContext(): Context? {
         return runCatching {
             val atClass = Class.forName("android.app.ActivityThread")
-            val at = BaseHookModule.callStaticMethod(atClass, "currentActivityThread")
+            val at = HookBridge.callStaticMethod(atClass, "currentActivityThread")
                 ?: return null
-            BaseHookModule.callMethod(at, "getApplication") as? Context
+            HookBridge.callMethod(at, "getApplication") as? Context
         }.getOrNull()
     }
 
@@ -556,12 +555,12 @@ object ArirangClient {
     fun getSystemContext(): Context? {
         return try {
             val atClass = Class.forName("android.app.ActivityThread")
-            val at = BaseHookModule.callStaticMethod(
+            val at = HookBridge.callStaticMethod(
                 atClass,
                 "currentActivityThread"
             ) ?: return null
 
-            BaseHookModule.callMethod(at, "getSystemContext") as Context
+            HookBridge.callMethod(at, "getSystemContext") as Context
 
         } catch (_: Throwable) {
             null

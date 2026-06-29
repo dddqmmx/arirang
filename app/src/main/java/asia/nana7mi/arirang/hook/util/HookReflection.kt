@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.util
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import java.lang.reflect.Field
 
@@ -28,7 +28,7 @@ internal fun setFieldValueIfExists(instance: Any, fieldName: String, value: Any?
     runCatching {
         val field = findFieldInHierarchy(instance.javaClass, fieldName) ?: return@runCatching
         val normalizedValue = field.type.coerceReflectiveValue(value)
-        BaseHookModule.setObjectField(instance, fieldName, normalizedValue)
+        HookBridge.setObjectField(instance, fieldName, normalizedValue)
     }
 }
 

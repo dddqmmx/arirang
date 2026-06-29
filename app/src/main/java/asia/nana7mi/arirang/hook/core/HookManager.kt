@@ -1,6 +1,5 @@
 package asia.nana7mi.arirang.hook.core
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
 
 import asia.nana7mi.arirang.data.datastore.GlobalConfigPrefs
 import asia.nana7mi.arirang.hook.activation.XposedActivation
@@ -44,7 +43,7 @@ class HookManager : IXposedHookLoadPackage {
         val prefs = HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
         val restrictHotSwitching = prefs.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false)
 
-        BaseHookModule.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
+        HookBridge.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
         modules
             .filter { it.matches(lpparam.packageName) }
             .filter { !restrictHotSwitching || it.isEnabled() }

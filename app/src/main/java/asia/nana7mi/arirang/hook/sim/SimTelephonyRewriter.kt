@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import asia.nana7mi.arirang.hook.util.getFieldValue
 import asia.nana7mi.arirang.hook.util.setFieldValueIfExists
@@ -62,7 +62,7 @@ internal fun rewriteServiceState(serviceState: Any?, profile: SimProfile) {
     rewriteServiceStateNestedLists(serviceState, profile)
 
     runCatching {
-        BaseHookModule.callMethod(
+        HookBridge.callMethod(
             serviceState,
             "setOperatorName",
             profile.alphaLong,

@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.util.callOneArgIfCompatible
@@ -27,9 +27,9 @@ internal fun createSubscriptionInfo(
 ): Any? {
     return runCatching {
         val subscriptionInfoClass = template?.javaClass
-            ?: BaseHookModule.findClassIfExists("android.telephony.SubscriptionInfo", classLoader)
+            ?: HookBridge.findClassIfExists("android.telephony.SubscriptionInfo", classLoader)
             ?: return@runCatching null
-        val builderClass = BaseHookModule.findClassIfExists(
+        val builderClass = HookBridge.findClassIfExists(
             "android.telephony.SubscriptionInfo\$Builder",
             classLoader ?: subscriptionInfoClass.classLoader
         ) ?: return@runCatching null

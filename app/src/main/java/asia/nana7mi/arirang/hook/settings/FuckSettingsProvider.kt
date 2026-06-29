@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.hook.settings
 
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.util.orFalse
@@ -31,7 +32,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         HookLog.i(HookLog.Module.SETTINGS, "Installing settings hook for ${lpparam.packageName}")
 
         try {
-            val lmsClass = BaseHookModule.findClassIfExists(
+            val lmsClass = HookBridge.findClassIfExists(
                 "com.android.providers.settings.SettingsProvider",
                 classLoader
             )?: return
@@ -42,7 +43,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
     }
 
     private fun hookCall(lmsClass: Class<*>) {
-        BaseHookModule.findAndHookMethod(
+        HookBridge.findAndHookMethod(
             lmsClass, "call",
             String::class.java,
             String::class.java,
@@ -60,7 +61,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
                 // Handle Android ID (Secure)
                 val callMethodGetSecure = runCatching {
-                    BaseHookModule.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_SECURE") as String
+                    HookBridge.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_SECURE") as String
                 }.getOrNull() ?: "get_secure"
 
                 if (method == callMethodGetSecure && request == Settings.Secure.ANDROID_ID) {
@@ -82,7 +83,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
                 // Handle Bluetooth Name (Global)
                 val callMethodGetGlobal = runCatching {
-                    BaseHookModule.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_GLOBAL") as String
+                    HookBridge.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_GLOBAL") as String
                 }.getOrNull() ?: "get_global"
 
                 if (method == callMethodGetGlobal && (request == "bluetooth_name" || request == "device_name")) {
@@ -99,7 +100,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
     private fun readAndroidIdFromConfig(settingsProvider: Any?): String? {
         val context = runCatching {
-            BaseHookModule.callMethod(settingsProvider, "getContext") as? Context
+            HookBridge.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
         val snapshot = ArirangClient.readConfigSnapshot(
             configName = "unique_identifier",
@@ -122,7 +123,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
     private fun readBluetoothNameFromConfig(settingsProvider: Any?): String? {
         val context = runCatching {
-            BaseHookModule.callMethod(settingsProvider, "getContext") as? Context
+            HookBridge.callMethod(settingsProvider, "getContext") as? Context
         }.getOrNull()
         val snapshot = ArirangClient.readConfigSnapshot(
             configName = "bluetooth",

@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import android.bluetooth.BluetoothDevice
 
@@ -13,17 +13,17 @@ import android.bluetooth.BluetoothDevice
  */
 internal fun createFakeBluetoothDevice(device: BluetoothDeviceProfile): BluetoothDevice? {
     val bt = runCatching {
-        BaseHookModule.newInstance(BluetoothDevice::class.java, device.address)
+        HookBridge.newInstance(BluetoothDevice::class.java, device.address)
     }.getOrNull() ?: runCatching {
-        BaseHookModule.newInstance(
+        HookBridge.newInstance(
             BluetoothDevice::class.java,
             device.address,
             0 // ADDRESS_TYPE_PUBLIC
         )
     }.getOrNull() ?: return null
 
-    runCatching { BaseHookModule.setObjectField(bt, "mName", device.name) }
-    runCatching { BaseHookModule.setObjectField(bt, "mAlias", device.name) }
+    runCatching { HookBridge.setObjectField(bt, "mName", device.name) }
+    runCatching { HookBridge.setObjectField(bt, "mAlias", device.name) }
 
     return bt as BluetoothDevice?
 }

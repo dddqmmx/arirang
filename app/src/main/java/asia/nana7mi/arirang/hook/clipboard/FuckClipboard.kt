@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.hook.clipboard
 
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 
 import android.os.Binder
@@ -30,8 +31,8 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         runCatching {
-            val clipboardService = BaseHookModule.findClass("com.android.server.clipboard.ClipboardService", lpparam.classLoader)
-            val clipboardImpl = BaseHookModule.findClassIfExists(
+            val clipboardService = HookBridge.findClass("com.android.server.clipboard.ClipboardService", lpparam.classLoader)
+            val clipboardImpl = HookBridge.findClassIfExists(
                 "com.android.server.clipboard.ClipboardService\$ClipboardImpl",
                 lpparam.classLoader
             )
@@ -51,7 +52,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             val userId = (args.firstOrNull { it is Int } as? Int)
                 ?.takeIf { it >= 0 }
                 ?: runCatching {
-                    BaseHookModule.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
+                    HookBridge.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
                 }.getOrDefault(uid / PER_USER_RANGE)
 
             if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
@@ -68,7 +69,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             }
         }
 
-        BaseHookModule.hookAllMethods(targetClass, "getPrimaryClip", hookCallback)
+        HookBridge.hookAllMethods(targetClass, "getPrimaryClip", hookCallback)
     }
 
     private fun shouldBypass(callingPackage: String, uid: Int): Boolean {
@@ -82,9 +83,9 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             override fun beforeHookedMethod(param: MethodHookParam) {
                 val uid = runCatching {
                     if (param.thisObject.javaClass.simpleName == "ProcessRecord") {
-                        BaseHookModule.getIntField(param.thisObject, "uid")
+                        HookBridge.getIntField(param.thisObject, "uid")
                     } else {
-                        BaseHookModule.getIntField(param.thisObject, "mUid")
+                        HookBridge.getIntField(param.thisObject, "mUid")
                     }
                 }.getOrNull()
 
@@ -96,12 +97,12 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
         }
 
         runCatching {
-            val processRecordClass = BaseHookModule.findClass("com.android.server.am.ProcessRecord", classLoader)
-            BaseHookModule.hookAllMethods(processRecordClass, "isDebugging", hookCallback)
+            val processRecordClass = HookBridge.findClass("com.android.server.am.ProcessRecord", classLoader)
+            HookBridge.hookAllMethods(processRecordClass, "isDebugging", hookCallback)
         }
         runCatching {
-            val wpcClass = BaseHookModule.findClass("com.android.server.wm.WindowProcessController", classLoader)
-            BaseHookModule.hookAllMethods(wpcClass, "isDebugging", hookCallback)
+            val wpcClass = HookBridge.findClass("com.android.server.wm.WindowProcessController", classLoader)
+            HookBridge.hookAllMethods(wpcClass, "isDebugging", hookCallback)
         }
     }
 }

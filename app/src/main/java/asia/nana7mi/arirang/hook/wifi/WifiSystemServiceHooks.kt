@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.wifi
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import asia.nana7mi.arirang.hook.core.HookLog
 import de.robv.android.xposed.XC_MethodHook
@@ -21,7 +21,7 @@ internal class WifiSystemServiceHooks(
             systemServiceManagerHookInstalled = true
         }
 
-        val managerClass = BaseHookModule.findClassIfExists(
+        val managerClass = HookBridge.findClassIfExists(
             "com.android.server.SystemServiceManager",
             classLoader
         )
@@ -30,7 +30,7 @@ internal class WifiSystemServiceHooks(
             return
         }
 
-        BaseHookModule.hookAllMethods(managerClass, "startServiceFromJar", afterHookedMethod {
+        HookBridge.hookAllMethods(managerClass, "startServiceFromJar", afterHookedMethod {
             val className = args.firstOrNull() as? String ?: return@afterHookedMethod
             val jarPath = args.getOrNull(1) as? String
             if (className != WIFI_SYSTEM_SERVICE_CLASS) return@afterHookedMethod
@@ -57,7 +57,7 @@ internal class WifiSystemServiceHooks(
         wifiServiceClass.declaredMethods
             .filter { it.name == "onStart" && it.parameterTypes.isEmpty() }
             .forEach { method ->
-                BaseHookModule.hookMethod(method, afterHookedMethod {
+                HookBridge.hookMethod(method, afterHookedMethod {
                     HookLog.i(HookLog.Module.WIFI, "WifiService.onStart observed; resolving WifiServiceImpl")
                     serviceHooks.hookWifiServiceInstance(thisObject)
                 })

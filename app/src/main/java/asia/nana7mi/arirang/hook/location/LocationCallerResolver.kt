@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.location
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.util.callNoArg
@@ -117,14 +117,14 @@ internal object LocationCallerResolver {
     private fun packageNameFromWorkSource(value: Any?): String? {
         val workSource = value?.takeIf { it.javaClass.name == "android.os.WorkSource" } ?: return null
         return runCatching {
-            val size = BaseHookModule.callMethod(workSource, "size") as? Int ?: return@runCatching null
+            val size = HookBridge.callMethod(workSource, "size") as? Int ?: return@runCatching null
             repeat(size) { index ->
-                (BaseHookModule.callMethod(workSource, "getName", index) as? String)
+                (HookBridge.callMethod(workSource, "getName", index) as? String)
                     ?.takeIf { it.isLikelyPackageName() && it != GMS_PACKAGE }
                     ?.let { return it }
             }
             repeat(size) { index ->
-                val uid = BaseHookModule.callMethod(workSource, "getUid", index) as? Int ?: return@repeat
+                val uid = HookBridge.callMethod(workSource, "getUid", index) as? Int ?: return@repeat
                 packageNameForUid(uid)
                     ?.takeIf { it != GMS_PACKAGE }
                     ?.let { return it }

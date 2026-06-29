@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.hook.system
 
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
 
@@ -18,7 +19,7 @@ import org.json.JSONObject
 class SystemServerHook : BaseHookModule(matchSystem = true) {
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
-            val amsClass = BaseHookModule.findClass("com.android.server.am.ActivityManagerService", lpparam.classLoader)
+            val amsClass = HookBridge.findClass("com.android.server.am.ActivityManagerService", lpparam.classLoader)
             
             // Search for systemReady method that takes a Runnable as its first parameter
             // Newer Android versions (14+) often have systemReady(Runnable, TimingsTraceAndSlog)
@@ -28,7 +29,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
 
             HookLog.i(HookLog.Module.CORE, "found systemReady with parameters: ${systemReady.parameterTypes.joinToString { it.name }}")
 
-            BaseHookModule.hookMethod(
+            HookBridge.hookMethod(
                 systemReady,
                 afterHookedMethod {
                     HookLog.i(HookLog.Module.CORE, "AMS systemReady, starting auto-bind to ArirangService")
@@ -74,7 +75,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
             hookBluetoothManagerWhenPublished(lpparam.classLoader)
 
             // Hook SystemProperties for Java-level property spoofing
-            val systemPropertiesClass = BaseHookModule.findClass("android.os.SystemProperties", lpparam.classLoader)
+            val systemPropertiesClass = HookBridge.findClass("android.os.SystemProperties", lpparam.classLoader)
             hookSystemProperties(systemPropertiesClass)
 
         } catch (t: Throwable) {
@@ -91,7 +92,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
      * way to reach [com.android.server.bluetooth.BluetoothManagerService] from here.
      */
     private fun hookBluetoothManagerWhenPublished(systemClassLoader: ClassLoader) {
-        val smClass = BaseHookModule.findClassIfExists("android.os.ServiceManager", systemClassLoader)
+        val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", systemClassLoader)
             ?: run {
                 HookLog.w(HookLog.Module.BLUETOOTH, "ServiceManager not found; cannot reach BluetoothManagerService")
                 return
@@ -103,7 +104,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
                     it.parameterTypes[0] == String::class.java
             }
             .forEach { method ->
-                BaseHookModule.hookMethod(method, beforeHookedMethod {
+                HookBridge.hookMethod(method, beforeHookedMethod {
                     if (args.getOrNull(0) != "bluetooth_manager") return@beforeHookedMethod
                     val binder = args.getOrNull(1) ?: return@beforeHookedMethod
                     onBluetoothManagerPublished(binder)
@@ -115,7 +116,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
         if (!bmsHooked.compareAndSet(false, true)) return
         runCatching {
             val cl = binder.javaClass.classLoader
-            val bmsClass = BaseHookModule.findClassIfExists(
+            val bmsClass = HookBridge.findClassIfExists(
                 "com.android.server.bluetooth.BluetoothManagerService", cl
             ) ?: run {
                 HookLog.w(
@@ -135,7 +136,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
 
     private fun hookBluetoothManagerService(bmsClass: Class<*>) {
         // getName() — the leaf the app-facing IBluetoothManager.getName() funnels through.
-        BaseHookModule.findAndHookMethod(bmsClass, "getName", object : XC_MethodHook() {
+        HookBridge.findAndHookMethod(bmsClass, "getName", object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 val original = param.result as? String
                 val name = readBluetoothNameFromConfig(param.thisObject)
@@ -149,7 +150,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
         })
 
         // getAddress()
-        BaseHookModule.findAndHookMethod(bmsClass, "getAddress", object : XC_MethodHook() {
+        HookBridge.findAndHookMethod(bmsClass, "getAddress", object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 if (readBluetoothNameFromConfig(param.thisObject) == null) return
                 param.result = "02:00:00:AA:BB:CC"
@@ -174,8 +175,8 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
             }
         }
 
-        BaseHookModule.findAndHookMethod(spClass, "get", String::class.java, hook)
-        BaseHookModule.findAndHookMethod(spClass, "get", String::class.java, String::class.java, hook)
+        HookBridge.findAndHookMethod(spClass, "get", String::class.java, hook)
+        HookBridge.findAndHookMethod(spClass, "get", String::class.java, String::class.java, hook)
     }
 
     /**
@@ -186,7 +187,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
      */
     private fun readBluetoothNameFromConfig(service: Any?): String? {
         val context = runCatching {
-            BaseHookModule.getObjectField(service, "mContext") as? Context
+            HookBridge.getObjectField(service, "mContext") as? Context
         }.getOrNull()
         val snapshot = ArirangClient.readConfigSnapshot(
             configName = "bluetooth",

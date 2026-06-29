@@ -1,6 +1,7 @@
 package asia.nana7mi.arirang.hook.wifi
 
 import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 

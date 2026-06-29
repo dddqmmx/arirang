@@ -1,6 +1,7 @@
 package asia.nana7mi.arirang.hook.process
 
 import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -30,9 +31,9 @@ class FuckProcess : BaseHookModule(matchSystem = true, matchClient = false) {
         if (lpparam.packageName == "android") return // Don't hook system_server ProcessBuilder
 
         runCatching {
-            val processBuilderClass = BaseHookModule.findClass("java.lang.ProcessBuilder", lpparam.classLoader)
+            val processBuilderClass = HookBridge.findClass("java.lang.ProcessBuilder", lpparam.classLoader)
             
-            BaseHookModule.hookAllMethods(processBuilderClass, "start", beforeHookedMethod {
+            HookBridge.hookAllMethods(processBuilderClass, "start", beforeHookedMethod {
                 val pb = this.thisObject as ProcessBuilder
                 val cmd = pb.command()
                 
@@ -41,8 +42,8 @@ class FuckProcess : BaseHookModule(matchSystem = true, matchClient = false) {
                     if (key != null) {
                         // Let's call the Java SystemProperties.get() which is ALREADY SPOOFED by our native zygisk module.
                         val spoofedValue = runCatching {
-                            val spClass = BaseHookModule.findClass("android.os.SystemProperties", lpparam.classLoader)
-                            BaseHookModule.callStaticMethod(spClass, "get", key, "") as String
+                            val spClass = HookBridge.findClass("android.os.SystemProperties", lpparam.classLoader)
+                            HookBridge.callStaticMethod(spClass, "get", key, "") as String
                         }.getOrDefault("")
 
                         HookLog.i(HookLog.Module.CORE, "Spoofed getprop execution for key: $key -> $spoofedValue")

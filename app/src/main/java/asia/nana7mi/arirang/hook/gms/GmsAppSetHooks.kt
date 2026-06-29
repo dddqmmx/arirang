@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.gms
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import android.os.IBinder
 import android.os.IInterface
@@ -19,11 +19,11 @@ internal class GmsAppSetHooks(
     private val hookedServiceClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
 
     fun hookCallbackBinderProxy(classLoader: ClassLoader) {
-        val binderProxyClass = BaseHookModule.findClassIfExists("android.os.BinderProxy", classLoader)
-            ?: BaseHookModule.findClassIfExists("android.os.BinderProxy", ClassLoader.getSystemClassLoader())
+        val binderProxyClass = HookBridge.findClassIfExists("android.os.BinderProxy", classLoader)
+            ?: HookBridge.findClassIfExists("android.os.BinderProxy", ClassLoader.getSystemClassLoader())
             ?: return
 
-        BaseHookModule.findAndHookMethod(
+        HookBridge.findAndHookMethod(
             binderProxyClass,
             "transact",
             Int::class.javaPrimitiveType,
@@ -73,7 +73,7 @@ internal class GmsAppSetHooks(
         }
 
         method.isAccessible = true
-        BaseHookModule.hookMethod(method, beforeHookedMethod {
+        HookBridge.hookMethod(method, beforeHookedMethod {
             val request = args.getOrNull(0)
             val callback = args.getOrNull(1)
             val appSetClassLoader = ownerClass.classLoader ?: ClassLoader.getSystemClassLoader()
@@ -97,7 +97,7 @@ internal class GmsAppSetHooks(
         if (callback == null) return false
 
         return runCatching {
-            val infoClass = BaseHookModule.findClass("com.google.android.gms.appset.AppSetInfoParcel", classLoader)
+            val infoClass = HookBridge.findClass("com.google.android.gms.appset.AppSetInfoParcel", classLoader)
             val info = infoClass.newAppSetInfoParcel(appSetId)
 
             val callbackMethod = callback.javaClass.findDeclaredMethodInHierarchy { method ->
@@ -125,7 +125,7 @@ internal class GmsAppSetHooks(
                 logClassHierarchyMethods("App Set callback object", callback.javaClass)
             }
 
-            val statusClass = BaseHookModule.findClass("com.google.android.gms.common.api.Status", classLoader)
+            val statusClass = HookBridge.findClass("com.google.android.gms.common.api.Status", classLoader)
             spoofCallbackBinder(callback, statusClass.successStatus(), info)
         }.onFailure {
             HookLog.i(HookLog.Module.GMS, "failed to spoof App Set ID from GMS service callback: ${it.message}")

@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.location
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import android.location.Location
 import android.location.LocationManager
@@ -33,7 +33,7 @@ internal fun fakeLocation(
 }
 
 internal fun rewriteLocationResult(locationResult: Any, profile: LocationProfile): Boolean {
-    runCatching { BaseHookModule.callMethod(locationResult, "getLocations") }
+    runCatching { HookBridge.callMethod(locationResult, "getLocations") }
         .getOrNull()
         ?.takeIf { it.containsLocation() }
         ?.let {
@@ -129,7 +129,7 @@ private fun Location.applyProfile(profile: LocationProfile, providerName: String
     bearingAccuracyDegrees = MOCK_BEARING_ACCURACY
 
     runCatching {
-        BaseHookModule.callMethod(this, "setIsFromMockProvider", false)
+        HookBridge.callMethod(this, "setIsFromMockProvider", false)
     }
 
     extras = Bundle(extras ?: Bundle()).apply {

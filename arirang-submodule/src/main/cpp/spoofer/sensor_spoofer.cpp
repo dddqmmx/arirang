@@ -263,8 +263,6 @@ void apply_overrides(Sensor &sensor, const SubmoduleConfig &config) {
 
 void inject_sensors(Vector *list, const SubmoduleConfig &config) {
     for (const auto &entry : config.sensor_injections) {
-        // Vector::push_back copies the item bytes through VectorImpl::add, so
-        // the stack-local Sensor may be destroyed immediately after insertion.
         Sensor injection;
         injection.setType(entry.type);
         injection.setHandle(entry.handle);
@@ -274,6 +272,8 @@ void inject_sensors(Vector *list, const SubmoduleConfig &config) {
         if (!entry.vendor.empty()) {
             injection.vendor().setTo(entry.vendor.c_str());
         }
+        // Vector::push_back copies the item bytes through VectorImpl::add, so
+        // the stack-local Sensor may be destroyed immediately after insertion.
         list->push_back(&injection);
     }
 }

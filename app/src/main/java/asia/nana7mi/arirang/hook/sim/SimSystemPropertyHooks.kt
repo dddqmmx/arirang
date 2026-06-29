@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.util.asIntOrNull
@@ -15,12 +15,12 @@ internal class SimSystemPropertyHooks(
     private val profileForSlot: (slotIndex: Int?, allowFallback: Boolean) -> SimProfile?
 ) {
     fun hookTelephonyPropertyWriters(classLoader: ClassLoader) {
-        val telephonyManagerClass = BaseHookModule.findClassIfExists(
+        val telephonyManagerClass = HookBridge.findClassIfExists(
             "android.telephony.TelephonyManager",
             classLoader
         ) ?: return
 
-        BaseHookModule.hookAllMethods(telephonyManagerClass, "setTelephonyProperty", beforeHookedMethod {
+        HookBridge.hookAllMethods(telephonyManagerClass, "setTelephonyProperty", beforeHookedMethod {
             val config = currentConfig()
             if (!config.enabled) return@beforeHookedMethod
             val profile = profileForSlot(args.getOrNull(0).asIntOrNull(), false)
@@ -79,7 +79,7 @@ internal class SimSystemPropertyHooks(
                     it.parameterTypes[1] == String::class.java
             }
             .forEach { method ->
-                BaseHookModule.hookMethod(method, beforeHookedMethod {
+                HookBridge.hookMethod(method, beforeHookedMethod {
                     val override = systemPropertyOverride(args.firstOrNull()) ?: return@beforeHookedMethod
                     args[1] = override
                 })
@@ -87,7 +87,7 @@ internal class SimSystemPropertyHooks(
     }
 
     fun hookGeneratedTelephonyProperties(classLoader: ClassLoader) {
-        val telephonyPropertiesClass = BaseHookModule.findClassIfExists(
+        val telephonyPropertiesClass = HookBridge.findClassIfExists(
             "android.sysprop.TelephonyProperties",
             classLoader
         ) ?: run {
@@ -106,7 +106,7 @@ internal class SimSystemPropertyHooks(
             "operator_numeric" to { it.operatorNumericList },
             "operator_alpha" to { it.alphaList }
         ).forEach { (methodName, value) ->
-            BaseHookModule.hookAllMethods(telephonyPropertiesClass, methodName, hookedMethod(
+            HookBridge.hookAllMethods(telephonyPropertiesClass, methodName, hookedMethod(
                 before = {
                     if (args.size == 1 && args[0] is List<*>) {
                         val config = currentConfig()
@@ -137,7 +137,7 @@ internal class SimSystemPropertyHooks(
                     it.parameterTypes.firstOrNull() == String::class.java
             }
             .forEach { method ->
-                BaseHookModule.hookMethod(method, beforeHookedMethod {
+                HookBridge.hookMethod(method, beforeHookedMethod {
                     val override = systemPropertyOverride(args.firstOrNull()) ?: return@beforeHookedMethod
                     result = override
                 })
@@ -148,7 +148,7 @@ internal class SimSystemPropertyHooks(
         runCatching {
             val config = currentConfig()
             if (!config.enabled) return
-            val systemPropertiesClass = BaseHookModule.findClass("android.os.SystemProperties", null)
+            val systemPropertiesClass = HookBridge.findClass("android.os.SystemProperties", null)
             listOf(
                 "gsm.sim.operator.iso-country" to config.countryIsoPropertyValue,
                 "gsm.sim.operator.numeric" to config.operatorNumericPropertyValue,
@@ -157,7 +157,7 @@ internal class SimSystemPropertyHooks(
                 "gsm.operator.numeric" to config.operatorNumericPropertyValue,
                 "gsm.operator.alpha" to config.alphaPropertyValue
             ).forEach { (key, value) ->
-                BaseHookModule.callStaticMethod(systemPropertiesClass, "set", key, value)
+                HookBridge.callStaticMethod(systemPropertiesClass, "set", key, value)
             }
         }.onFailure {
             HookLog.w(HookLog.Module.SIM, "failed to write proof telephony properties: ${it.message}")
@@ -171,7 +171,7 @@ internal class SimSystemPropertyHooks(
     ) {
         if (telephonyManagerClass.declaredMethods.none { it.name == methodName }) return
 
-        BaseHookModule.hookAllMethods(telephonyManagerClass, methodName, beforeHookedMethod {
+        HookBridge.hookAllMethods(telephonyManagerClass, methodName, beforeHookedMethod {
             if (!currentConfig().enabled) return@beforeHookedMethod
             val value = valueProvider(this) ?: return@beforeHookedMethod
             val valueIndex = args.indexOfLast { it is String }
@@ -228,8 +228,8 @@ internal class SimSystemPropertyHooks(
     }
 
     private fun systemPropertiesClass(classLoader: ClassLoader): Class<*>? {
-        return BaseHookModule.findClassIfExists("android.os.SystemProperties", null)
-            ?: BaseHookModule.findClassIfExists("android.os.SystemProperties", classLoader)
+        return HookBridge.findClassIfExists("android.os.SystemProperties", null)
+            ?: HookBridge.findClassIfExists("android.os.SystemProperties", classLoader)
     }
 
     private fun beforeHookedMethod(

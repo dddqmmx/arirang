@@ -6,6 +6,7 @@ import android.os.Binder
 import android.os.IInterface
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
@@ -29,9 +30,9 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
     }
 
     private fun hookApplicationContext(classLoader: ClassLoader) {
-        val applicationClass = BaseHookModule.findClassIfExists("android.app.Application", classLoader)
+        val applicationClass = HookBridge.findClassIfExists("android.app.Application", classLoader)
             ?: Application::class.java
-        BaseHookModule.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
+        HookBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
             val app = thisObject as? Application ?: return@afterHookedMethod
             gmsContext = app.applicationContext
             ArirangClient.autoBindCurrentUser(app)
@@ -39,7 +40,7 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
     }
 
     private fun hookBinderInterfaceAttachment() {
-        BaseHookModule.findAndHookMethod(
+        HookBridge.findAndHookMethod(
             Binder::class.java,
             "attachInterface",
             IInterface::class.java,
