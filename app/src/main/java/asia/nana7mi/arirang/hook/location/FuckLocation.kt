@@ -70,6 +70,8 @@ class FuckLocation : BaseHookModule(
     private val receiverPackages = Collections.synchronizedMap(WeakHashMap<IBinder, String>())
     private val activeDeliveryPackage = ThreadLocal<String?>()
 
+    private val deliveredStatusCallbacks = Collections.newSetFromMap(ConcurrentHashMap<IBinder, Boolean>())
+
     @Volatile
     private var gmsContext: Context? = null
 
@@ -194,10 +196,47 @@ class FuckLocation : BaseHookModule(
             if (method.parameterTypes.isEmpty() && IInterface::class.java.isAssignableFrom(method.returnType)) {
                 runCatching {
                     method.isAccessible = true
-                    (method.invoke(holder) as? IInterface)?.let { hookDeliveryProxyClass(it.javaClass) }
+                    val proxy = method.invoke(holder) as? IInterface
+                    if (proxy != null) {
+                        hookDeliveryProxyClass(proxy.javaClass)
+                        scheduleProactiveFakeDelivery(holder, proxy)
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * getCurrentLocation 与 getLastLocation 共用 ILocationStatusCallback (LocationReceiver type 4)。
+     * getLastLocation 在 gxoy.f() lambda 内同步调用 dfjy.a()，结果立即到达客户端；
+     * getCurrentLocation 在 gxni.f() 内异步注册监听器，仅超时或真实定位到达时才回调，
+     * 而 Self-Check 客户端的 Tasks.await 超时（2.5s）远短于 GMS 默认超时（~30s）。
+     *
+     * 因此对 type-4 LocationReceiver 在捕获后延迟交付一个假定位，确保客户端在超时前拿到数据。
+     * 若同步路径（getLastLocation）已先完成交付，则此处跳过，避免重复投递。
+     */
+    private fun scheduleProactiveFakeDelivery(holder: Any, callbackProxy: IInterface) {
+        runCatching {
+            val type = HookBridge.getIntField(holder, "a")
+            if (type != 4) return
+        }.getOrElse { return }
+
+        val profile = resolveProfile() ?: return
+        val binder = callbackProxy.asBinder()
+        val cl = holder.javaClass.classLoader
+
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (deliveredStatusCallbacks.contains(binder)) return@postDelayed
+
+            runCatching {
+                val statusClass = HookBridge.findClass("com.google.android.gms.common.api.Status", cl)
+                val statusOk = HookBridge.getStaticObjectField(statusClass, "b")
+                val fakeLoc = fakeLocation(profile)
+                HookBridge.callMethod(callbackProxy, "a", statusOk, fakeLoc)
+                deliveredStatusCallbacks.add(binder)
+                HookLog.d(HookLog.Module.LOCATION, "proactive fake delivery for getCurrentLocation")
+            }
+        }, 200L)
     }
 
     private fun bindBinder(binder: IBinder, pkg: String?) {
@@ -236,7 +275,13 @@ class FuckLocation : BaseHookModule(
                     activeDeliveryPackage.set(pkg)
                     resolveProfile(pkg)?.let { profile ->
                         args.forEachIndexed { index, arg ->
-                            rewriteLocationContainer(arg, profile)?.let { args[index] = it }
+                            if (arg == null && method.parameterTypes[index] == Location::class.java) {
+                                args[index] = fakeLocation(profile)
+                                (thisObject as? IInterface)?.asBinder()?.let { deliveredStatusCallbacks.add(it) }
+                            } else {
+                                rewriteLocationContainer(arg, profile)?.let { args[index] = it }
+                                (thisObject as? IInterface)?.asBinder()?.let { deliveredStatusCallbacks.add(it) }
+                            }
                         }
                     }
                 },
