@@ -158,7 +158,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
 
                     val callingPackages = getPackagesForUid(this.thisObject, callingUid)
                     if (!config.shouldKeepForPackages(callingUid, callingPackages, packageName)) {
-                        HookLog.d(HookLog.Module.PACKAGE_LIST, "Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
+                        HookLog.d(HookLog.Module.PACKAGE_LIST, "Blocked getPackageInfo for '$packageName' from caller ${callingPackages.firstOrNull() ?: callingUid}")
                         result = null
                     }
                 }.onFailure {
@@ -259,14 +259,18 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                         getPackagesForUid(this.thisObject, callingUid)
                     }
 
+                    var filteredCount = 0
                     val filtered = targetPackages.filter { pkg ->
                         val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg)
                         if (!keep) {
-                            HookLog.d(HookLog.Module.PACKAGE_LIST, "Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in getPackagesForUid")
+                            filteredCount++
                         }
                         keep
                     }.toTypedArray()
 
+                    if (filteredCount > 0) {
+                        HookLog.d(HookLog.Module.PACKAGE_LIST, "getPackagesForUid: filtered $filteredCount package(s) for caller ${callingPackages.firstOrNull() ?: callingUid}")
+                    }
                     if (filtered.size != pkgs.size) {
                         result = if (filtered.isEmpty()) null else filtered
                     }
@@ -303,7 +307,6 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     }
 
                     if (visibleTargetPackages.isEmpty()) {
-                        HookLog.d(HookLog.Module.PACKAGE_LIST, "Filtered name '$name' for caller ${callingPackages.firstOrNull() ?: callingUid} in getNameForUid")
                         result = null
                     } else {
                         result = visibleTargetPackages.first()
@@ -355,14 +358,18 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             if (!config.enabled) return
 
             val callingPackages = getPackagesForUid(param.thisObject, callingUid)
+            var filteredCount = 0
             val filtered = list.filter { item ->
                 if (item == null) return@filter false
                 val pkg = getPackageName(item) ?: return@filter true
                 val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg)
                 if (!keep) {
-                    HookLog.d(HookLog.Module.PACKAGE_LIST, "Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
+                    filteredCount++
                 }
                 keep
+            }
+            if (filteredCount > 0) {
+                HookLog.d(HookLog.Module.PACKAGE_LIST, "$methodName: filtered $filteredCount package(s) for caller ${callingPackages.firstOrNull() ?: callingUid}")
             }
             param.result = HookBridge.newInstance(parceledListSlice.javaClass, filtered)
         }.onFailure {
