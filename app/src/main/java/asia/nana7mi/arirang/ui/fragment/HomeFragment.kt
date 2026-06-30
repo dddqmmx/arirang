@@ -128,7 +128,7 @@ private fun HomeScreen(
                 title = stringResource(R.string.category_permission),
                 items = listOf(
                     FeatureItem(R.string.feature_clipboard, Icons.Default.ContentPaste, ClipboardConfigActivity::class.java, true),
-                    FeatureItem(R.string.feature_app_list, Icons.Default.Apps, PackageListConfigActivity::class.java, false),
+                    FeatureItem(R.string.feature_app_list, Icons.Default.Apps, PackageListConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_sensor_info, Icons.Default.Sensors, SensorConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_bluetooth_list, Icons.Default.Bluetooth, BluetoothConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_wifi_list, Icons.Default.Wifi, WifiConfigActivity::class.java, true)
