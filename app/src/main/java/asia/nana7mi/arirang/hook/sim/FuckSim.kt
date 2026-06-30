@@ -41,6 +41,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     @Volatile
     private var phoneConfigBindHookInstalled = false
 
+    private val serviceConnectionListener = ArirangClient.ConnectionListener {
+        configStore.current(force = true)
+        propertyHooks.writeProofTelephonyProperties()
+    }
+
     override fun isEnabled(): Boolean = hookConfig.enabled
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -82,20 +87,19 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         propertyHooks.hookSystemPropertyWriters(classLoader)
         propertyHooks.hookSystemPropertyReaders(classLoader)
         propertyHooks.hookGeneratedTelephonyProperties(classLoader)
+        propertyHooks.writeProofTelephonyProperties()
     }
 
     private fun hookPhoneConfigServiceBind(classLoader: ClassLoader) {
         if (phoneConfigBindHookInstalled) return
         phoneConfigBindHookInstalled = true
 
+        ArirangClient.addConnectionListener(serviceConnectionListener)
+
         val applicationClass = HookBridge.findClassIfExists("android.app.Application", classLoader) ?: return
         HookBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
             val app = thisObject as? android.app.Application ?: return@afterHookedMethod
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                ArirangClient.autoBindCurrentUser(app)
-                configStore.current(force = true)
-                propertyHooks.writeProofTelephonyProperties()
-            }, 5_000L)
+            ArirangClient.autoBindCurrentUser(app)
         })
     }
 

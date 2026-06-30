@@ -112,9 +112,13 @@ private fun SettingsScreen(
         if (uri != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    val deContext = context.createDeviceProtectedStorageContext()
                     val dirsToZip = listOf(
                         File(context.filesDir.parentFile, "shared_prefs"),
-                        context.filesDir
+                        context.filesDir,
+                        File(deContext.filesDir.parentFile, "shared_prefs"),
+                        deContext.filesDir,
+                        File(context.filesDir.parentFile, "databases")
                     )
                     ZipUtils.zipFiles(dirsToZip, outputStream)
                 }
@@ -130,9 +134,16 @@ private fun SettingsScreen(
     ) { uri ->
         if (uri != null) {
             runCatching {
+                val destDir = context.filesDir.parentFile ?: context.filesDir
+                val deDestDir = context.createDeviceProtectedStorageContext().filesDir.parentFile ?: destDir
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val destDir = context.filesDir.parentFile ?: context.filesDir
-                    ZipUtils.unzipFiles(inputStream, destDir)
+                    val bytes = inputStream.readBytes()
+                    bytes.inputStream().use { ceStream ->
+                        ZipUtils.unzipFiles(ceStream, destDir)
+                    }
+                    bytes.inputStream().use { deStream ->
+                        ZipUtils.unzipFiles(deStream, deDestDir)
+                    }
                 }
                 Toast.makeText(context, R.string.import_success_restart, Toast.LENGTH_LONG).show()
                 val packageManager = context.packageManager

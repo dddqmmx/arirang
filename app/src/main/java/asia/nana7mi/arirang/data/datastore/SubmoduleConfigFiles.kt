@@ -1,7 +1,6 @@
 package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
-import androidx.core.content.edit
 import asia.nana7mi.arirang.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
@@ -21,8 +20,7 @@ object SubmoduleConfigFiles {
         uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context),
         sensorConfig: SensorConfigPrefs.Config = SensorConfigPrefs.loadConfig(context)
     ) {
-        val configFile = configFile(context)
-        configFile.parentFile?.mkdirs()
+        val configFileDe = configFile(context)
 
         val simProperties = buildSimProperties(simConfig)
         val json = JSONObject()
@@ -69,8 +67,12 @@ object SubmoduleConfigFiles {
             .put("hookLogConfigSnapshot", HookLogSettings.buildHookSnapshot(context))
             .put("wifiConfigVersion", WifiConfigPrefs.lastModified(context))
             .put("wifiConfigSnapshot", WifiConfigPrefs.buildHookSnapshot(context))
+            .put("bluetoothConfigVersion", BluetoothConfigPrefs.lastModified(context))
+            .put("bluetoothConfigSnapshot", BluetoothConfigPrefs.buildHookSnapshot(context))
             .put("locationConfigVersion", LocationConfigPrefs.lastModified(context))
             .put("locationConfigSnapshot", LocationConfigPrefs.buildHookSnapshot(context))
+            .put("packageListConfigVersion", PackageVisibilityPrefs.lastModified(context))
+            .put("packageListConfigSnapshot", PackageVisibilityPrefs.buildHookSnapshot(context))
             .put("sensorConfigEnabled", sensorConfig.enabled)
             .put("sensorHideAll", sensorConfig.hideAll)
             .put("sensorGlobalVendorReplacement", sensorConfig.vendorReplacement)
@@ -86,13 +88,24 @@ object SubmoduleConfigFiles {
             .put("sensorConfigSnapshot", SensorConfigPrefs.buildHookSnapshot(context))
             .toString()
 
-        configFile.writeText(json)
-        configFile.setReadable(false, false)
-        configFile.setWritable(false, false)
-        configFile.setExecutable(false, false)
-        configFile.setReadable(true, false)   // 0644 - world-readable so system_server can read
-        configFile.setWritable(true, true)    // owner-only write
-        configFile.parentFile?.setExecutable(true, false)  // world-traversable directory
+        writeConfigFile(configFileDe, json)
+        val configFileCe = ceConfigFile(context)
+        writeConfigFile(configFileCe, json)
+    }
+
+    private fun writeConfigFile(file: File, json: String) {
+        file.parentFile?.mkdirs()
+        file.writeText(json)
+        file.setReadable(false, false)
+        file.setWritable(false, false)
+        file.setExecutable(false, false)
+        file.setReadable(true, false)
+        file.setWritable(true, true)
+        file.parentFile?.setExecutable(true, false)
+    }
+
+    private fun ceConfigFile(context: Context): File {
+        return File(File(context.filesDir, BuildConfig.SUBMODULE_CONFIG_DIR), BuildConfig.SUBMODULE_CONFIG_FILE)
     }
 
     private fun buildSensorBlacklist(config: SensorConfigPrefs.Config): JSONArray {

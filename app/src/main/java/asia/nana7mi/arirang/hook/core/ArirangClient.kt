@@ -38,6 +38,20 @@ import java.util.concurrent.TimeUnit
  */
 object ArirangClient {
 
+    fun interface ConnectionListener {
+        fun onServiceConnected()
+    }
+
+    private val connectionListeners = java.util.concurrent.CopyOnWriteArrayList<ConnectionListener>()
+
+    fun addConnectionListener(listener: ConnectionListener) {
+        connectionListeners.add(listener)
+    }
+
+    fun removeConnectionListener(listener: ConnectionListener) {
+        connectionListeners.remove(listener)
+    }
+
     /** 日志 TAG */
     private const val TAG = "ArirangClient"
 
@@ -143,17 +157,14 @@ object ArirangClient {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
             HookLog.i(HookLog.Module.NOTIFY, "onServiceConnected $name")
             try {
-                // 将 IBinder 转换为 AIDL 接口
                 sService = IArirangService.Stub.asInterface(service)
-                // 连接成功，移除潜在的重连任务
                 handler.removeCallbacks(reconnectRunnable)
+                connectionListeners.forEach { it.onServiceConnected() }
             } catch (t: Throwable) {
                 HookLog.i(HookLog.Module.NOTIFY, "asInterface failed: ${t.stackTraceToString()}")
                 sService = null
             } finally {
-                // 标记不再处于 binding 状态
                 sBinding = false
-                // 释放等待线程
                 sConnectLatch?.countDown()
             }
         }
