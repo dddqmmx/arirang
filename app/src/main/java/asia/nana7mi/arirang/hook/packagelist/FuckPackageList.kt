@@ -158,7 +158,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
 
                     val callingPackages = getPackagesForUid(this.thisObject, callingUid)
                     if (!config.shouldKeepForPackages(callingUid, callingPackages, packageName)) {
-                        HookBridge.log("Arirang/package_list/D: Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
+                        HookLog.d(HookLog.Module.PACKAGE_LIST, "Blocked getPackageInfo for package '$packageName' for caller ${callingPackages.firstOrNull() ?: callingUid}")
                         result = null
                     }
                 }.onFailure {
@@ -252,7 +252,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     if (!config.enabled) return@afterHookedMethod
 
                     val targetUid = args[0] as Int
-                    val targetPackages = pkgs.mapNotNull { it as? String }
+                    val targetPackages = pkgs.mapNotNull { it as? String }.toSet()
                     val callingPackages = if (targetUid == callingUid) {
                         targetPackages
                     } else {
@@ -260,10 +260,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     }
 
                     val filtered = targetPackages.filter { pkg ->
-                        val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
-                            isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
+                        val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg)
                         if (!keep) {
-                            HookBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in getPackagesForUid")
+                            HookLog.d(HookLog.Module.PACKAGE_LIST, "Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in getPackagesForUid")
                         }
                         keep
                     }.toTypedArray()
@@ -294,19 +293,17 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     val targetPackages = getPackagesForUid(this.thisObject, targetUid)
                     val callingPackages = getPackagesForUid(this.thisObject, callingUid)
                     val visibleTargetPackages = if (targetPackages.isEmpty()) {
-                        listOf(name).filter { pkg ->
-                            config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
-                                isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
-                        }
+                        setOf(name).filter { pkg ->
+                            config.shouldKeepForPackages(callingUid, callingPackages, pkg)
+                        }.toSet()
                     } else {
                         targetPackages.filter { pkg ->
-                            config.shouldKeepForPackages(callingUid, callingPackages, pkg) &&
-                                isInstalledPackageForCaller(this.thisObject, callingUid, pkg)
-                        }
+                            config.shouldKeepForPackages(callingUid, callingPackages, pkg)
+                        }.toSet()
                     }
 
                     if (visibleTargetPackages.isEmpty()) {
-                        HookBridge.log("Arirang/package_list/D: Filtered name '$name' for caller ${callingPackages.firstOrNull() ?: callingUid} in getNameForUid")
+                        HookLog.d(HookLog.Module.PACKAGE_LIST, "Filtered name '$name' for caller ${callingPackages.firstOrNull() ?: callingUid} in getNameForUid")
                         result = null
                     } else {
                         result = visibleTargetPackages.first()
@@ -330,23 +327,15 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         )
     }
 
-    private fun getPackagesForUid(pmObject: Any, uid: Int): List<String> {
-        if (uid <= 0) return emptyList()
+    private fun getPackagesForUid(pmObject: Any, uid: Int): Set<String> {
+        if (uid <= 0) return emptySet()
         return withInternalCall {
             runCatching {
                 (HookBridge.callMethod(pmObject, "getPackagesForUid", uid) as? Array<*>)
                     ?.mapNotNull { it as? String }
-                    .orEmpty()
-            }.getOrDefault(emptyList())
-        }
-    }
-
-    private fun isInstalledPackageForCaller(pmObject: Any, callingUid: Int, packageName: String): Boolean {
-        val userId = callingUid / 100000
-        return withInternalCall {
-            runCatching {
-                HookBridge.callMethod(pmObject, "getPackageInfo", packageName, 0L, userId) != null
-            }.getOrDefault(true)
+                    ?.toSet()
+                    ?: emptySet()
+            }.getOrDefault(emptySet())
         }
     }
 
@@ -371,7 +360,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 val pkg = getPackageName(item) ?: return@filter true
                 val keep = config.shouldKeepForPackages(callingUid, callingPackages, pkg)
                 if (!keep) {
-                    HookBridge.log("Arirang/package_list/D: Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
+                    HookLog.d(HookLog.Module.PACKAGE_LIST, "Filtered package '$pkg' for caller ${callingPackages.firstOrNull() ?: callingUid} in $methodName")
                 }
                 keep
             }

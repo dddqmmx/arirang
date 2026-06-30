@@ -16,6 +16,7 @@ internal class PackageListHookConfig(private val prefsName: String) {
     private var defaultTemplateId: String? = null
     private val templates = mutableMapOf<String, Template>()
     private val appRules = mutableMapOf<String, AppRule>()
+    private val resolvedTemplateCache = mutableMapOf<String, Pair<Set<String>, Boolean>>()
     private var lastLoadedTimestamp = -1L
 
     private val pref by lazy {
@@ -39,7 +40,7 @@ internal class PackageListHookConfig(private val prefsName: String) {
 
     fun shouldKeepForPackages(
         callingUid: Int,
-        callingPackages: List<String>,
+        callingPackages: Set<String>,
         targetPackage: String
     ): Boolean {
         if (!enabled) return true
@@ -47,9 +48,10 @@ internal class PackageListHookConfig(private val prefsName: String) {
         if (targetPackage == "android" || targetPackage == BuildConfig.APPLICATION_ID) return true
 
         if (callingPackages.isEmpty()) return true
-        if (callingPackages.contains(BuildConfig.APPLICATION_ID)) return true
+        if (BuildConfig.APPLICATION_ID in callingPackages) return true
+        if (targetPackage in callingPackages) return true
 
-        return callingPackages.all { shouldKeep(it, targetPackage) }
+        return callingPackages.any { shouldKeep(it, targetPackage) }
     }
 
     private fun loadFromSnapshot(snapshot: String) {
@@ -108,6 +110,7 @@ internal class PackageListHookConfig(private val prefsName: String) {
 
     private fun parseTemplates(templatesJson: String?) {
         templates.clear()
+        resolvedTemplateCache.clear()
         if (templatesJson.isNullOrBlank()) return
 
         runCatching {
@@ -182,7 +185,9 @@ internal class PackageListHookConfig(private val prefsName: String) {
 
     private fun keepByTemplate(templateId: String?, targetPackage: String): Boolean {
         if (templateId == null) return true
-        val (templatePackages, isBlacklist) = resolvedTemplatePackages(templateId)
+        val (templatePackages, isBlacklist) = resolvedTemplateCache.getOrPut(templateId) {
+            resolvedTemplatePackages(templateId)
+        }
         return if (isBlacklist) {
             !templatePackages.contains(targetPackage)
         } else {
