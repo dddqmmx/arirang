@@ -192,12 +192,9 @@
 
     
     <string name="init_select_language">言語を選択</string>
-    <string name="init_select_region">地域を選択</string>
     <string name="init_welcome_title">ようこそ</string>
     <string name="init_welcome_subtitle">初期設定を完了してください</string>
     <string name="init_label_language">言語</string>
-    <string name="init_label_region">地域</string>
-    <string name="init_extreme_warning">⚠ 極限セキュリティモードが有効です</string>
     <string name="init_button_next">次へ</string>
     <string name="btn_cancel">キャンセル</string>
     <string name="init_button_enter">アプリに入る</string>
@@ -211,8 +208,6 @@
     <string name="init_risk_item_rom">信頼できないROMソース</string>
     <string name="init_risk_item_kernel">ベースバンドまたはカーネルが改ざんされている</string>
     <string name="init_risk_item_root">Root権限がマルウェアに制御されている</string>
-
-    <string name="user_region_title">地域</string>
 
     <string name="permission_allow">許可</string>
     <string name="permission_deny">拒否</string>

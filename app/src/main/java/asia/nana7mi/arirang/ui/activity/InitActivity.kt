@@ -8,12 +8,6 @@ import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.*
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,7 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.ArrowDropDown
@@ -34,7 +27,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -79,7 +71,6 @@ fun getAppColorScheme(context: Context): ColorScheme {
 fun SetupFlow() {
     var step by rememberSaveable { mutableIntStateOf(1) }
     var selectedLanguageCode by rememberSaveable { mutableStateOf(getCurrentAppLanguageCode()) }
-    var selectedRegionCode by rememberSaveable { mutableStateOf("JP") }
 
     AnimatedContent(
         targetState = step,
@@ -95,16 +86,14 @@ fun SetupFlow() {
         label = "ScreenTransition"
     ) { targetStep ->
         when (targetStep) {
-            1 -> LanguageRegionScreen(
-                onNext = { lang, region ->
+            1 -> LanguageScreen(
+                onNext = { lang ->
                     selectedLanguageCode = lang
-                    selectedRegionCode = region
                     step = 2
                 }
             )
             2 -> WarningScreen(
                 languageCode = selectedLanguageCode,
-                regionCode = selectedRegionCode,
                 onBack = { step = 1 }
             )
         }
@@ -112,35 +101,21 @@ fun SetupFlow() {
 }
 
 // =======================
-// 第一屏：语言与地区 (逻辑增强版)
+// 第一屏：语言选择
 // =======================
 @Composable
-fun LanguageRegionScreen(onNext: (String, String) -> Unit) {
-    // --- 读取 XML 资源 ---
+fun LanguageScreen(onNext: (String) -> Unit) {
     val languageLabels = stringArrayResource(id = R.array.language_names)
     val languageCodes = stringArrayResource(id = R.array.language_codes)
-    val regionLabels = stringArrayResource(id = R.array.region_names)
-    val regionCodes = stringArrayResource(id = R.array.region_codes)
 
-    // 组合成对象列表
     val languages = remember(languageLabels, languageCodes) {
         languageLabels.zip(languageCodes) { label, code -> OptionItem(label, code) }
     }
-    val regions = remember(regionLabels, regionCodes) {
-        regionLabels.zip(regionCodes) { label, code -> OptionItem(label, code) }
-    }
 
-    // --- 状态管理 ---
     var currentLanguage by remember { mutableStateOf(languages.find { it.value == getCurrentAppLanguageCode() } ?: languages.first()) }
-    var currentRegionCode by rememberSaveable { mutableStateOf(regions.first().value) }
-    val currentRegion = regions.find { it.value == currentRegionCode } ?: regions.first()
-    
-    val isExtreme = currentRegion.value == "KP"
 
     var showLangDialog by remember { mutableStateOf(false) }
-    var showRegionDialog by remember { mutableStateOf(false) }
 
-    // --- 弹窗组件调用 ---
     if (showLangDialog) {
         CommonSelectionDialog(
             title = stringResource(id = R.string.init_select_language),
@@ -150,53 +125,15 @@ fun LanguageRegionScreen(onNext: (String, String) -> Unit) {
             onOptionSelected = { selected ->
                 currentLanguage = selected
                 showLangDialog = false
-                // 执行真正的语言切换
-                applyLanguage( selected.value)
+                applyLanguage(selected.value)
             }
         )
     }
 
-    if (showRegionDialog) {
-        CommonSelectionDialog(
-            title = stringResource(id = R.string.init_select_region),
-            options = regions,
-            selectedOption = currentRegion,
-            onDismiss = { showRegionDialog = false },
-            onOptionSelected = { selected ->
-                currentRegionCode = selected.value
-                showRegionDialog = false
-            }
-        )
-    }
-
-    // --- UI 布局 ---
-    Box(modifier = Modifier.fillMaxSize()) {
-
-        // 🔴 呼吸红色背景
-        if (isExtreme) {
-            val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
-                initialValue = 0.04f,
-                targetValue = 0.5f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(900),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "pulseAnim"
-            )
-
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Color.Red.copy(alpha = pulse)
-                    )
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Column(
@@ -237,34 +174,15 @@ fun LanguageRegionScreen(onNext: (String, String) -> Unit) {
             modifier = Modifier.weight(1f)
         ) {
             SelectionCard(
-                icon = Icons.Default.Public,
+                icon = Icons.Default.Language,
                 label = stringResource(id = R.string.init_label_language),
-                value = currentLanguage.label, // 显示动态选中的值
+                value = currentLanguage.label,
                 onClick = { showLangDialog = true }
             )
-            SelectionCard(
-                icon = Icons.Default.Public,
-                label = stringResource(id = R.string.init_label_region),
-                value = currentRegion.label, // 显示动态选中的值
-                onClick = { showRegionDialog = true }
-            )
-            AnimatedVisibility(
-                visible = isExtreme,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Text(
-                    text = stringResource(id = R.string.init_extreme_warning),
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
         }
 
         Button(
-            onClick = { onNext(currentLanguage.value, currentRegion.value) },
+            onClick = { onNext(currentLanguage.value) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -273,7 +191,7 @@ fun LanguageRegionScreen(onNext: (String, String) -> Unit) {
             Text(stringResource(id = R.string.init_button_next), fontSize = 18.sp)
         }
     }
-}}
+}
 
 
 // =======================
@@ -391,7 +309,7 @@ fun getCurrentAppLanguageCode(): String {
 // 第二屏
 // =======================
 @Composable
-fun WarningScreen(languageCode: String, regionCode: String, onBack: () -> Unit) {
+fun WarningScreen(languageCode: String, onBack: () -> Unit) {
     val activity = LocalActivity.current as InitActivity
     val scrollState = rememberScrollState()
 
@@ -402,7 +320,6 @@ fun WarningScreen(languageCode: String, regionCode: String, onBack: () -> Unit) 
                 Button(
                     onClick = {
                         AppPreferences.setSetupCompleted(activity, true)
-                        AppPreferences.setRegion(activity, regionCode)
                         AppPreferences.setLanguage(activity, languageCode)
                         val intent = Intent(activity, MainActivity::class.java)
                         activity.startActivity(intent)

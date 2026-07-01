@@ -15,7 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,7 +30,6 @@ import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.R
-import asia.nana7mi.arirang.data.datastore.AppPreferences
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class AboutFragment : Fragment() {
@@ -54,11 +52,6 @@ class AboutFragment : Fragment() {
 @Composable
 private fun AboutScreen() {
     val context = LocalContext.current
-    val regionCode = AppPreferences.getRegion(context) ?: "US"
-    val regionCodes = remember { context.resources.getStringArray(R.array.region_codes) }
-    val regionNames = remember { context.resources.getStringArray(R.array.region_names) }
-    val index = regionCodes.indexOf(regionCode)
-    val regionDisplayName = if (index != -1) regionNames[index] else regionCode
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -87,14 +80,6 @@ private fun AboutScreen() {
                     val intent = Intent(Intent.ACTION_VIEW, "https://github.com/dddqmmx".toUri())
                     context.startActivity(intent)
                 }
-            )
-        }
-
-        item {
-            InfoCard(
-                title = stringResource(R.string.user_region_title),
-                content = regionDisplayName,
-                icon = Icons.Default.Public
             )
         }
 

@@ -32,7 +32,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
@@ -98,8 +97,6 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val languageNames = stringArrayResource(R.array.language_names)
     val languageCodes = stringArrayResource(R.array.language_codes)
-    val regionNames = stringArrayResource(R.array.region_names)
-    val regionCodes = stringArrayResource(R.array.region_codes)
     val logModules = remember {
         HookLogSettings.MODULE_KEYS.map { key ->
             HookLogSettings.Module(key, logModuleLabelRes(key))
@@ -162,13 +159,8 @@ private fun SettingsScreen(
     val currentLanguage = languageNames.getOrElse(languageCodes.indexOf(savedLanguage)) { savedLanguage }
 
 
-    var currentRegionCode by remember {
-        mutableStateOf(AppPreferences.getRegion(context) ?: DEFAULT_REGION)
-    }
     var showLanguageDialog by remember { mutableStateOf(false) }
-    var showRegionDialog by remember { mutableStateOf(false) }
     var showLogDialog by remember { mutableStateOf(false) }
-    val currentRegion = regionNames.getOrElse(regionCodes.indexOf(currentRegionCode)) { currentRegionCode }
 
     LazyColumn(
         modifier = Modifier
@@ -232,17 +224,6 @@ private fun SettingsScreen(
         }
 
         item {
-            SettingsSection(title = stringResource(R.string.init_select_region)) {
-                SettingCard(
-                    title = stringResource(R.string.user_region_title),
-                    summary = currentRegion,
-                    icon = Icons.Default.Public,
-                    onClick = { showRegionDialog = true }
-                )
-            }
-        }
-
-        item {
             SettingsSection(title = stringResource(R.string.log_settings_title)) {
                 SettingCard(
                     title = stringResource(R.string.log_settings_title),
@@ -264,21 +245,6 @@ private fun SettingsScreen(
                 AppPreferences.setLanguage(context, code)
                 applyLanguage(code)
                 showLanguageDialog = false
-            }
-        )
-    }
-
-    if (showRegionDialog) {
-        RegionDialog(
-            regionNames = regionNames,
-            regionCodes = regionCodes,
-            selectedCode = currentRegionCode,
-            onDismiss = { showRegionDialog = false },
-            onSelect = { code ->
-                AppPreferences.setRegion(context, code)
-                currentRegionCode = code
-                showRegionDialog = false
-                Toast.makeText(context, R.string.save_success, Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -473,52 +439,6 @@ private fun SettingCard(
     }
 }
 
-@Composable
-private fun RegionDialog(
-    regionNames: Array<String>,
-    regionCodes: Array<String>,
-    selectedCode: String,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.init_select_region)) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                regionNames.zip(regionCodes).forEach { (name, code) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(code) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        RadioButton(
-                            selected = code == selectedCode,
-                            onClick = { onSelect(code) }
-                        )
-                        Text(
-                            text = name,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = stringResource(android.R.string.cancel))
-            }
-        }
-    )
-}
-
 private fun applyLanguage(code: String) {
     val localeList = if (code == "system") {
         LocaleListCompat.getEmptyLocaleList()
@@ -527,8 +447,6 @@ private fun applyLanguage(code: String) {
     }
     AppCompatDelegate.setApplicationLocales(localeList)
 }
-
-private const val DEFAULT_REGION = "JP"
 
 private fun logModuleLabelRes(key: String): Int {
     return when (key) {

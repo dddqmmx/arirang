@@ -193,12 +193,9 @@
 
     
     <string name="init_select_language">选择语言</string>
-    <string name="init_select_region">选择地区</string>
     <string name="init_welcome_title">欢迎使用</string>
     <string name="init_welcome_subtitle">请完成初始化设置</string>
     <string name="init_label_language">语言</string>
-    <string name="init_label_region">地区</string>
-    <string name="init_extreme_warning">⚠ 极致安全模式已启用</string>
     <string name="init_button_next">继续</string>
     <string name="btn_cancel">取消</string>
     <string name="init_button_enter">进入应用</string>
@@ -213,8 +210,6 @@
     <string name="init_risk_item_kernel">基带或内核被篡改</string>
     <string name="init_risk_item_root">Root 权限被恶意程序控制</string>
 
-    
-    <string name="user_region_title">地区</string>
 
     <string name="permission_allow">允许</string>
     <string name="permission_deny">拒绝</string>

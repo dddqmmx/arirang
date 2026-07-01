@@ -44,19 +44,4 @@
         <item>ko</item>
     </string-array>
 
-    <!-- 地区显示名称 -->
-    <string-array name="region_names">
-        <item>Japan</item>
-        <item>South Korea</item>
-        <item>USA</item>
-        <item>North Korea</item>
-    </string-array>
-
-    <!-- 地区实际代码 -->
-    <string-array name="region_codes">
-        <item>JP</item>
-        <item>KR</item>
-        <item>US</item>
-        <item>KP</item>
-    </string-array>
 </resources>

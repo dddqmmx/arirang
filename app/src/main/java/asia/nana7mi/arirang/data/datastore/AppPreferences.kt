@@ -9,8 +9,6 @@ object AppPreferences {
 
     private const val KEY_SETUP_COMPLETED = "is_setup_completed"
     private const val KEY_LANGUAGE = "app_language"
-    private const val KEY_REGION = "app_region"
-
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     fun setSetupCompleted(context: Context, isCompleted: Boolean) {
@@ -33,13 +31,4 @@ object AppPreferences {
         return prefs(context).getString(KEY_LANGUAGE, null)
     }
 
-    fun setRegion(context: Context, regionCode: String) {
-        prefs(context).edit {
-            putString(KEY_REGION, regionCode)
-        }
-    }
-
-    fun getRegion(context: Context): String? {
-        return prefs(context).getString(KEY_REGION, null)
-    }
 }

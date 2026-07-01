@@ -211,12 +211,9 @@
 
     
     <string name="init_select_language">Select Language</string>
-    <string name="init_select_region">Select Region</string>
     <string name="init_welcome_title">Welcome</string>
     <string name="init_welcome_subtitle">Please complete initialization setup</string>
     <string name="init_label_language">Language</string>
-    <string name="init_label_region">Region</string>
-    <string name="init_extreme_warning">⚠ EXTREME SECURITY MODE ENABLED</string>
     <string name="init_button_next">Next</string>
     <string name="btn_cancel">Cancel</string>
     <string name="init_button_enter">Enter App</string>
@@ -230,7 +227,6 @@
     <string name="init_risk_item_rom">Untrusted ROM source</string>
     <string name="init_risk_item_kernel">Baseband or kernel tampered</string>
     <string name="init_risk_item_root">Root access controlled by malware</string>
-    <string name="user_region_title">Region</string>
 
     <string name="permission_allow">Allow</string>
     <string name="permission_deny">Deny</string>
