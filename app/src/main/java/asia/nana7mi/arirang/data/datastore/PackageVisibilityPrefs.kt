@@ -89,10 +89,11 @@ object PackageVisibilityPrefs {
     }
 
     fun setEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putBoolean(KEY_ENABLED, enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
         }
+        SubmoduleConfigFiles.write(context)
     }
 
     fun setDefaultSelection(context: Context, mode: DisplayMode, templateId: String?) {
@@ -102,11 +103,12 @@ object PackageVisibilityPrefs {
         } else {
             mode
         }
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putString(KEY_DEFAULT_MODE, resolvedMode.name)
             putString(KEY_DEFAULT_TEMPLATE_ID, templateId)
         }
         syncLegacyDefault(context, resolvedMode, templateId, templates)
+        SubmoduleConfigFiles.write(context)
     }
 
     fun loadTemplates(context: Context): List<Template> {
@@ -121,11 +123,12 @@ object PackageVisibilityPrefs {
         val cleaned = templates.map { template ->
             if (template.parentId == template.id) template.copy(parentId = null) else template
         }
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putString(KEY_TEMPLATES, gson.toJson(cleaned))
         }
         val config = loadConfig(context)
         syncLegacyDefault(context, config.defaultMode, config.defaultTemplateId, cleaned)
+        SubmoduleConfigFiles.write(context)
     }
 
     fun loadAppRules(context: Context): List<AppRule> {
@@ -137,10 +140,11 @@ object PackageVisibilityPrefs {
     }
 
     fun saveAppRules(context: Context, rules: List<AppRule>) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putString(KEY_APP_RULES, gson.toJson(rules))
             putLong(KEY_LAST_MODIFIED, Date().time)
         }
+        SubmoduleConfigFiles.write(context)
     }
 
     fun createTemplate(
