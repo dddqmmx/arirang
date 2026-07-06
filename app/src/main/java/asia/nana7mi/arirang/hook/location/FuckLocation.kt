@@ -32,12 +32,6 @@ class FuckLocation : BaseHookModule(
 ) {
 
     private companion object {
-        private const val DEBUG_HARDCODED_CONFIG = false
-        private const val DEBUG_PACKAGE_NAME = "asia.nana7mi.arirang.selfcheck"
-        private const val DEBUG_LATITUDE = 39.019444
-        private const val DEBUG_LONGITUDE = 125.738052
-        private const val DEBUG_PACKAGE_LATITUDE = 35.681236
-        private const val DEBUG_PACKAGE_LONGITUDE = 139.767125
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
 
         private val GNSS_CLASSES = arrayOf(
@@ -45,25 +39,10 @@ class FuckLocation : BaseHookModule(
             "com.android.server.location.gnss.GnssLocationProvider",
             "com.android.server.location.gnss.GnssLocationProviderImpl"
         )
-
-        private val debugConfig = LocationHookConfig(
-            enabled = true,
-            defaultProfile = LocationProfile(
-                latitude = DEBUG_LATITUDE,
-                longitude = DEBUG_LONGITUDE
-            ),
-            perPackage = mapOf(
-                DEBUG_PACKAGE_NAME to LocationProfile(
-                    latitude = DEBUG_PACKAGE_LATITUDE,
-                    longitude = DEBUG_PACKAGE_LONGITUDE
-                )
-            )
-        )
     }
 
     private val hookedClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
 
-    // GMS 融合定位「按应用」修复所需的两张状态：
     // receiverPackages —— 注册时（getCallingUid 仍指向真正请求方）把投递用的 callback/listener
     //   binder 绑定到包名；key 为 GMS 持有的 BinderProxy，使用 WeakHashMap，GMS 注销后自动回收。
     // activeDeliveryPackage —— 异步投递时按 binder 反查到的包名写入此 thread-local，供 resolveProfile() 消费。
@@ -297,7 +276,7 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun currentConfig(): LocationHookConfig {
-        if (DEBUG_HARDCODED_CONFIG) return debugConfig
+        if (LocationDebugConfig.DEBUG_HARDCODED_CONFIG) return LocationDebugConfig.debugConfig
         return configFile.current()
     }
 

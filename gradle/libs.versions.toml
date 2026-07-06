@@ -22,6 +22,7 @@ playServicesLocation = "21.3.0"
 playServicesAdsIdentifier = "18.3.0"
 playServicesAppSet = "16.1.0"
 ui = "1.10.6"
+foundation = "1.11.4"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
@@ -51,6 +52,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-ads-identifier = { module = "com.google.android.gms:play-services-ads-identifier", version.ref = "playServicesAdsIdentifier" }
 play-services-appset = { module = "com.google.android.gms:play-services-appset", version.ref = "playServicesAppSet" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

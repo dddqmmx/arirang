@@ -55,10 +55,12 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
                     HookBridge.callStaticMethod(UserHandle::class.java, "getUserId", uid) as Int
                 }.getOrDefault(uid / PER_USER_RANGE)
 
+            // 对请求uid进行检查
             if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
 
             pendingUids.add(uid)
             try {
+                //向arirang客户端发送请求获取客户端app的回复
                 val allowed = ArirangClient.requestClipboardReadAccess(callingPackage, uid, userId)
                 if (!allowed) {
                     HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
@@ -78,6 +80,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
         return false
     }
 
+    //为了防止android弹出未响应弹窗为当前阻塞应用授予临时特权
     private fun hookAnrExemption(classLoader: ClassLoader) {
         val hookCallback = object : de.robv.android.xposed.XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {

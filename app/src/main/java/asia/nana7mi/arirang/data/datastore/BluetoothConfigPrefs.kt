@@ -3,10 +3,10 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.BluetoothDeviceSchema
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.Date
 
 object BluetoothConfigPrefs {
@@ -72,33 +72,19 @@ object BluetoothConfigPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        val connectedDevices = JSONArray().apply {
-            config.connectedDevices.forEach { device ->
-                put(
-                    JSONObject()
-                        .put("name", device.name)
-                        .put("address", device.address)
-                )
-            }
-        }
-        val scanResults = JSONArray().apply {
-            config.scanResults.forEach { device ->
-                put(
-                    JSONObject()
-                        .put("name", device.name)
-                        .put("address", device.address)
-                )
-            }
-        }
-        return JSONObject()
-            .put(KEY_ENABLED, config.enabled)
-            .put(KEY_LAST_MODIFIED, lastModified(context))
-            .put(KEY_DEVICE_NAME, config.deviceName)
-            .put(KEY_CONNECTED_DEVICES, connectedDevices)
-            .put(KEY_HIDE_CONNECTED_DEVICES, config.hideConnectedDevices)
-            .put(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
-            .put(KEY_SCAN_RESULTS, scanResults)
-            .toString()
+        return BluetoothConfigSchema(
+            enabled = config.enabled,
+            deviceName = config.deviceName,
+            connectedDevices = config.connectedDevices.map { d ->
+                BluetoothDeviceSchema(name = d.name, address = d.address)
+            },
+            hideConnectedDevices = config.hideConnectedDevices,
+            hideScanResults = config.hideScanResults,
+            scanResults = config.scanResults.map { d ->
+                BluetoothDeviceSchema(name = d.name, address = d.address)
+            },
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     fun defaultDevice(index: Int = 0, isNearby: Boolean = false): Device {

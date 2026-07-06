@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.SensorConfigSchema
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
@@ -23,10 +24,6 @@ object SensorConfigPrefs {
     const val PRECISION_MEDIUM = 2
     const val PRECISION_HIGH = 3
 
-    /**
-     * A single sensor entry in the managed list.
-     * [isCustom] marks sensors added by the user (not from the device).
-     */
     data class SensorEntry(
         val name: String,
         val vendor: String,
@@ -58,9 +55,6 @@ object SensorConfigPrefs {
     data class Config(
         val enabled: Boolean = false,
         val hideAll: Boolean = false,
-        val disableMic: Boolean = false,
-        val disableCameraFront: Boolean = false,
-        val disableCameraRear: Boolean = false,
         val disableAccel: Boolean = false,
         val disableGyro: Boolean = false,
         val disableMagnetic: Boolean = false,
@@ -79,7 +73,7 @@ object SensorConfigPrefs {
         } else {
             emptyList()
         }
-        
+
         val precisionJsonStr = prefs.getString(KEY_PRECISION_BY_SENSOR_TYPE, null)
         val precisionMap = mutableMapOf<Int, Int>()
         if (precisionJsonStr != null) {
@@ -89,10 +83,9 @@ object SensorConfigPrefs {
                     precisionMap[key.toInt()] = json.getInt(key)
                 }
             } catch (e: Exception) {
-                // Ignore
             }
         }
-        
+
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             hideAll = prefs.getBoolean(KEY_HIDE_ALL, false),
@@ -131,23 +124,15 @@ object SensorConfigPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        return JSONObject().apply {
-            put("version", lastModified(context))
-            put(KEY_ENABLED, config.enabled)
-            put(KEY_HIDE_ALL, config.hideAll)
-            put("blacklistSize", config.sensorEntries.count { it.hidden })
-            put("injectionSize", config.sensorEntries.count { it.isCustom })
-        }.toString()
+        return SensorConfigSchema(
+            enabled = config.enabled,
+            hideAll = config.hideAll,
+            blacklistSize = config.sensorEntries.count { it.hidden },
+            injectionSize = config.sensorEntries.count { it.isCustom },
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
-    /**
-     * Replace vendor keywords case-aware.
-     * Matches known vendor keywords and replaces with [replacement],
-     * preserving the original casing pattern:
-     *   "xiaomi" + "Google" → "google"
-     *   "XIAOMI" + "Google" → "GOOGLE"
-     *   "Xiaomi" + "Google" → "Google"
-     */
     fun applyCaseAwareReplace(original: String, replacement: String, keywords: List<String>): String {
         var result = original
         for (keyword in keywords) {

@@ -3,10 +3,11 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.SimConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.SimProfileSchema
 import asia.nana7mi.arirang.model.SimInfo
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.json.JSONObject
 import java.util.Date
 
 object SimConfigPrefs {
@@ -73,12 +74,40 @@ object SimConfigPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        return JSONObject()
-            .put(KEY_ENABLED, config.enabled.toString())
-            .put(KEY_HIDE_SIM, config.hideSim.toString())
-            .put(KEY_LAST_MODIFIED, lastModified(context).toString())
-            .put(KEY_SIM_INFO_MAP, gson.toJson(config.simInfoBySlot.toSortedMap()))
-            .toString()
+        return SimConfigSchema(
+            enabled = config.enabled,
+            hideSim = config.hideSim,
+            simProfiles = config.simInfoBySlot.map { (slot, info) ->
+                SimProfileSchema(
+                    id = info.id ?: -1,
+                    iccId = info.iccId.orEmpty(),
+                    simSlotIndex = info.simSlotIndex ?: slot,
+                    displayName = info.displayName.orEmpty(),
+                    carrierName = info.carrierName.orEmpty(),
+                    countryIso = info.countryIso.orEmpty(),
+                    mcc = info.mcc.orEmpty(),
+                    mnc = info.mnc.orEmpty(),
+                    imei = info.imei.orEmpty(),
+                    number = info.number.orEmpty(),
+                    cardId = info.cardId ?: -1,
+                    cardString = info.cardString.orEmpty(),
+                    nameSource = info.nameSource ?: 0,
+                    iconTint = info.iconTint ?: 0,
+                    roaming = info.roaming ?: 0,
+                    isEmbedded = info.isEmbedded ?: false,
+                    isOpportunistic = info.isOpportunistic ?: false,
+                    isGroupDisabled = info.isGroupDisabled ?: false,
+                    profileClass = info.profileClass ?: -1,
+                    subType = info.subType ?: 0,
+                    groupOwner = info.groupOwner.orEmpty(),
+                    areUiccApplicationsEnabled = info.areUiccApplicationsEnabled ?: true,
+                    portIndex = info.portIndex ?: 0,
+                    usageSetting = info.usageSetting ?: 0,
+                    carrierId = info.carrierId ?: -1
+                )
+            },
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     private fun loadSimInfoMap(prefs: SharedPreferences): Map<Int, SimInfo> {

@@ -3,10 +3,10 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.WifiConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.WifiScanNetworkSchema
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.Date
 
 object WifiConfigPrefs {
@@ -75,23 +75,14 @@ object WifiConfigPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        val scanResults = JSONArray().apply {
-            config.scanResults.forEach { network ->
-                put(
-                    JSONObject()
-                        .put("ssid", network.ssid)
-                        .put("bssid", network.bssid)
-                )
-            }
-        }
-        return JSONObject()
-            .put(KEY_ENABLED, config.enabled)
-            .put(KEY_LAST_MODIFIED, lastModified(context))
-            .put(KEY_CURRENT_SSID, config.currentSsid)
-            .put(KEY_CURRENT_BSSID, config.currentBssid)
-            .put(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
-            .put(KEY_SCAN_RESULTS, scanResults)
-            .toString()
+        return WifiConfigSchema(
+            enabled = config.enabled,
+            currentSsid = config.currentSsid,
+            currentBssid = config.currentBssid,
+            hideScanResults = config.hideScanResults,
+            scanResults = config.scanResults.map { s -> WifiScanNetworkSchema(ssid = s.ssid, bssid = s.bssid) },
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     fun defaultScanNetwork(index: Int = 0): ScanNetwork {

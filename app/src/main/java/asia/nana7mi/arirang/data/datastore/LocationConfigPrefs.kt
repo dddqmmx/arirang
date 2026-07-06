@@ -3,6 +3,8 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.LocationConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.LocationProfileSchema
 import org.json.JSONObject
 import java.util.Date
 
@@ -90,18 +92,29 @@ object LocationConfigPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        return JSONObject()
-            .put(KEY_ENABLED, config.enabled)
-            .put(KEY_LAST_MODIFIED, lastModified(context))
-            .put(KEY_LATITUDE, config.latitude)
-            .put(KEY_LONGITUDE, config.longitude)
-            .put(KEY_ALTITUDE, config.altitude)
-            .put(KEY_ACCURACY, config.accuracy.toDouble())
-            .put(KEY_SPEED, config.speed.toDouble())
-            .put(KEY_BEARING, config.bearing.toDouble())
-            .put(KEY_SATELLITES, config.satellites)
-            .put(KEY_PER_PACKAGE, packageProfilesToJson(config.perPackage))
-            .toString()
+        return LocationConfigSchema(
+            enabled = config.enabled,
+            latitude = config.latitude,
+            longitude = config.longitude,
+            altitude = config.altitude,
+            accuracy = config.accuracy,
+            speed = config.speed,
+            bearing = config.bearing,
+            satellites = config.satellites,
+            perPackage = config.perPackage.mapValues { (_, p) ->
+                LocationProfileSchema(
+                    enabled = p.enabled,
+                    latitude = p.latitude,
+                    longitude = p.longitude,
+                    altitude = p.altitude,
+                    accuracy = p.accuracy,
+                    speed = p.speed,
+                    bearing = p.bearing,
+                    satellites = p.satellites
+                )
+            },
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     private fun parsePackageProfiles(json: String?): Map<String, Profile> {

@@ -4,9 +4,9 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.json.JSONObject
 import java.security.SecureRandom
 import java.util.Date
 import java.util.Locale
@@ -87,17 +87,17 @@ object UniqueIdentifierPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        return JSONObject()
-            .put(KEY_ENABLED, config.enabled.toString())
-            .put(KEY_LAST_MODIFIED, lastModified(context).toString())
-            .put(KEY_ANDROID_ID, config.androidId)
-            .put(KEY_GAID, config.gaid)
-            .put(KEY_WIDEVINE_DRM_ID, config.widevineDrmId)
-            .put(KEY_APP_SET_ID, config.appSetId)
-            .put(KEY_SERIAL, config.serial)
-            .put(KEY_IMEI_BY_SLOT, gson.toJson(config.imeiBySlot.toSortedMap()))
-            .put(KEY_TAC_BY_SLOT, gson.toJson(config.tacBySlot.toSortedMap()))
-            .toString()
+        return IdentifierConfigSchema(
+            enabled = config.enabled,
+            androidId = config.androidId,
+            gaid = config.gaid,
+            widevineDrmId = config.widevineDrmId,
+            appSetId = config.appSetId,
+            serial = config.serial,
+            imeiBySlot = config.imeiBySlot,
+            tacBySlot = config.tacBySlot,
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     fun defaultImeiForSlot(slotIndex: Int): String {

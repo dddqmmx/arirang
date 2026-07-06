@@ -2,13 +2,15 @@ package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
 import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.PackageListAppRuleSchema
+import asia.nana7mi.arirang.data.datastore.schema.PackageListConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.PackageListTemplateSchema
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import org.json.JSONObject
 import java.util.Date
 
 object PackageVisibilityPrefs {
-    private const val PREFS_NAME = "clipboard_visibility_prefs"
+    const val PREFS_NAME = "clipboard_visibility_prefs"
 
     private const val KEY_ENABLED = "enabled"
     private const val KEY_MODE = "mode"
@@ -77,15 +79,30 @@ object PackageVisibilityPrefs {
     }
 
     fun buildHookSnapshot(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return JSONObject()
-            .put(KEY_ENABLED, prefs.getBoolean(KEY_ENABLED, false))
-            .put(KEY_LAST_MODIFIED, lastModified(context))
-            .put(KEY_DEFAULT_MODE, prefs.getString(KEY_DEFAULT_MODE, DisplayMode.ALL_VISIBLE.name))
-            .put(KEY_DEFAULT_TEMPLATE_ID, prefs.getString(KEY_DEFAULT_TEMPLATE_ID, null))
-            .put(KEY_TEMPLATES, prefs.getString(KEY_TEMPLATES, null))
-            .put(KEY_APP_RULES, prefs.getString(KEY_APP_RULES, null))
-            .toString()
+        val config = loadConfig(context)
+        return PackageListConfigSchema(
+            enabled = config.enabled,
+            defaultMode = config.defaultMode.name,
+            defaultTemplateId = config.defaultTemplateId,
+            templates = config.templates.map { t ->
+                PackageListTemplateSchema(
+                    id = t.id,
+                    name = t.name,
+                    parentId = t.parentId,
+                    visiblePackages = t.visiblePackages.toList(),
+                    listMode = t.listMode.name
+                )
+            },
+            appRules = config.appRules.map { r ->
+                PackageListAppRuleSchema(
+                    packageName = r.packageName,
+                    mode = r.mode.name,
+                    templateId = r.templateId,
+                    visiblePackages = r.visiblePackages.toList()
+                )
+            },
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     fun setEnabled(context: Context, enabled: Boolean) {
@@ -107,7 +124,6 @@ object PackageVisibilityPrefs {
             putString(KEY_DEFAULT_MODE, resolvedMode.name)
             putString(KEY_DEFAULT_TEMPLATE_ID, templateId)
         }
-        syncLegacyDefault(context, resolvedMode, templateId, templates)
         SubmoduleConfigFiles.write(context)
     }
 
@@ -126,8 +142,6 @@ object PackageVisibilityPrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putString(KEY_TEMPLATES, gson.toJson(cleaned))
         }
-        val config = loadConfig(context)
-        syncLegacyDefault(context, config.defaultMode, config.defaultTemplateId, cleaned)
         SubmoduleConfigFiles.write(context)
     }
 
@@ -213,42 +227,6 @@ object PackageVisibilityPrefs {
                 }
             } ?: emptySet()
             DisplayMode.CUSTOM -> emptySet()
-        }
-    }
-
-    private fun syncLegacyDefault(
-        context: Context,
-        mode: DisplayMode,
-        templateId: String?,
-        templates: List<Template>
-    ) {
-        val template = templates.firstOrNull { it.id == templateId }
-        val visiblePackages = when (mode) {
-            DisplayMode.ALL_VISIBLE, DisplayMode.DEFAULT -> null
-            DisplayMode.ALL_HIDDEN -> emptySet()
-            DisplayMode.TEMPLATE -> template?.takeIf { it.listMode == TemplateListMode.WHITELIST }
-                ?.let { resolvedTemplatePackages(it, templates) } ?: emptySet()
-            DisplayMode.CUSTOM -> emptySet()
-        }
-        val invisiblePackages = template?.takeIf {
-            mode == DisplayMode.TEMPLATE && it.listMode == TemplateListMode.BLACKLIST
-        }?.let { resolvedTemplatePackages(it, templates) }
-
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
-            if (invisiblePackages != null) {
-                putInt(KEY_MODE, 1)
-                putStringSet(KEY_INVISIBLE_LIST, invisiblePackages)
-                putStringSet(KEY_VISIBLE_LIST, emptySet())
-            } else if (visiblePackages == null) {
-                putInt(KEY_MODE, 1)
-                putStringSet(KEY_INVISIBLE_LIST, emptySet())
-                putStringSet(KEY_VISIBLE_LIST, emptySet())
-            } else {
-                putInt(KEY_MODE, 0)
-                putStringSet(KEY_VISIBLE_LIST, visiblePackages)
-                putStringSet(KEY_INVISIBLE_LIST, emptySet())
-            }
-            putLong(KEY_LAST_MODIFIED, Date().time)
         }
     }
 }

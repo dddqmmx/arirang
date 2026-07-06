@@ -9,7 +9,7 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.OutputStream
 
-class FuckProcess : BaseHookModule(matchSystem = true, matchClient = false) {
+class FuckProcess : BaseHookModule(matchSystem = true) {
 
     /**
      * MANDATORY DESIGN COMPLIANCE: Arirang is a system-level privacy model.

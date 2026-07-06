@@ -20,8 +20,8 @@ configure<ApplicationExtension>  {
         minSdk = 34
         //noinspection OldTargetApi
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.4.0-experimental"
+        versionCode = 6
+        versionName = "0.4.1-experimental"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         multiDexEnabled = false
         buildConfigField("String", "SUBMODULE_CONFIG_DIR", buildConfigString(arirangSubmoduleConfigDir))
@@ -83,6 +83,7 @@ tasks.register("unitTestClasses") {
 
 dependencies {
     implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.google.gson)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)

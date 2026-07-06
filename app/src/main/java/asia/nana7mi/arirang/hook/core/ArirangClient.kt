@@ -52,9 +52,6 @@ object ArirangClient {
         connectionListeners.remove(listener)
     }
 
-    /** 日志 TAG */
-    private const val TAG = "ArirangClient"
-
     /** 目标服务所在包名 */
     private const val TARGET_PKG = BuildConfig.APPLICATION_ID
 

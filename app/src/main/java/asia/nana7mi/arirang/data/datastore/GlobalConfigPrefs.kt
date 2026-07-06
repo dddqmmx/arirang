@@ -3,7 +3,7 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import org.json.JSONObject
+import asia.nana7mi.arirang.data.datastore.schema.GlobalConfigSchema
 import java.util.Date
 
 object GlobalConfigPrefs {
@@ -43,10 +43,10 @@ object GlobalConfigPrefs {
 
     fun buildHookSnapshot(context: Context): String {
         val config = loadConfig(context)
-        return JSONObject().apply {
-            put("version", lastModified(context))
-            put(KEY_RESTRICT_HOT_SWITCHING, config.restrictHotSwitching)
-        }.toString()
+        return GlobalConfigSchema(
+            restrictHotSwitching = config.restrictHotSwitching,
+            lastModified = lastModified(context)
+        ).toJson()
     }
 
     @Suppress("DEPRECATION")

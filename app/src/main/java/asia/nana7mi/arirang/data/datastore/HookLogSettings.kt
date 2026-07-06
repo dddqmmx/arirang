@@ -3,7 +3,7 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import org.json.JSONObject
+import asia.nana7mi.arirang.data.datastore.schema.HookLogConfigSchema
 import java.util.Date
 
 object HookLogSettings {
@@ -58,12 +58,20 @@ object HookLogSettings {
         val prefs = prefs(context).also {
             migratePrivatePrefsIfNeeded(context, it)
         }
-        return JSONObject().apply {
-            put("version", prefs.getLong(KEY_LAST_MODIFIED, 0L))
-            MODULE_KEYS.forEach { key ->
-                put(key, prefs.getBoolean(prefKey(key), true))
-            }
-        }.toString()
+        return HookLogConfigSchema(
+            core = prefs.getBoolean(prefKey("core"), true),
+            clipboard = prefs.getBoolean(prefKey("clipboard"), true),
+            gms = prefs.getBoolean(prefKey("gms"), true),
+            location = prefs.getBoolean(prefKey("location"), true),
+            packageList = prefs.getBoolean(prefKey("package_list"), true),
+            settings = prefs.getBoolean(prefKey("settings"), true),
+            sim = prefs.getBoolean(prefKey("sim"), true),
+            wifi = prefs.getBoolean(prefKey("wifi"), true),
+            bluetooth = prefs.getBoolean(prefKey("bluetooth"), true),
+            uniqueId = prefs.getBoolean(prefKey("unique_id"), true),
+            notify = prefs.getBoolean(prefKey("notify"), true),
+            lastModified = prefs.getLong(KEY_LAST_MODIFIED, 0L)
+        ).toJson()
     }
 
     @Suppress("DEPRECATION")
