@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.home
 
 import android.content.Context
 import android.util.AttributeSet

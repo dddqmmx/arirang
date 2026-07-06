@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.about
 
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement

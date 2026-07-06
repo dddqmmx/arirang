@@ -34,10 +34,10 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.model.SimInfo
-import asia.nana7mi.arirang.ui.component.InfoDialog
-import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.SimSlotItem
-import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.dialog.InfoDialog
+import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.sim.SimSlotItem
+import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 import java.security.SecureRandom
 

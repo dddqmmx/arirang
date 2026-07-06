@@ -54,8 +54,8 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.DeviceInfoPrefs
 import asia.nana7mi.arirang.model.DevicePresetCatalog
-import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class DeviceInfoConfigActivity : ComponentActivity() {

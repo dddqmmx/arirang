@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.sim
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable

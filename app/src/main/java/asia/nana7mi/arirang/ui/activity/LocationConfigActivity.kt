@@ -63,8 +63,8 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Profile
-import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class LocationConfigActivity : ComponentActivity() {

@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

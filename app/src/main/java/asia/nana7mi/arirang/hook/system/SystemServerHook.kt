@@ -15,7 +15,6 @@ import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import org.json.JSONObject
-
 class SystemServerHook : BaseHookModule(matchSystem = true) {
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {

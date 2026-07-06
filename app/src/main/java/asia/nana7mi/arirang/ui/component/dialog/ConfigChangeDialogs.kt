@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.dialog
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save

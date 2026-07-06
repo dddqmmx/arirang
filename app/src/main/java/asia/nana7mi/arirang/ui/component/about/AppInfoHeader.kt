@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.about
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box

@@ -53,8 +53,8 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs.SensorEntry
-import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class SensorConfigActivity : ComponentActivity() {

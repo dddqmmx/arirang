@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.component
+package asia.nana7mi.arirang.ui.component.settings
 
 import android.content.Intent
 import android.widget.Toast
@@ -33,6 +33,7 @@ import androidx.core.os.LocaleListCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.AppPreferences
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
+import asia.nana7mi.arirang.ui.component.dialog.HookLogDialog
 import asia.nana7mi.arirang.util.ZipUtils
 import java.io.File
 import java.text.SimpleDateFormat

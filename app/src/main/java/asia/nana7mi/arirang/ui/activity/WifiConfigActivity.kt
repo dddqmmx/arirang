@@ -58,8 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
-import asia.nana7mi.arirang.ui.component.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
+import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 import java.security.SecureRandom
 

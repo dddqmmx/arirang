@@ -9,7 +9,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.ui.activity.AdvancedSettingsActivity
-import asia.nana7mi.arirang.ui.component.SettingsScreen
+import asia.nana7mi.arirang.ui.component.settings.SettingsScreen
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class SettingsFragment : Fragment() {
