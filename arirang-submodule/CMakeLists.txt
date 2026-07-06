@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(arirang_zygisk)
 
+# Architecture check: this module is designed exclusively for ARM64 (AArch64).
+# The DRM hook (vtable scanning, inline trampolines) and the Zygisk injector
+# (ptrace injection) both assume AArch64 instruction encodings, register sizes,
+# and calling conventions. Building for x86, x86_64, or ARM32 is unsupported.
+if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
+    message(FATAL_ERROR "arirang-submodule supports only arm64 (aarch64). "
+                        "Detected: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
 set(ARIRANG_APPLICATION_ID "" CACHE STRING "Android application id that owns the submodule config.")
 set(ARIRANG_SUBMODULE_CONFIG_DIR "" CACHE STRING "Submodule config directory under app files.")
 set(ARIRANG_SUBMODULE_CONFIG_FILE "" CACHE STRING "Submodule config file name.")
@@ -57,12 +66,20 @@ target_include_directories(arirang_zygisk PRIVATE
 target_link_libraries(arirang_zygisk log dl)
 
 # Separate native library LD_PRELOAD'd into the Widevine DRM HAL daemon.
-# Intentionally has NO overlap with the Zygisk module - it must never be
+# Intentionally has NO overlap with the Zygisk module — it must never be
 # loaded into app processes.
-# The DRM hook now uses the data-level vtable/method-table hook instead of the
-# fragile inline hook, so inline_hook.cpp is intentionally omitted here.
+#
+# Hook strategy (ARM64 only):
+#   1. PRIMARY: vtable/method-table data-level hook (drm_vtable_hook.cpp)
+#   2. FALLBACK: instruction-level inline hook (drm_inline_hook.cpp)
+#      Used when vtable scanning finds no usable slots. Logged as a
+#      downgrade warning. Requires inline_hook.cpp (trampoline allocation
+#      and prologue patching).
 add_library(arirang_drm_hook SHARED
     src/main/cpp/drm/arirang_drm_hook.cpp
+    src/main/cpp/drm/drm_vtable_hook.cpp
+    src/main/cpp/drm/drm_inline_hook.cpp
+    src/main/cpp/hook/inline_hook.cpp
     src/main/cpp/hook/symbol_resolver.cpp
     src/main/cpp/hook/vtable_hook.cpp
     src/main/cpp/utils/logging.cpp

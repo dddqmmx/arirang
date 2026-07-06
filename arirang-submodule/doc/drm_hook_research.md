@@ -1,5 +1,16 @@
 # Arirang DRM Hook — Research & Migration Notes
 
+> **Architecture:** ARM64 (AArch64) only. The vtable scanning, inline trampoline
+> patch generation, and ptrace-based injector are all hardcoded for AArch64
+> instruction encodings, pointer sizes, and calling conventions. Building for
+> x86, x86\_64, or ARM32 is unsupported — the CMake build will reject non-arm64
+> targets at configuration time.
+>
+> **Hook strategy:** Primary uses vtable/method-table data-level patching
+> (`drm_vtable_hook.cpp`). Fallback uses instruction-level inline hook patching
+> (`drm_inline_hook.cpp`) when no vtable slots are found. Downgrade events are
+> logged at WARN level.
+>
 > Working device: Pixel 8 Pro (`husky`), Android 16 (API 36), KernelSU Next root.
 > Target process: `android.hardware.drm@1.4-service.widevine` (pid varies).
 
