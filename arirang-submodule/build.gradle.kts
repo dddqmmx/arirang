@@ -147,6 +147,9 @@ val stageModule by tasks.registering(Copy::class) {
     from("module/sepolicy.rule") {
         into("")
     }
+    from("module/lib") {
+        into("lib")
+    }
     from(nativeBuildDir.map { it.file("libarirang_zygisk.so") }) {
         into("zygisk")
         // Root managers discover the Zygisk library by ABI-specific filename.
