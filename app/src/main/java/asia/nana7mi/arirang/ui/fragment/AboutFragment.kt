@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
-import asia.nana7mi.arirang.ui.component.about.AboutScreen
+import asia.nana7mi.arirang.ui.screen.about.AboutScreen
 import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
 
 class AboutFragment : Fragment() {

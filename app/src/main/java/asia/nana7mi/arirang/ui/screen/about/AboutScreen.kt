@@ -1,5 +1,6 @@
-package asia.nana7mi.arirang.ui.component.about
+package asia.nana7mi.arirang.ui.screen.about
 
+import asia.nana7mi.arirang.ui.component.about.*
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues

@@ -1,5 +1,6 @@
-package asia.nana7mi.arirang.ui.component.home
+package asia.nana7mi.arirang.ui.screen.home
 
+import asia.nana7mi.arirang.ui.component.home.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize

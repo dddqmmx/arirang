@@ -1,5 +1,6 @@
-package asia.nana7mi.arirang.ui.component.settings
+package asia.nana7mi.arirang.ui.screen.settings
 
+import asia.nana7mi.arirang.ui.component.settings.*
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -52,6 +53,9 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val languageNames = stringArrayResource(R.array.language_names)
     val languageCodes = stringArrayResource(R.array.language_codes)
+    val errorMarker = "__ARIRANG_ERROR__"
+    val exportFailedTemplate = stringResource(R.string.export_failed_message, errorMarker)
+    val importFailedTemplate = stringResource(R.string.import_failed_message, errorMarker)
     val logModules = remember {
         HookLogSettings.MODULE_KEYS.map { key ->
             HookLogSettings.Module(key, logModuleLabelRes(key))
@@ -74,7 +78,7 @@ fun SettingsScreen(
                 }.onFailure {
                     Toast.makeText(
                         context,
-                        context.getString(R.string.export_failed_message, it.message.orEmpty()),
+                        exportFailedTemplate.replace(errorMarker, it.message.orEmpty()),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -105,7 +109,7 @@ fun SettingsScreen(
                 }.onFailure {
                     Toast.makeText(
                         context,
-                        context.getString(R.string.import_failed_message, it.message.orEmpty()),
+                        importFailedTemplate.replace(errorMarker, it.message.orEmpty()),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
