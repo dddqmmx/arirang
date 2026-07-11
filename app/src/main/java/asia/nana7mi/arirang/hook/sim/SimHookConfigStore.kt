@@ -1,6 +1,7 @@
 package asia.nana7mi.arirang.hook.sim
 
 import asia.nana7mi.arirang.hook.core.ArirangClient
+import asia.nana7mi.arirang.data.config.ConfigIds
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.util.optBooleanOrNull
@@ -70,16 +71,18 @@ internal class SimHookConfigStore {
     private fun loadHookConfig(force: Boolean = false): SimHookConfig {
         val values = readConfigValues(force)
         val enabled = values?.get(KEY_ENABLED)?.toBooleanStrictOrNull() ?: false
-        val hideSim = values?.get(KEY_HIDE_SIM)?.toBooleanStrictOrNull() ?: false
-        val profilesBySlot = values?.get(KEY_SIM_INFO_MAP)
+        val hideSim = values?.firstValue(KEY_HIDE_SIM, KEY_HIDE_SIM_SNAPSHOT)
+            ?.toBooleanStrictOrNull()
+            ?: false
+        val profilesBySlot = values?.firstValue(KEY_SIM_INFO_MAP)
             ?.let(::parseProfileMap)
             ?.takeIf { it.isNotEmpty() }
-            ?: values?.get(KEY_SIM_INFO_LIST)
+            ?: values?.firstValue(KEY_SIM_INFO_LIST, KEY_SIM_PROFILES_SNAPSHOT)
                 ?.let(::parseProfileList)
                 ?.takeIf { it.isNotEmpty() }
             ?: SimHookDefaults.PROFILES_BY_SLOT
         val uniqueIdentifiers = readUniqueIdentifierConfig(force)
-        val normalized = normalizeProfiles(profilesBySlot, uniqueIdentifiers.slotLimit)
+        val normalized = normalizeProfiles(profilesBySlot)
         return SimHookConfig(
             enabled = enabled,
             hideSim = hideSim,
@@ -106,29 +109,33 @@ internal class SimHookConfigStore {
         if (first == null) return second
         if (second == null) return first
 
-        val firstVersion = first[KEY_LAST_MODIFIED]?.toLongOrNull() ?: Long.MIN_VALUE
-        val secondVersion = second[KEY_LAST_MODIFIED]?.toLongOrNull() ?: Long.MIN_VALUE
+        val firstVersion = first.firstValue(KEY_LAST_MODIFIED, KEY_LAST_MODIFIED_SNAPSHOT)
+            ?.toLongOrNull()
+            ?: Long.MIN_VALUE
+        val secondVersion = second.firstValue(KEY_LAST_MODIFIED, KEY_LAST_MODIFIED_SNAPSHOT)
+            ?.toLongOrNull()
+            ?: Long.MIN_VALUE
         return if (secondVersion > firstVersion) second else first
     }
 
     private fun logHookConfig(config: SimHookConfig) {
-        HookLog.i(
+        HookLog.d(
             HookLog.Module.SIM,
             "config loaded enabled=${config.enabled} hideSim=${config.hideSim} " +
-                "uniqueIds=${config.uniqueIdentifiers.enabled} slots=${config.visibleProfiles.joinToString { "${it.slotIndex}:${it.countryIso}/${it.operatorNumeric}/${it.alphaLong}" }}"
+                "uniqueIds=${config.uniqueIdentifiers.enabled} visibleSlots=${config.visibleProfilesBySlot.keys}"
         )
-        HookLog.i(
+        HookLog.d(
             HookLog.Module.UNIQUE_ID,
             "unique config enabled=${config.uniqueIdentifiers.enabled} " +
                 "imeiSlots=${config.uniqueIdentifiers.imeiBySlot.mapValues { it.value.maskIdentifier() }} " +
-                "tacSlots=${config.uniqueIdentifiers.tacBySlot}"
+                "tacSlots=${config.uniqueIdentifiers.tacBySlot.mapValues { it.value.maskIdentifier() }}"
         )
     }
 
     private fun readHookNotifyValues(force: Boolean = false): Map<String, String>? {
         if (!preferHookNotifyConfig) return null
         return ArirangClient.readConfigSnapshot(
-            configName = "sim",
+            configName = ConfigIds.SIM,
             force = force,
             logName = "SIM"
         )
@@ -146,7 +153,7 @@ internal class SimHookConfigStore {
 
     private fun readUniqueIdentifierConfig(force: Boolean = false): UniqueIdentifierHookConfig {
         val hookNotifyValues = ArirangClient.readConfigSnapshot(
-            configName = "unique_identifier",
+            configName = ConfigIds.UNIQUE_IDENTIFIER,
             force = force,
             logName = "unique identifier"
         )
@@ -162,11 +169,11 @@ internal class SimHookConfigStore {
             ?: sharedPrefsValues
             ?: return UniqueIdentifierHookConfig()
         val enabled = values[KEY_UNIQUE_ENABLED]?.toBooleanStrictOrNull() ?: false
-        val imeiBySlot = values[KEY_IMEI_BY_SLOT]
+        val imeiBySlot = values.firstValue(KEY_IMEI_BY_SLOT, KEY_IMEI_BY_SLOT_SNAPSHOT)
             ?.let(::parseSlotStringMap)
             ?.takeIf { it.isNotEmpty() }
             ?: SimHookDefaults.PROFILES_BY_SLOT.mapValues { it.value.imei }
-        val tacBySlot = values[KEY_TAC_BY_SLOT]
+        val tacBySlot = values.firstValue(KEY_TAC_BY_SLOT, KEY_TAC_BY_SLOT_SNAPSHOT)
             ?.let(::parseSlotStringMap)
             ?.takeIf { it.isNotEmpty() }
             ?: imeiBySlot.mapValues { it.value.take(8) }
@@ -276,21 +283,23 @@ internal class SimHookConfigStore {
         )
     }
 
-    private fun normalizeProfiles(profilesBySlot: Map<Int, SimProfile>, slotLimit: Int): Map<Int, SimProfile> {
+    private fun normalizeProfiles(profilesBySlot: Map<Int, SimProfile>): Map<Int, SimProfile> {
         return profilesBySlot.toSortedMap()
             .entries
-            .take(slotLimit.coerceAtLeast(1))
-            .mapIndexed { index, (_, profile) ->
-                val normalizedSlot = index.coerceAtLeast(0)
-                normalizedSlot to profile.copy(
-                    slotIndex = normalizedSlot,
-                    subId = profile.subId.takeIf { it > 0 } ?: normalizedSlot + 1,
-                    cardId = profile.cardId.takeIf { it >= 0 } ?: normalizedSlot,
-                    portIndex = profile.portIndex.takeIf { it >= 0 } ?: normalizedSlot
+            .filter { (slotIndex, _) -> slotIndex >= 0 }
+            .associate { (slotIndex, profile) ->
+                slotIndex to profile.copy(
+                    slotIndex = slotIndex,
+                    subId = profile.subId.takeIf { it > 0 } ?: slotIndex + 1,
+                    cardId = profile.cardId.takeIf { it >= 0 } ?: slotIndex,
+                    portIndex = profile.portIndex.takeIf { it >= 0 } ?: slotIndex
                 )
             }
-            .toMap()
             .toSortedMap()
+    }
+
+    private fun Map<String, String>.firstValue(vararg keys: String): String? {
+        return keys.firstNotNullOfOrNull { key -> this[key] }
     }
 
     private fun String.maskIdentifier(): String {
@@ -303,12 +312,17 @@ internal class SimHookConfigStore {
         private const val UNIQUE_PREFS_NAME = "unique_identifier_prefs"
         private const val KEY_ENABLED = "enabled"
         private const val KEY_HIDE_SIM = "hide_sim"
+        private const val KEY_HIDE_SIM_SNAPSHOT = "hideSim"
         private const val KEY_LAST_MODIFIED = "last_modified"
+        private const val KEY_LAST_MODIFIED_SNAPSHOT = "lastModified"
         private const val KEY_SIM_INFO_MAP = "sim_info_map"
         private const val KEY_SIM_INFO_LIST = "sim_info_list"
+        private const val KEY_SIM_PROFILES_SNAPSHOT = "simProfiles"
         private const val KEY_UNIQUE_ENABLED = "enabled"
         private const val KEY_IMEI_BY_SLOT = "imei_by_slot"
+        private const val KEY_IMEI_BY_SLOT_SNAPSHOT = "imeiBySlot"
         private const val KEY_TAC_BY_SLOT = "tac_by_slot"
+        private const val KEY_TAC_BY_SLOT_SNAPSHOT = "tacBySlot"
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
     }
 }

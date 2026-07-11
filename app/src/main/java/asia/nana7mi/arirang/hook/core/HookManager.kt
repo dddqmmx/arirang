@@ -43,10 +43,12 @@ class HookManager : IXposedHookLoadPackage {
         val prefs = HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
         val restrictHotSwitching = prefs.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false)
 
-        HookBridge.log("Arirang/HookManager: handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
+        HookLog.d(HookLog.Module.CORE, "handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
         modules
             .filter { it.matches(lpparam.packageName) }
-            .filter { !restrictHotSwitching || it.isEnabled() }
+            .filter { module ->
+                !restrictHotSwitching || module.requiresRuntimeConfigInstall() || module.isEnabled()
+            }
             .forEach { module ->
                 runCatching {
                     module.onHook(lpparam)
@@ -54,5 +56,12 @@ class HookManager : IXposedHookLoadPackage {
                     HookLog.e(HookLog.Module.CORE, "module ${module.javaClass.simpleName} failed for ${lpparam.packageName}", it)
                 }
             }
+    }
+
+    private fun HookModule.requiresRuntimeConfigInstall(): Boolean {
+        // These modules use private realtime snapshots that are unavailable until their host
+        // process has installed the hook and connected to ArirangService. Filtering them before
+        // onHook() would make the disabled default permanent when hot-switch restriction is on.
+        return this is FuckGms || this is FuckSim || this is FuckPackageList
     }
 }

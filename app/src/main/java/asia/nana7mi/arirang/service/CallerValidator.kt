@@ -15,7 +15,9 @@ class CallerValidator(private val context: Context) {
             "com.android.networkstack",
             "com.android.networkstack.inprocess",
             "com.android.wifi",
+            "com.android.location.fused",
             "com.android.bluetooth",
+            "com.google.android.bluetooth",
             BuildConfig.APPLICATION_ID
         )
     }

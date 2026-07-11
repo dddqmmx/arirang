@@ -9,12 +9,16 @@ import asia.nana7mi.arirang.hook.util.firstIntOrNull
 import asia.nana7mi.arirang.hook.util.getFieldValue
 
 import android.os.Binder
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Array as ReflectArray
+
+private const val CONFIG_REFRESH_DELAY_MS = 600L
 
 /**
  * System-side feasibility proof for SIM country and phone-number spoofing.
@@ -43,7 +47,10 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private val serviceConnectionListener = ArirangClient.ConnectionListener {
         configStore.current(force = true)
-        propertyHooks.writeProofTelephonyProperties()
+        Handler(Looper.getMainLooper()).postDelayed({
+            configStore.current()
+            propertyHooks.writeProofTelephonyProperties()
+        }, CONFIG_REFRESH_DELAY_MS)
     }
 
     override fun isEnabled(): Boolean = hookConfig.enabled
@@ -928,12 +935,19 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         }
         val config = hookConfig
         val result = config.uniqueIdentifiers.typeAllocationCodeForSlot(slotIndex, profile?.typeAllocationCode)
-        HookLog.i(
+        HookLog.d(
             HookLog.Module.UNIQUE_ID,
             "TAC call ${method.declaringClass.simpleName}.${method.name} firstInt=$firstInt slot=$slotIndex " +
-                "uniqueEnabled=${config.uniqueIdentifiers.enabled} profileSlot=${profile?.slotIndex} fallback=${profile?.typeAllocationCode} result=$result"
+                "uniqueEnabled=${config.uniqueIdentifiers.enabled} profileSlot=${profile?.slotIndex} " +
+                "fallback=${profile?.typeAllocationCode.maskIdentifier()} result=${result.maskIdentifier()}"
         )
         return result
+    }
+
+    private fun String?.maskIdentifier(): String {
+        if (isNullOrBlank()) return "<none>"
+        if (length <= 4) return "***"
+        return take(2) + "***" + takeLast(2)
     }
 
     private fun profileForTelephonyManager(param: XC_MethodHook.MethodHookParam): SimProfile? {

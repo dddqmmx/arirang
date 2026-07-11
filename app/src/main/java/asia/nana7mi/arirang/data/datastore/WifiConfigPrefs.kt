@@ -69,6 +69,24 @@ object WifiConfigPrefs {
         SubmoduleConfigFiles.write(context)
     }
 
+    fun importSchema(context: Context, schema: WifiConfigSchema) {
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                currentSsid = schema.currentSsid.trim().take(MAX_SSID_LENGTH)
+                    .ifBlank { DEFAULT_CURRENT_SSID },
+                currentBssid = schema.currentBssid.normalizedMacOr(DEFAULT_CURRENT_BSSID),
+                hideScanResults = schema.hideScanResults,
+                scanResults = schema.scanResults.take(MAX_NETWORKS).mapNotNull { network ->
+                    val ssid = network.ssid.trim().take(MAX_SSID_LENGTH)
+                    val bssid = network.bssid.normalizedMacOrNull() ?: return@mapNotNull null
+                    ScanNetwork(ssid = ssid, bssid = bssid)
+                }
+            )
+        )
+    }
+
     fun lastModified(context: Context): Long {
         return prefs(context).getLong(KEY_LAST_MODIFIED, 0L)
     }
@@ -102,6 +120,17 @@ object WifiConfigPrefs {
             .orEmpty()
             .filter { it.ssid.isNotBlank() || it.bssid.isNotBlank() }
     }
+
+    private fun String.normalizedMacOr(fallback: String): String = normalizedMacOrNull() ?: fallback
+
+    private fun String.normalizedMacOrNull(): String? {
+        val normalized = trim().uppercase()
+        return normalized.takeIf { MAC_ADDRESS.matches(it) }
+    }
+
+    private const val MAX_SSID_LENGTH = 32
+    private const val MAX_NETWORKS = 256
+    private val MAC_ADDRESS = Regex("^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
     @Suppress("DEPRECATION")
     private fun prefs(context: Context) =

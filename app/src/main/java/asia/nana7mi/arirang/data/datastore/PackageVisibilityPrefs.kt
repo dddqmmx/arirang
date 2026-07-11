@@ -105,6 +105,76 @@ object PackageVisibilityPrefs {
         ).toJson()
     }
 
+    fun importSchema(context: Context, schema: PackageListConfigSchema) {
+        val mode = schema.defaultMode.toDisplayMode(DisplayMode.ALL_VISIBLE)
+        val templateIds = mutableSetOf<String>()
+        val templates = schema.templates.asSequence()
+            .take(MAX_TEMPLATES)
+            .mapNotNull { template ->
+                val id = template.id.trim().take(MAX_IDENTIFIER_LENGTH)
+                if (id.isBlank() || !templateIds.add(id)) return@mapNotNull null
+                Template(
+                    id = id,
+                    name = template.name.trim().take(MAX_NAME_LENGTH),
+                    parentId = template.parentId?.trim()?.take(MAX_IDENTIFIER_LENGTH)
+                        ?.takeIf { it.isNotBlank() && it != id },
+                    visiblePackages = template.visiblePackages.sanitizedPackages(),
+                    listMode = runCatching { TemplateListMode.valueOf(template.listMode) }
+                        .getOrDefault(TemplateListMode.WHITELIST)
+                )
+            }
+            .toList()
+            .map { template -> template.copy(parentId = template.parentId?.takeIf(templateIds::contains)) }
+
+        val rulesByPackage = LinkedHashMap<String, AppRule>()
+        schema.appRules.asSequence().take(MAX_APP_RULES).forEach { rule ->
+            val packageName = rule.packageName.trim()
+            if (!PACKAGE_NAME.matches(packageName)) return@forEach
+            val ruleMode = rule.mode.toDisplayMode(DisplayMode.DEFAULT)
+            rulesByPackage[packageName] = AppRule(
+                packageName = packageName,
+                mode = ruleMode,
+                templateId = rule.templateId?.trim()?.take(MAX_IDENTIFIER_LENGTH)
+                    ?.takeIf { it in templateIds },
+                visiblePackages = rule.visiblePackages.sanitizedPackages()
+            )
+        }
+
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                defaultMode = mode,
+                defaultTemplateId = schema.defaultTemplateId?.trim()?.take(MAX_IDENTIFIER_LENGTH)
+                    ?.takeIf { it in templateIds },
+                templates = templates,
+                appRules = rulesByPackage.values.toList()
+            )
+        )
+    }
+
+    private fun saveConfig(context: Context, config: Config) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
+            putBoolean(KEY_ENABLED, config.enabled)
+            putString(KEY_DEFAULT_MODE, config.defaultMode.name)
+            putString(KEY_DEFAULT_TEMPLATE_ID, config.defaultTemplateId)
+            putString(KEY_TEMPLATES, gson.toJson(config.templates))
+            putString(KEY_APP_RULES, gson.toJson(config.appRules))
+            putLong(KEY_LAST_MODIFIED, Date().time)
+        }
+        SubmoduleConfigFiles.write(context)
+    }
+
+    private fun String.toDisplayMode(fallback: DisplayMode): DisplayMode =
+        runCatching { DisplayMode.valueOf(this) }.getOrDefault(fallback)
+
+    private fun List<String>.sanitizedPackages(): Set<String> = asSequence()
+        .map(String::trim)
+        .filter(PACKAGE_NAME::matches)
+        .distinct()
+        .take(MAX_PACKAGES_PER_LIST)
+        .toCollection(linkedSetOf())
+
     fun setEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putBoolean(KEY_ENABLED, enabled)
@@ -123,6 +193,7 @@ object PackageVisibilityPrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putString(KEY_DEFAULT_MODE, resolvedMode.name)
             putString(KEY_DEFAULT_TEMPLATE_ID, templateId)
+            putLong(KEY_LAST_MODIFIED, Date().time)
         }
         SubmoduleConfigFiles.write(context)
     }
@@ -141,6 +212,7 @@ object PackageVisibilityPrefs {
         }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
             putString(KEY_TEMPLATES, gson.toJson(cleaned))
+            putLong(KEY_LAST_MODIFIED, Date().time)
         }
         SubmoduleConfigFiles.write(context)
     }
@@ -229,4 +301,11 @@ object PackageVisibilityPrefs {
             DisplayMode.CUSTOM -> emptySet()
         }
     }
+
+    private const val MAX_TEMPLATES = 256
+    private const val MAX_APP_RULES = 4_096
+    private const val MAX_PACKAGES_PER_LIST = 4_096
+    private const val MAX_IDENTIFIER_LENGTH = 128
+    private const val MAX_NAME_LENGTH = 256
+    private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+$")
 }

@@ -4,7 +4,11 @@ package asia.nana7mi.arirang.hook.core
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
+import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.schema.HookLogConfigSchema
 import org.json.JSONObject
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 object HookLog {
     enum class Module(val key: String, val defaultEnabled: Boolean = true) {
@@ -31,6 +35,10 @@ object HookLog {
     private var cachedSwitches: Map<String, Boolean> = emptyMap()
 
     private val resolvingConfig = ThreadLocal.withInitial { false }
+    private val refreshInFlight = AtomicBoolean(false)
+    private val refreshExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "ArirangHookLogConfig").apply { isDaemon = true }
+    }
 
     fun i(module: Module, message: String) {
         write(module, "I", message)
@@ -73,13 +81,14 @@ object HookLog {
     private fun currentSwitches(): Map<String, Boolean> {
         val now = SystemClock.uptimeMillis()
         val cached = cachedSwitches
-        if (now - cachedAt < CACHE_TTL_MS) return cached
+        if (cached.isNotEmpty() && now - cachedAt < CACHE_TTL_MS) return cached
+        refreshSwitchesAsync()
+        return cached
+    }
 
-        return synchronized(this) {
-            val checkedAt = SystemClock.uptimeMillis()
-            if (checkedAt - cachedAt < CACHE_TTL_MS) {
-                return@synchronized cachedSwitches
-            }
+    private fun refreshSwitchesAsync() {
+        if (!refreshInFlight.compareAndSet(false, true)) return
+        refreshExecutor.execute {
             resolvingConfig.set(true)
             try {
                 val updated = buildMap {
@@ -98,21 +107,37 @@ object HookLog {
                     }
                 }
                 cachedSwitches = updated
-                cachedAt = checkedAt
-                return@synchronized updated
+            } catch (t: Throwable) {
+                HookBridge.log("Arirang/HookLog/E: failed to refresh hook log config: ${t.message}")
             } finally {
+                cachedAt = SystemClock.uptimeMillis()
                 resolvingConfig.set(false)
+                refreshInFlight.set(false)
             }
         }
     }
 
     private fun hookLogSnapshotJson(): JSONObject? {
         ArirangClient.readConfigSnapshot(
-            configName = "hook_log",
+            configName = ConfigIds.HOOK_LOG,
             allowBind = true,
             logName = "hook log"
         )?.let { snapshot ->
-            runCatching { JSONObject(snapshot) }.getOrNull()?.let { return it }
+            runCatching { HookLogConfigSchema.fromJson(snapshot) }.getOrNull()?.let { schema ->
+                return JSONObject().apply {
+                    put("core", schema.core)
+                    put("clipboard", schema.clipboard)
+                    put("gms", schema.gms)
+                    put("location", schema.location)
+                    put("package_list", schema.packageList)
+                    put("settings", schema.settings)
+                    put("sim", schema.sim)
+                    put("wifi", schema.wifi)
+                    put("bluetooth", schema.bluetooth)
+                    put("unique_id", schema.uniqueId)
+                    put("notify", schema.notify)
+                }
+            }
         }
 
         return runCatching {

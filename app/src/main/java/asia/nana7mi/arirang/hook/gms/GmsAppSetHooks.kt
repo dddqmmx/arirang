@@ -30,26 +30,48 @@ internal class GmsAppSetHooks(
             Parcel::class.java,
             Parcel::class.java,
             Int::class.javaPrimitiveType,
-            beforeHookedMethod {
-                val code = args.getOrNull(0) as? Int ?: return@beforeHookedMethod
-                if (code != APP_SET_CALLBACK_TRANSACTION) return@beforeHookedMethod
+            object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val code = param.args.getOrNull(0) as? Int ?: return
+                    if (code != APP_SET_CALLBACK_TRANSACTION) return
 
-                val data = args.getOrNull(1) as? Parcel ?: return@beforeHookedMethod
-                if (data.interfaceTokenOrNull() != APP_SET_CALLBACK_DESCRIPTOR) return@beforeHookedMethod
+                    val data = param.args.getOrNull(1) as? Parcel ?: return
+                    if (data.interfaceTokenOrNull() != APP_SET_CALLBACK_DESCRIPTOR) return
 
-                val appSetId = currentConfig().appSetId.takeIf { it.isNotBlank() } ?: return@beforeHookedMethod
-                HookLog.i(HookLog.Module.GMS, "App Set ID callback matched in GMS")
-                val replacement = Parcel.obtain()
-                try {
-                    val status = data.readParcelableAfterInterfaceToken(Status.CREATOR) ?: Status.RESULT_SUCCESS
-                    replacement.writeInterfaceToken(APP_SET_CALLBACK_DESCRIPTOR)
-                    replacement.writeParcelableCompat(status, 0)
-                    replacement.writeParcelableCompat(AppSetIdResult(appSetId, 1), 0)
-                    args[1] = replacement
-                    HookLog.i(HookLog.Module.GMS, "App Set ID spoofed from GMS callback")
-                } catch (t: Throwable) {
-                    replacement.recycle()
-                    HookLog.i(HookLog.Module.GMS, "failed to rewrite App Set ID callback: ${t.message}")
+                    val appSetId = currentConfig().appSetId.takeIf { it.isNotBlank() } ?: return
+                    HookLog.i(HookLog.Module.GMS, "App Set ID callback matched in GMS")
+                    val replacement = Parcel.obtain()
+                    try {
+                        val status = data.readParcelableAfterInterfaceToken(Status.CREATOR)
+                            ?: Status.RESULT_SUCCESS
+                        replacement.writeInterfaceToken(APP_SET_CALLBACK_DESCRIPTOR)
+                        replacement.writeParcelableCompat(status, 0)
+                        replacement.writeParcelableCompat(AppSetIdResult(appSetId, 1), 0)
+                        param.args[1] = replacement
+                        param.setObjectExtra(REPLACEMENT_PARCEL_EXTRA, replacement)
+                        HookLog.i(HookLog.Module.GMS, "App Set ID spoofed from GMS callback")
+                    } catch (t: Throwable) {
+                        if (param.args.getOrNull(1) === replacement) {
+                            param.args[1] = data
+                        }
+                        if (param.getObjectExtra(REPLACEMENT_PARCEL_EXTRA) === replacement) {
+                            param.setObjectExtra(REPLACEMENT_PARCEL_EXTRA, null)
+                        }
+                        replacement.recycle()
+                        HookLog.i(HookLog.Module.GMS, "failed to rewrite App Set ID callback: ${t.message}")
+                    }
+                }
+
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val replacement = param.getObjectExtra(REPLACEMENT_PARCEL_EXTRA) as? Parcel ?: return
+                    param.setObjectExtra(REPLACEMENT_PARCEL_EXTRA, null)
+                    runCatching { replacement.recycle() }
+                        .onFailure {
+                            HookLog.i(
+                                HookLog.Module.GMS,
+                                "failed to recycle App Set callback parcel: ${it.message}"
+                            )
+                        }
                 }
             }
         )
@@ -170,5 +192,7 @@ internal class GmsAppSetHooks(
         private const val APP_SET_CALLBACK_DESCRIPTOR =
             "com.google.android.gms.appset.internal.IAppSetIdCallback"
         private const val APP_SET_CALLBACK_TRANSACTION = 1
+        private const val REPLACEMENT_PARCEL_EXTRA =
+            "asia.nana7mi.arirang.gms.app_set_replacement_parcel"
     }
 }

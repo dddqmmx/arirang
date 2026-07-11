@@ -86,6 +86,37 @@ object LocationConfigPrefs {
         SubmoduleConfigFiles.write(context)
     }
 
+    fun importSchema(context: Context, schema: LocationConfigSchema) {
+        fun profile(profile: LocationProfileSchema) = Profile(
+            enabled = profile.enabled,
+            latitude = profile.latitude.validLatitude(DEFAULT_LATITUDE),
+            longitude = profile.longitude.validLongitude(DEFAULT_LONGITUDE),
+            altitude = profile.altitude.validFinite(DEFAULT_ALTITUDE, -1_000.0, 100_000.0),
+            accuracy = profile.accuracy.validFinite(DEFAULT_ACCURACY, 0f, 100_000f),
+            speed = profile.speed.validFinite(DEFAULT_SPEED, 0f, 100_000f),
+            bearing = profile.bearing.validFinite(DEFAULT_BEARING, 0f, 360f),
+            satellites = profile.satellites.coerceIn(0, MAX_SATELLITES)
+        )
+
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                latitude = schema.latitude.validLatitude(DEFAULT_LATITUDE),
+                longitude = schema.longitude.validLongitude(DEFAULT_LONGITUDE),
+                altitude = schema.altitude.validFinite(DEFAULT_ALTITUDE, -1_000.0, 100_000.0),
+                accuracy = schema.accuracy.validFinite(DEFAULT_ACCURACY, 0f, 100_000f),
+                speed = schema.speed.validFinite(DEFAULT_SPEED, 0f, 100_000f),
+                bearing = schema.bearing.validFinite(DEFAULT_BEARING, 0f, 360f),
+                satellites = schema.satellites.coerceIn(0, MAX_SATELLITES),
+                perPackage = schema.perPackage.entries.asSequence()
+                    .filter { PACKAGE_NAME.matches(it.key) }
+                    .take(MAX_PACKAGE_PROFILES)
+                    .associate { it.key to profile(it.value) }
+            )
+        )
+    }
+
     fun lastModified(context: Context): Long {
         return prefs(context).getLong(KEY_LAST_MODIFIED, 0L)
     }
@@ -163,6 +194,17 @@ object LocationConfigPrefs {
             }
         }
     }
+
+    private fun Double.validLatitude(fallback: Double) = validFinite(fallback, -90.0, 90.0)
+    private fun Double.validLongitude(fallback: Double) = validFinite(fallback, -180.0, 180.0)
+    private fun Double.validFinite(fallback: Double, minimum: Double, maximum: Double): Double =
+        takeIf { it.isFinite() && it in minimum..maximum } ?: fallback
+    private fun Float.validFinite(fallback: Float, minimum: Float, maximum: Float): Float =
+        takeIf { it.isFinite() && it in minimum..maximum } ?: fallback
+
+    private const val MAX_SATELLITES = 255
+    private const val MAX_PACKAGE_PROFILES = 2_048
+    private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+$")
 
     private fun prefs(context: Context): SharedPreferences {
         return try {

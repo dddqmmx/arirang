@@ -7,6 +7,8 @@ import asia.nana7mi.arirang.hook.util.callNoArg
 import asia.nana7mi.arirang.hook.util.getFieldValue
 
 import android.location.LocationManager
+import java.util.Collections
+import java.util.IdentityHashMap
 
 internal object LocationCallerResolver {
     fun providerFromArgs(args: Array<Any?>): String {
@@ -19,16 +21,18 @@ internal object LocationCallerResolver {
     }
 
     fun callerFromArgs(args: Array<Any?>): String? {
-        return args.asSequence()
-            .mapNotNull { arg ->
-                when (arg) {
-                    is String -> arg.takeIf { it.isLikelyPackageName() }
-                    else -> packageNameFromObject(arg)
-                }
-            }
+        args.filterIsInstance<String>()
+            .firstOrNull { it.isLikelyExternalPackageName() }
+            ?.let { return it }
+
+        args.asSequence()
+            .mapNotNull(::directPackageNameFromObject)
             .firstOrNull()
-            ?: args.filterIsInstance<String>()
-                .lastOrNull { it.isLikelyPackageName() }
+            ?.let { return it }
+
+        return args.asSequence()
+            .mapNotNull(::packageNameFromObject)
+            .firstOrNull()
     }
 
     fun packageNameForUid(uid: Int): String? {
@@ -37,13 +41,28 @@ internal object LocationCallerResolver {
             ArirangClient.getSystemContext()
                 ?.packageManager
                 ?.getPackagesForUid(uid)
-                ?.firstOrNull()
+                ?.asSequence()
+                ?.filter { it.isLikelyPackageName() }
+                ?.distinct()
+                ?.sorted()
+                ?.toList()
+                ?.singleOrNull()
         }.getOrNull()
     }
 
     fun packageNameFromObject(value: Any?): String? {
+        val visited = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>())
+        return packageNameFromObject(value, visited, 0)
+    }
+
+    private fun packageNameFromObject(
+        value: Any?,
+        visited: MutableSet<Any>,
+        depth: Int
+    ): String? {
         value ?: return null
-        if (value is String) return value.takeIf { it.isLikelyPackageName() }
+        if (value is String) return value.takeIf { it.isLikelyExternalPackageName() }
+        if (depth > MAX_RESOLUTION_DEPTH || !visited.add(value)) return null
 
         directPackageNameFromObject(value)?.let { return it }
         packageNameFromWorkSource(value)?.let { return it }
@@ -57,14 +76,14 @@ internal object LocationCallerResolver {
             listOf("mClientIdentities", "clients", "zzb").forEach { fieldName ->
                 val clients = getFieldValue(value, fieldName) as? List<*>
                 clients?.forEach { client ->
-                    packageNameFromObject(client)?.let { return it }
+                    packageNameFromObject(client, visited, depth + 1)?.let { return it }
                 }
             }
         }
 
         if (className == "com.google.android.gms.location.internal.LocationRequestUpdateData") {
-            packageNameFromObject(getFieldValue(value, "b"))?.let { return it }
-            (getFieldValue(value, "g") as? String)?.takeIf { it.isLikelyPackageName() }?.let { return it }
+            packageNameFromObject(getFieldValue(value, "b"), visited, depth + 1)?.let { return it }
+            (getFieldValue(value, "g") as? String)?.takeIf { it.isLikelyExternalPackageName() }?.let { return it }
         }
 
         listOf(
@@ -81,14 +100,14 @@ internal object LocationCallerResolver {
         ).forEach { fieldName ->
             val nested = getFieldValue(value, fieldName)
             if (nested != null && nested !== value) {
-                packageNameFromObject(nested)?.let { return it }
+                packageNameFromObject(nested, visited, depth + 1)?.let { return it }
             }
         }
 
         listOf("getCallerIdentity", "getIdentity", "getAttributionSource", "getWorkSource").forEach { methodName ->
             val nested = callNoArg(value, methodName)
             if (nested != null && nested !== value) {
-                packageNameFromObject(nested)?.let { return it }
+                packageNameFromObject(nested, visited, depth + 1)?.let { return it }
             }
         }
 
@@ -140,5 +159,10 @@ internal object LocationCallerResolver {
             this != LocationManager.FUSED_PROVIDER
     }
 
+    private fun String.isLikelyExternalPackageName(): Boolean {
+        return isLikelyPackageName() && this != GMS_PACKAGE
+    }
+
     private const val GMS_PACKAGE = "com.google.android.gms"
+    private const val MAX_RESOLUTION_DEPTH = 8
 }

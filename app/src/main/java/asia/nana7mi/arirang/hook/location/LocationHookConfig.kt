@@ -3,6 +3,8 @@ package asia.nana7mi.arirang.hook.location
 import asia.nana7mi.arirang.hook.core.HookLog
 
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
+import asia.nana7mi.arirang.data.datastore.schema.LocationConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.LocationProfileSchema
 import de.robv.android.xposed.XSharedPreferences
 import org.json.JSONObject
 
@@ -26,16 +28,38 @@ internal data class LocationProfile(
 internal object LocationHookConfigParser {
     fun parseSnapshot(snapshot: String): LocationHookConfig? {
         return runCatching {
-            val json = JSONObject(snapshot)
+            val schema = LocationConfigSchema.fromJson(snapshot)
             LocationHookConfig(
-                enabled = json.optBoolean(LocationConfigPrefs.KEY_ENABLED, false),
-                defaultProfile = profileFromJson(json),
-                perPackage = parsePackageProfiles(json)
+                enabled = schema.enabled,
+                defaultProfile = schema.toProfile(),
+                perPackage = schema.perPackage.mapValues { (_, profile) -> profile.toProfile() }
             )
         }.onFailure {
             HookLog.w(HookLog.Module.LOCATION, "failed to parse location config snapshot: ${it.message}")
         }.getOrNull()
     }
+
+    private fun LocationConfigSchema.toProfile(): LocationProfile = LocationProfile(
+        enabled = enabled,
+        latitude = latitude,
+        longitude = longitude,
+        altitude = altitude,
+        accuracy = accuracy,
+        speed = speed,
+        bearing = bearing,
+        satellites = satellites.coerceIn(0, 64)
+    )
+
+    private fun LocationProfileSchema.toProfile(): LocationProfile = LocationProfile(
+        enabled = enabled,
+        latitude = latitude,
+        longitude = longitude,
+        altitude = altitude,
+        accuracy = accuracy,
+        speed = speed,
+        bearing = bearing,
+        satellites = satellites.coerceIn(0, 64)
+    )
 
     fun readStored(prefs: XSharedPreferences): LocationHookConfig {
         return LocationHookConfig(
@@ -84,7 +108,8 @@ internal object LocationHookConfigParser {
     }
 
     private fun parsePackageProfiles(json: JSONObject): Map<String, LocationProfile> {
-        val root = json.optJSONObject(LocationConfigPrefs.KEY_PER_PACKAGE)
+        val root = json.optJSONObject("perPackage")
+            ?: json.optJSONObject(LocationConfigPrefs.KEY_PER_PACKAGE)
             ?: json.optJSONObject("package_profiles")
             ?: json
 

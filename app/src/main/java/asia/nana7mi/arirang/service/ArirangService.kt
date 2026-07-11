@@ -6,6 +6,8 @@ import android.os.IBinder
 import android.os.Process
 import android.util.Log
 import asia.nana7mi.arirang.hook.IArirangService
+import asia.nana7mi.arirang.hook.IClipboardDecisionCallback
+import asia.nana7mi.arirang.hook.IConfigSnapshotCallback
 import asia.nana7mi.arirang.model.ClipboardAccessDecision
 
 /**
@@ -53,6 +55,17 @@ class ArirangService : Service() {
             return clipboardController.handleClipboardRequest(userId, normalizedPkgName).value
         }
 
+        override fun requestClipboardReadAsync(
+            pkgName: String,
+            uid: Int,
+            userId: Int,
+            callback: IClipboardDecisionCallback
+        ) {
+            val decision = requestClipboardRead(pkgName, uid, userId)
+            runCatching { callback.onDecision(decision) }
+                .onFailure { Log.w(TAG, "Failed to deliver clipboard decision", it) }
+        }
+
         override fun onPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {
             val normalizedPkgName = pkgName.trim()
             val callingUid = getCallingUid()
@@ -89,6 +102,18 @@ class ArirangService : Service() {
                 return ""
             }
             return configProvider.readConfigSnapshot(configName)
+        }
+
+        override fun readConfigAsync(configName: String, callback: IConfigSnapshotCallback) {
+            val callingUid = getCallingUid()
+            if (!callerValidator.isTrustedCaller(callingUid)) {
+                Log.w(TAG, "Rejected async config request from uid=$callingUid config=$configName")
+                runCatching { callback.onConfig(0L, "") }
+                return
+            }
+            val config = configProvider.readConfig(configName)
+            runCatching { callback.onConfig(config?.version ?: 0L, config?.payload.orEmpty()) }
+                .onFailure { Log.w(TAG, "Failed to deliver config snapshot", it) }
         }
     }
 

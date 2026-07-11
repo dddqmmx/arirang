@@ -35,6 +35,15 @@ object GlobalConfigPrefs {
         return saved
     }
 
+    fun importSchema(context: Context, schema: GlobalConfigSchema) {
+        require(schema.schemaVersion in 1..GlobalConfigSchema.SCHEMA_VERSION) {
+            "Unsupported global config schema version: ${schema.schemaVersion}"
+        }
+        check(saveConfig(context, Config(restrictHotSwitching = schema.restrictHotSwitching))) {
+            "Unable to persist global config"
+        }
+    }
+
     fun lastModified(context: Context): Long {
         return prefs(context).also {
             migratePrivatePrefsIfNeeded(context, it)

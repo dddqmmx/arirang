@@ -5,6 +5,7 @@ import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,10 +13,45 @@ import android.content.Intent
 import android.content.IntentFilter
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
+import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import org.json.JSONObject
 class SystemServerHook : BaseHookModule(matchSystem = true) {
+    private data class BluetoothNameConfig(val enabled: Boolean = false, val name: String? = null)
+
+    private val bluetoothNameConfig = RealtimeHookConfig(
+        defaultValue = BluetoothNameConfig(),
+        refreshIntervalMs = 1_000L,
+        readSnapshot = { force ->
+            ArirangClient.readConfigSnapshot(
+                configName = ConfigIds.BLUETOOTH,
+                force = force,
+                allowBind = true,
+                logName = "Bluetooth"
+            )
+        },
+        parseSnapshot = { snapshot ->
+            runCatching {
+                val schema = BluetoothConfigSchema.fromJson(snapshot)
+                BluetoothNameConfig(
+                    enabled = schema.enabled,
+                    name = schema.deviceName.takeIf { it.isNotBlank() }
+                )
+            }.getOrNull()
+        },
+        readFallback = {
+            runCatching {
+                val prefs = HookConfigFile.xSharedPreferences(BluetoothConfigPrefs.PREFS_NAME)
+                BluetoothNameConfig(
+                    enabled = prefs.getBoolean(BluetoothConfigPrefs.KEY_ENABLED, false),
+                    name = prefs.getString(BluetoothConfigPrefs.KEY_DEVICE_NAME, null)
+                        ?.takeIf { it.isNotBlank() }
+                )
+            }.getOrDefault(BluetoothNameConfig())
+        }
+    )
+
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
             val amsClass = HookBridge.findClass("com.android.server.am.ActivityManagerService", lpparam.classLoader)
@@ -137,23 +173,24 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
         // getName() — the leaf the app-facing IBluetoothManager.getName() funnels through.
         HookBridge.findAndHookMethod(bmsClass, "getName", object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
-                val original = param.result as? String
-                val name = readBluetoothNameFromConfig(param.thisObject)
+                if (param.hasThrowable()) return
+                val name = readBluetoothNameFromConfig()
                 if (name == null) {
-                    HookLog.i(HookLog.Module.BLUETOOTH, "BluetoothManagerService.getName() hit but config disabled/unreadable (original=$original)")
+                    HookLog.d(HookLog.Module.BLUETOOTH, "BluetoothManagerService.getName() config disabled/unavailable")
                     return
                 }
                 param.result = name
-                HookLog.i(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getName(): $original -> $name")
+                HookLog.d(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getName()")
             }
         })
 
         // getAddress()
         HookBridge.findAndHookMethod(bmsClass, "getAddress", object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
-                if (readBluetoothNameFromConfig(param.thisObject) == null) return
+                if (param.hasThrowable()) return
+                if (readBluetoothNameFromConfig() == null) return
                 param.result = "02:00:00:AA:BB:CC"
-                HookLog.i(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getAddress() -> (spoofed)")
+                HookLog.d(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getAddress()")
             }
         })
     }
@@ -168,9 +205,9 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
             override fun afterHookedMethod(param: MethodHookParam) {
                 val key = param.args[0] as? String ?: return
                 if (key != "bluetooth.device.default_name") return
-                val name = readBluetoothNameFromConfig(null) ?: return
+                val name = readBluetoothNameFromConfig() ?: return
                 param.result = name
-                HookLog.i(HookLog.Module.BLUETOOTH, "spoof SystemProperties bluetooth.device.default_name -> $name")
+                HookLog.d(HookLog.Module.BLUETOOTH, "spoof SystemProperties bluetooth.device.default_name")
             }
         }
 
@@ -184,28 +221,7 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
      * world-readable XSharedPreferences. Used by the system_server-side BT-off fallback
      * hooks (BluetoothManagerService / SystemProperties).
      */
-    private fun readBluetoothNameFromConfig(service: Any?): String? {
-        val context = runCatching {
-            HookBridge.getObjectField(service, "mContext") as? Context
-        }.getOrNull()
-        val snapshot = ArirangClient.readConfigSnapshot(
-            configName = "bluetooth",
-            allowBind = true,
-            bindContext = context,
-            logName = "Bluetooth"
-        )
-        val json = runCatching { snapshot?.let { JSONObject(it) } }.getOrNull()
-        if (json?.optBoolean(BluetoothConfigPrefs.KEY_ENABLED) == true) {
-            return json.optString(BluetoothConfigPrefs.KEY_DEVICE_NAME)
-                .takeIf { it.isNotBlank() }
-        }
-
-        // Fallback to XSharedPreferences if the snapshot was unavailable.
-        return runCatching {
-            val prefs = HookConfigFile.xSharedPreferences(BluetoothConfigPrefs.PREFS_NAME)
-            if (prefs.getBoolean(BluetoothConfigPrefs.KEY_ENABLED, false)) {
-                prefs.getString(BluetoothConfigPrefs.KEY_DEVICE_NAME, null)?.takeIf { it.isNotBlank() }
-            } else null
-        }.getOrNull()
+    private fun readBluetoothNameFromConfig(): String? {
+        return bluetoothNameConfig.current().takeIf { it.enabled }?.name
     }
 }

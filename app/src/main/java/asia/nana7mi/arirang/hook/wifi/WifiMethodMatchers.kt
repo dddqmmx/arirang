@@ -1,12 +1,18 @@
 package asia.nana7mi.arirang.hook.wifi
 
 import android.net.wifi.ScanResult
+import asia.nana7mi.arirang.hook.core.HookBridge
 import java.lang.reflect.Method
 
-internal fun Method.wrapScanResults(classLoader: ClassLoader, results: List<ScanResult>): Any? {
+internal fun Method.wrapScanResults(results: List<ScanResult>): Any? {
     return when {
-        returnsParceledListSlice() -> parceledListSlice(classLoader, results)
-        returnsList() -> results
+        returnsParceledListSlice() -> runCatching {
+            HookBridge.newInstance(returnType, results)
+        }.getOrNull()
+        returnType.isAssignableFrom(ArrayList::class.java) -> ArrayList(results)
+        returnsList() -> runCatching {
+            HookBridge.newInstance(returnType, results)
+        }.getOrNull()
         else -> null
     }
 }

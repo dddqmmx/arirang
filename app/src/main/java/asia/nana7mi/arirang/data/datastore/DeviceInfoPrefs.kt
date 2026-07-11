@@ -1,7 +1,7 @@
 package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
-import androidx.core.content.edit
+import asia.nana7mi.arirang.data.datastore.schema.DeviceInfoConfigSchema
 import asia.nana7mi.arirang.model.DevicePresetCatalog
 import org.json.JSONObject
 
@@ -10,6 +10,7 @@ object DeviceInfoPrefs {
     private val DEFAULT_PRESET = DevicePresetCatalog.defaultPreset()
 
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_LAST_MODIFIED = "last_modified"
     private const val KEY_PRESET_ID = "preset_id"
     private const val KEY_BRAND = "brand"
     private const val KEY_MANUFACTURER = "manufacturer"
@@ -92,26 +93,114 @@ object DeviceInfoPrefs {
     }
 
     fun saveConfig(context: Context, config: Config) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
-            putBoolean(KEY_ENABLED, config.enabled)
-            putString(KEY_PRESET_ID, config.presetId)
-            putString(KEY_BRAND, config.brand)
-            putString(KEY_MANUFACTURER, config.manufacturer)
-            putString(KEY_MODEL, config.model)
-            putString(KEY_DEVICE, config.device)
-            putString(KEY_PRODUCT, config.product)
-            putString(KEY_BOARD, config.board)
-            putString(KEY_HARDWARE, config.hardware)
-            putString(KEY_DISPLAY, config.display)
-            putString(KEY_HOST, config.host)
-            putString(KEY_ID, config.id)
-            putString(KEY_TAGS, config.tags)
-            putString(KEY_TYPE, config.type)
-            putString(KEY_USER, config.user)
-            putString(KEY_FINGERPRINT, config.fingerprint)
-            putLong(KEY_TIME, config.time)
-        }
+        val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_ENABLED, config.enabled)
+            .putLong(KEY_LAST_MODIFIED, System.currentTimeMillis())
+            .putString(KEY_PRESET_ID, config.presetId)
+            .putString(KEY_BRAND, config.brand)
+            .putString(KEY_MANUFACTURER, config.manufacturer)
+            .putString(KEY_MODEL, config.model)
+            .putString(KEY_DEVICE, config.device)
+            .putString(KEY_PRODUCT, config.product)
+            .putString(KEY_BOARD, config.board)
+            .putString(KEY_HARDWARE, config.hardware)
+            .putString(KEY_DISPLAY, config.display)
+            .putString(KEY_HOST, config.host)
+            .putString(KEY_ID, config.id)
+            .putString(KEY_TAGS, config.tags)
+            .putString(KEY_TYPE, config.type)
+            .putString(KEY_USER, config.user)
+            .putString(KEY_FINGERPRINT, config.fingerprint)
+            .putLong(KEY_TIME, config.time)
+            .commit()
+        check(saved) { "Unable to persist device info config" }
         SubmoduleConfigFiles.write(context, deviceConfig = config)
     }
 
+    fun lastModified(context: Context): Long =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getLong(KEY_LAST_MODIFIED, 0L)
+
+    fun buildHookSnapshot(context: Context): String {
+        val config = loadConfig(context)
+        return DeviceInfoConfigSchema(
+            enabled = config.enabled,
+            presetId = config.presetId,
+            brand = config.brand,
+            manufacturer = config.manufacturer,
+            model = config.model,
+            device = config.device,
+            product = config.product,
+            board = config.board,
+            hardware = config.hardware,
+            display = config.display,
+            host = config.host,
+            id = config.id,
+            tags = config.tags,
+            type = config.type,
+            user = config.user,
+            fingerprint = config.fingerprint,
+            time = config.time,
+            lastModified = lastModified(context)
+        ).toJson()
+    }
+
+    fun importSchema(context: Context, schema: DeviceInfoConfigSchema) {
+        require(schema.schemaVersion in 1..DeviceInfoConfigSchema.SCHEMA_VERSION) {
+            "Unsupported device info config schema version: ${schema.schemaVersion}"
+        }
+        val errors = validateSchema(schema)
+        require(errors.isEmpty()) { errors.joinToString() }
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                presetId = schema.presetId,
+                brand = schema.brand,
+                manufacturer = schema.manufacturer,
+                model = schema.model,
+                device = schema.device,
+                product = schema.product,
+                board = schema.board,
+                hardware = schema.hardware,
+                display = schema.display,
+                host = schema.host,
+                id = schema.id,
+                tags = schema.tags,
+                type = schema.type,
+                user = schema.user,
+                fingerprint = schema.fingerprint,
+                time = schema.time
+            )
+        )
+    }
+
+    fun validateSchema(schema: DeviceInfoConfigSchema): List<String> = buildList {
+        validateText("presetId", schema.presetId, MAX_SHORT_TEXT_LENGTH)
+        validateText("brand", schema.brand, MAX_SHORT_TEXT_LENGTH)
+        validateText("manufacturer", schema.manufacturer, MAX_SHORT_TEXT_LENGTH)
+        validateText("model", schema.model, MAX_SHORT_TEXT_LENGTH)
+        validateText("device", schema.device, MAX_SHORT_TEXT_LENGTH)
+        validateText("product", schema.product, MAX_SHORT_TEXT_LENGTH)
+        validateText("board", schema.board, MAX_SHORT_TEXT_LENGTH)
+        validateText("hardware", schema.hardware, MAX_SHORT_TEXT_LENGTH)
+        validateText("host", schema.host, MAX_SHORT_TEXT_LENGTH)
+        validateText("id", schema.id, MAX_SHORT_TEXT_LENGTH)
+        validateText("tags", schema.tags, MAX_SHORT_TEXT_LENGTH)
+        validateText("type", schema.type, MAX_SHORT_TEXT_LENGTH)
+        validateText("user", schema.user, MAX_SHORT_TEXT_LENGTH)
+        validateText("display", schema.display, MAX_LONG_TEXT_LENGTH)
+        validateText("fingerprint", schema.fingerprint, MAX_LONG_TEXT_LENGTH)
+        if (schema.time < 0L) add("time must not be negative")
+    }
+
+    private fun MutableList<String>.validateText(name: String, value: String, maxLength: Int) {
+        if (value.length > maxLength) add("$name exceeds $maxLength characters")
+        if (value.any { it == '\u0000' || it == '\r' || it == '\n' }) {
+            add("$name contains unsupported control characters")
+        }
+    }
+
+    private const val MAX_SHORT_TEXT_LENGTH = 256
+    private const val MAX_LONG_TEXT_LENGTH = 2_048
 }

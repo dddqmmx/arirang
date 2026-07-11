@@ -100,11 +100,12 @@ internal class WifiServiceHooks(
         candidateMethods
             .filter { it.returnsList() }
             .forEach { method ->
-                HookBridge.hookMethod(method, beforeHookedMethod {
+                HookBridge.hookMethod(method, afterHookedMethod {
+                    if (hasThrowable()) return@afterHookedMethod
                     val config = currentConfig()
-                    if (!config.enabled) return@beforeHookedMethod
-                    HookLog.i(HookLog.Module.WIFI, "spoof ScanRequestProxy.getScanResults via ${method.signature()}")
-                    result = spoofedScanResults(config)
+                    if (!config.enabled) return@afterHookedMethod
+                    method.wrapScanResults(spoofedScanResults(config))?.let { result = it }
+                    HookLog.d(HookLog.Module.WIFI, "spoof ScanRequestProxy.getScanResults via ${method.signature()}")
                 })
                 hookedScanResults++
             }
@@ -135,21 +136,25 @@ internal class WifiServiceHooks(
         candidateMethods.forEach { method ->
             when {
                 method.name == "getConnectionInfo" && method.returnsWifiInfo() -> {
-                    HookBridge.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
+                        if (isRedactedWifiInfo(result)) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        HookLog.i(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
-                        result = spoofedWifiInfo(config)
+                        if (!config.enabled) return@afterHookedMethod
+                        spoofedWifiInfo(config)?.let { result = it }
+                        HookLog.d(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
                     })
                     hookedConnectionInfo++
                 }
 
                 method.name == "getScanResults" && method.returnsScanResults() -> {
-                    HookBridge.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
+                        if (!containsVisibleScanResults(result)) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        HookLog.i(HookLog.Module.WIFI, "spoof getScanResults via ${method.signature()}")
-                        result = method.wrapScanResults(classLoader, spoofedScanResults(config))
+                        if (!config.enabled) return@afterHookedMethod
+                        method.wrapScanResults(spoofedScanResults(config))?.let { result = it }
+                        HookLog.d(HookLog.Module.WIFI, "spoof getScanResults via ${method.signature()}")
                     })
                     hookedScanResults++
                 }
@@ -170,5 +175,32 @@ internal class WifiServiceHooks(
                 param.block()
             }
         }
+    }
+
+    private fun afterHookedMethod(
+        block: XC_MethodHook.MethodHookParam.() -> Unit
+    ): XC_MethodHook {
+        return object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                param.block()
+            }
+        }
+    }
+
+    private fun isRedactedWifiInfo(value: Any?): Boolean {
+        value ?: return true
+        val bssid = runCatching { HookBridge.callMethod(value, "getBSSID") as? String }.getOrNull()
+        val ssid = runCatching { HookBridge.callMethod(value, "getSSID") as? String }.getOrNull()
+        return bssid == null || bssid.equals(DEFAULT_MAC_ADDRESS, ignoreCase = true) ||
+            ssid == null || ssid.equals("<unknown ssid>", ignoreCase = true)
+    }
+
+    private fun containsVisibleScanResults(value: Any?): Boolean {
+        val list = when (value) {
+            is List<*> -> value
+            null -> return false
+            else -> runCatching { HookBridge.callMethod(value, "getList") as? List<*> }.getOrNull()
+        }
+        return !list.isNullOrEmpty()
     }
 }

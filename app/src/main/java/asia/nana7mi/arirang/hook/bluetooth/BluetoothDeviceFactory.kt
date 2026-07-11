@@ -12,6 +12,7 @@ import android.bluetooth.BluetoothDevice
  * differs, fall back to `BluetoothDevice(String, int)`.
  */
 internal fun createFakeBluetoothDevice(device: BluetoothDeviceProfile): BluetoothDevice? {
+    if (!isValidBluetoothAddress(device.address)) return null
     val bt = runCatching {
         HookBridge.newInstance(BluetoothDevice::class.java, device.address)
     }.getOrNull() ?: runCatching {
@@ -29,6 +30,7 @@ internal fun createFakeBluetoothDevice(device: BluetoothDeviceProfile): Bluetoot
 }
 
 internal fun macToBytes(mac: String): ByteArray {
+    require(isValidBluetoothAddress(mac)) { "Invalid Bluetooth address" }
     val bytes = ByteArray(6)
     val hex = mac.replace(":", "")
     if (hex.length != 12) return bytes
@@ -37,3 +39,7 @@ internal fun macToBytes(mac: String): ByteArray {
     }
     return bytes
 }
+
+internal fun isValidBluetoothAddress(value: String): Boolean = BLUETOOTH_ADDRESS.matches(value)
+
+private val BLUETOOTH_ADDRESS = Regex("(?i)^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")

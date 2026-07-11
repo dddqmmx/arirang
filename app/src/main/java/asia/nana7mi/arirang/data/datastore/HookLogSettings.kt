@@ -48,6 +48,31 @@ object HookLogSettings {
         return saved
     }
 
+    fun importSchema(context: Context, schema: HookLogConfigSchema) {
+        require(schema.schemaVersion in 1..HookLogConfigSchema.SCHEMA_VERSION) {
+            "Unsupported hook log config schema version: ${schema.schemaVersion}"
+        }
+        val values = mapOf(
+            "core" to schema.core,
+            "clipboard" to schema.clipboard,
+            "gms" to schema.gms,
+            "location" to schema.location,
+            "package_list" to schema.packageList,
+            "settings" to schema.settings,
+            "sim" to schema.sim,
+            "wifi" to schema.wifi,
+            "bluetooth" to schema.bluetooth,
+            "unique_id" to schema.uniqueId,
+            "notify" to schema.notify
+        )
+        val saved = prefs(context).edit().apply {
+            values.forEach { (key, enabled) -> putBoolean(prefKey(key), enabled) }
+            putLong(KEY_LAST_MODIFIED, Date().time)
+        }.commit()
+        check(saved) { "Unable to persist hook log config" }
+        SubmoduleConfigFiles.write(context)
+    }
+
     fun lastModified(context: Context): Long {
         return prefs(context).also {
             migratePrivatePrefsIfNeeded(context, it)

@@ -27,7 +27,9 @@ internal class GmsAdvertisingIdHooks(
 
     private fun hookStringGetters(ownerClass: Class<*>) {
         val methods = ownerClass.declaredMethods.filter { method ->
-            method.returnType == String::class.java && method.parameterTypes.isEmpty()
+            method.name in ADS_IDENTIFIER_GETTER_NAMES &&
+                method.returnType == String::class.java &&
+                method.parameterTypes.isEmpty()
         }
 
         if (methods.isEmpty()) {
@@ -38,6 +40,7 @@ internal class GmsAdvertisingIdHooks(
         methods.forEach { method ->
             method.isAccessible = true
             HookBridge.hookMethod(method, afterHookedMethod {
+                if (hasThrowable()) return@afterHookedMethod
                 val gaid = currentConfig().gaid.takeIf { it.isNotBlank() } ?: return@afterHookedMethod
                 result = gaid
                 HookLog.i(HookLog.Module.GMS, "GAID spoofed from ${ownerClass.name}.${method.name}()")
@@ -85,5 +88,6 @@ internal class GmsAdvertisingIdHooks(
             "com.google.android.gms.ads.identifier.internal.IAdvertisingIdService"
 
         private const val ADS_IDENTIFIER_GET_ID_TRANSACTION = 1
+        private val ADS_IDENTIFIER_GETTER_NAMES = setOf("getId", "getAdvertisingId")
     }
 }

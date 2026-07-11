@@ -1,6 +1,8 @@
 package asia.nana7mi.arirang.hook.core
 
 import android.os.SystemClock
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class RealtimeHookConfig<T>(
     private val defaultValue: T,
@@ -10,32 +12,46 @@ class RealtimeHookConfig<T>(
     private val readFallback: () -> T
 ) {
     @Volatile
-    private var cachedValue: T = defaultValue
+    private var cachedValue: T = runCatching(readFallback).getOrDefault(defaultValue)
 
     @Volatile
-    private var cachedAt: Long = 0L
+    private var cachedAt: Long = -refreshIntervalMs
+
+    private val refreshInFlight = AtomicBoolean(false)
 
     fun current(force: Boolean = false): T {
         val now = SystemClock.uptimeMillis()
-        if (!force && now - cachedAt < refreshIntervalMs) return cachedValue
+        if (force || now - cachedAt >= refreshIntervalMs) {
+            refreshAsync(force)
+        }
+        return cachedValue
+    }
 
-        return synchronized(this) {
-            val checkedAt = SystemClock.uptimeMillis()
-            if (!force && checkedAt - cachedAt < refreshIntervalMs) {
-                return@synchronized cachedValue
+    private fun refreshAsync(force: Boolean) {
+        if (!refreshInFlight.compareAndSet(false, true)) return
+        REFRESH_EXECUTOR.execute {
+            try {
+                runCatching {
+                    readSnapshot(force)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let(parseSnapshot)
+                        ?: readFallback()
+                }.getOrNull()?.let { cachedValue = it }
+            } finally {
+                cachedAt = SystemClock.uptimeMillis()
+                refreshInFlight.set(false)
             }
-
-            cachedValue = readSnapshot(force)
-                ?.takeIf { it.isNotBlank() }
-                ?.let(parseSnapshot)
-                ?: readFallback()
-            cachedAt = checkedAt
-            cachedValue
         }
     }
 
     fun invalidate() {
-        cachedAt = 0L
+        cachedAt = -refreshIntervalMs
         cachedValue = defaultValue
+    }
+
+    private companion object {
+        val REFRESH_EXECUTOR = Executors.newSingleThreadExecutor { task ->
+            Thread(task, "ArirangConfigParser").apply { isDaemon = true }
+        }
     }
 }

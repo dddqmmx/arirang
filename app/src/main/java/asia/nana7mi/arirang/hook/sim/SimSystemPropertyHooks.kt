@@ -187,7 +187,7 @@ internal class SimSystemPropertyHooks(
             .takeIf { it in SYSTEM_PROPERTY_KEYS }
         val propertyKey = directKey ?: suffixedKey ?: return null
 
-        val config = configStore.current(force = true)
+        val config = configStore.current()
         if (!config.enabled) return null
 
         val slotIndex = if (directKey == null) {

@@ -66,6 +66,26 @@ object BluetoothConfigPrefs {
         SubmoduleConfigFiles.write(context)
     }
 
+    fun importSchema(context: Context, schema: BluetoothConfigSchema) {
+        fun importDevices(devices: List<BluetoothDeviceSchema>): List<Device> =
+            devices.take(MAX_DEVICES).mapNotNull { device ->
+                val address = device.address.normalizedMacOrNull() ?: return@mapNotNull null
+                Device(name = device.name.trim().take(MAX_DEVICE_NAME_LENGTH), address = address)
+            }
+
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                deviceName = schema.deviceName.trim().take(MAX_DEVICE_NAME_LENGTH),
+                connectedDevices = importDevices(schema.connectedDevices),
+                hideConnectedDevices = schema.hideConnectedDevices,
+                hideScanResults = schema.hideScanResults,
+                scanResults = importDevices(schema.scanResults)
+            )
+        )
+    }
+
     fun lastModified(context: Context): Long {
         return prefs(context).getLong(KEY_LAST_MODIFIED, 0L)
     }
@@ -105,6 +125,15 @@ object BluetoothConfigPrefs {
             .orEmpty()
             .filter { it.name.isNotBlank() || it.address.isNotBlank() }
     }
+
+    private fun String.normalizedMacOrNull(): String? {
+        val normalized = trim().uppercase()
+        return normalized.takeIf { MAC_ADDRESS.matches(it) }
+    }
+
+    private const val MAX_DEVICE_NAME_LENGTH = 248
+    private const val MAX_DEVICES = 256
+    private val MAC_ADDRESS = Regex("^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$")
 
     @Suppress("DEPRECATION")
     private fun prefs(context: Context) =

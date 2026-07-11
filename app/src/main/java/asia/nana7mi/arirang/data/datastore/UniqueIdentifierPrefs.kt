@@ -23,6 +23,7 @@ object UniqueIdentifierPrefs {
     private const val KEY_SERIAL = "serial"
     private const val KEY_IMEI_BY_SLOT = "imei_by_slot"
     private const val KEY_TAC_BY_SLOT = "tac_by_slot"
+    private const val MAX_IMPORTED_SLOT_INDEX = 31
 
     private val gson = Gson()
     private val random = SecureRandom()
@@ -74,6 +75,46 @@ object UniqueIdentifierPrefs {
             putString(KEY_TAC_BY_SLOT, gson.toJson(config.tacBySlot.toSortedMap()))
         }
         SubmoduleConfigFiles.write(context, uniqueIdentifierConfig = config)
+    }
+
+    fun importSchema(context: Context, schema: IdentifierConfigSchema) {
+        require(schema.schemaVersion in 1..IdentifierConfigSchema.SCHEMA_VERSION) {
+            "Unsupported identifier config schema version: ${schema.schemaVersion}"
+        }
+
+        val imeiBySlot = schema.imeiBySlot.entries
+            .asSequence()
+            .filter { (slot, _) -> slot in 0..MAX_IMPORTED_SLOT_INDEX }
+            .mapNotNull { (slot, value) ->
+                value.filter(Char::isDigit).take(15).takeIf { it.length == 15 }?.let { slot to it }
+            }
+            .toMap()
+            .toSortedMap()
+        val tacBySlot = schema.tacBySlot.entries
+            .asSequence()
+            .filter { (slot, _) -> slot in 0..MAX_IMPORTED_SLOT_INDEX }
+            .mapNotNull { (slot, value) ->
+                val normalized = value.filter(Char::isDigit).take(8)
+                    .takeIf { it.length == 8 }
+                    ?: imeiBySlot[slot]?.take(8)
+                normalized?.let { slot to it }
+            }
+            .toMap()
+            .toSortedMap()
+
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                androidId = schema.androidId.normalizedIdentifier(64),
+                gaid = schema.gaid.normalizedIdentifier(64),
+                widevineDrmId = schema.widevineDrmId.normalizedIdentifier(256),
+                appSetId = schema.appSetId.normalizedIdentifier(256),
+                serial = schema.serial.normalizedIdentifier(128),
+                imeiBySlot = imeiBySlot,
+                tacBySlot = tacBySlot
+            )
+        )
     }
 
     fun lastModified(context: Context): Long {
@@ -204,5 +245,9 @@ object UniqueIdentifierPrefs {
             }
         }.sum()
         return (10 - (sum % 10)) % 10
+    }
+
+    private fun String.normalizedIdentifier(maxLength: Int): String {
+        return trim().filterNot(Char::isISOControl).take(maxLength)
     }
 }

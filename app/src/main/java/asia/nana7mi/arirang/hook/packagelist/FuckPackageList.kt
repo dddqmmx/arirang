@@ -34,20 +34,20 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     it.parameterTypes[0] == String::class.java
             } ?: throw NoSuchMethodException("addService not found")
 
-            HookBridge.log("Arirang/package_list/I: Hooking ServiceManager.addService to capture package manager class")
+            HookLog.d(HookLog.Module.PACKAGE_LIST, "hooking ServiceManager.addService")
 
             HookBridge.hookMethod(addServiceMethod, beforeHookedMethod {
                 if (args.getOrNull(0) == "package") {
                     val binder = args.getOrNull(1) ?: return@beforeHookedMethod
                     val pmClass = binder.javaClass
-                    HookBridge.log("Arirang/package_list/I: Package manager service registered with class: ${pmClass.name}. Hooking methods...")
+                    HookLog.d(HookLog.Module.PACKAGE_LIST, "package manager service registered; hooking methods")
                     hookPackageManagerService(pmClass)
                 }
             })
 
             HookLog.i(HookLog.Module.PACKAGE_LIST, "ServiceManager hook installed successfully")
         }.onFailure {
-            HookBridge.log("Arirang/package_list/E: Failed to install ServiceManager hook: ${it.message}\n${it.stackTraceToString()}")
+            HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to install ServiceManager hook", it)
         }
     }
 
@@ -93,15 +93,15 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         
         val declaringClass = findDeclaringClass(pmClass, methodName, *parameterTypes)
         if (declaringClass == null) {
-            HookBridge.log("Arirang/package_list/W: Method $methodName not found in ${pmClass.name} hierarchy")
+            HookLog.w(HookLog.Module.PACKAGE_LIST, "method $methodName not found")
             return
         }
         
         runCatching {
             HookBridge.findAndHookMethod(declaringClass, methodName, *parameterTypesAndCallback)
-            HookBridge.log("Arirang/package_list/I: Successfully hooked $methodName on ${declaringClass.name}")
+            HookLog.d(HookLog.Module.PACKAGE_LIST, "hooked $methodName")
         }.onFailure {
-            HookBridge.log("Arirang/package_list/E: Failed to hook $methodName on ${declaringClass.name}: ${it.message}")
+            HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to hook $methodName", it)
         }
     }
 
@@ -114,9 +114,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                 .map { method ->
                     "${method.name}(${method.parameterTypes.joinToString { it.name }}) -> ${method.returnType.name}"
                 }
-            HookBridge.log("Arirang/package_list/I: Declared matching methods: \n" + methods.joinToString("\n"))
+            HookLog.d(HookLog.Module.PACKAGE_LIST, "matching method count=${methods.size}")
         }.onFailure {
-            HookBridge.log("Arirang/package_list/E: Failed to dump methods: ${it.message}")
+            HookLog.d(HookLog.Module.PACKAGE_LIST, "failed to inspect methods: ${it.message}")
         }
 
         // 1. Hook getInstalledApplications
@@ -152,7 +152,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     if (isInternalCall.get() == true) return@beforeHookedMethod
                     val packageName = args[0] as? String ?: return@beforeHookedMethod
                     val callingUid = Binder.getCallingUid()
-                    if (callingUid < 10000) return@beforeHookedMethod
+                    if (callingUid.appId() < 10000) return@beforeHookedMethod
                     config.loadIfUpdated()
                     if (!config.enabled) return@beforeHookedMethod
 
@@ -162,7 +162,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                         result = null
                     }
                 }.onFailure {
-                    HookBridge.log("Arirang/package_list/E: getPackageInfo hook failed: ${it.message}")
+                    HookLog.e(HookLog.Module.PACKAGE_LIST, "getPackageInfo hook failed", it)
                 }
             }
         )
@@ -247,7 +247,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     if (isInternalCall.get() == true) return@afterHookedMethod
                     val pkgs = result as? Array<*> ?: return@afterHookedMethod
                     val callingUid = Binder.getCallingUid()
-                    if (callingUid < 10000) return@afterHookedMethod
+                    if (callingUid.appId() < 10000) return@afterHookedMethod
                     config.loadIfUpdated()
                     if (!config.enabled) return@afterHookedMethod
 
@@ -275,7 +275,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                         result = if (filtered.isEmpty()) null else filtered
                     }
                 }.onFailure {
-                    HookBridge.log("Arirang/package_list/E: getPackagesForUid hook failed: ${it.message}")
+                    HookLog.e(HookLog.Module.PACKAGE_LIST, "getPackagesForUid hook failed", it)
                 }
             }
         )
@@ -290,7 +290,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     val targetUid = args[0] as Int
                     val name = result as? String ?: return@afterHookedMethod
                     val callingUid = Binder.getCallingUid()
-                    if (callingUid < 10000 || targetUid == callingUid) return@afterHookedMethod
+                    if (callingUid.appId() < 10000 || targetUid == callingUid) return@afterHookedMethod
                     config.loadIfUpdated()
                     if (!config.enabled) return@afterHookedMethod
 
@@ -308,11 +308,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
 
                     if (visibleTargetPackages.isEmpty()) {
                         result = null
-                    } else {
-                        result = visibleTargetPackages.first()
                     }
                 }.onFailure {
-                    HookBridge.log("Arirang/package_list/E: getNameForUid hook failed: ${it.message}")
+                    HookLog.e(HookLog.Module.PACKAGE_LIST, "getNameForUid hook failed", it)
                 }
             }
         )
@@ -352,7 +350,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             val list = HookBridge.callMethod(parceledListSlice, "getList") as? List<*> ?: return
 
             val callingUid = Binder.getCallingUid()
-            if (callingUid < 10000) return
+            if (callingUid.appId() < 10000) return
 
             config.loadIfUpdated()
             if (!config.enabled) return
@@ -373,8 +371,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             }
             param.result = HookBridge.newInstance(parceledListSlice.javaClass, filtered)
         }.onFailure {
-            HookBridge.log("Arirang/package_list/E: $methodName hook failed: ${it.message}")
+            HookLog.e(HookLog.Module.PACKAGE_LIST, "$methodName hook failed", it)
         }
     }
 
+    private fun Int.appId(): Int = Math.floorMod(this, 100_000)
 }

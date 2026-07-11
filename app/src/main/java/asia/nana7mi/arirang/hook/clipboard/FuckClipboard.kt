@@ -11,6 +11,8 @@ import android.os.Process
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 class FuckClipboard : BaseHookModule(matchSystem = true) {
     companion object {
@@ -25,8 +27,21 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             BuildConfig.APPLICATION_ID
         )
 
-        // Anr豁免进程的Uid名单
-        val pendingUids = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
+        // 同一 UID 可能并发发起多个读取请求，使用引用计数避免其中一个请求结束后
+        // 提前撤销另一个仍在等待的 ANR 豁免。
+        private val pendingUids = ConcurrentHashMap<Int, AtomicInteger>()
+
+        private fun beginPending(uid: Int) {
+            pendingUids.compute(uid) { _, count ->
+                (count ?: AtomicInteger()).apply { incrementAndGet() }
+            }
+        }
+
+        private fun endPending(uid: Int) {
+            pendingUids.computeIfPresent(uid) { _, count ->
+                if (count.decrementAndGet() <= 0) null else count
+            }
+        }
     }
 
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -58,16 +73,16 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
             // 对请求uid进行检查
             if (uid == Process.INVALID_UID || shouldBypass(callingPackage, uid)) return@beforeHookedMethod
 
-            pendingUids.add(uid)
+            beginPending(uid)
             try {
-                //向arirang客户端发送请求获取客户端app的回复
+                // 向arirang客户端发送请求获取客户端app的回复
                 val allowed = ArirangClient.requestClipboardReadAccess(callingPackage, uid, userId)
                 if (!allowed) {
                     HookLog.i(HookLog.Module.CLIPBOARD, "denied read for $callingPackage uid=$uid")
                     result = null
                 }
             } finally {
-                pendingUids.remove(uid)
+                endPending(uid)
             }
         }
 
@@ -92,7 +107,7 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
                     }
                 }.getOrNull()
 
-                if (uid != null && pendingUids.contains(uid)) {
+                if (uid != null && pendingUids[uid]?.get()?.let { it > 0 } == true) {
                     HookLog.i(HookLog.Module.CLIPBOARD, "Bypassing ANR for uid $uid via isDebugging spoof")
                     param.result = true
                 }

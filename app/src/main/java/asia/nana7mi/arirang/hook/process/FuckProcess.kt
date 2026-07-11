@@ -46,7 +46,7 @@ class FuckProcess : BaseHookModule(matchSystem = true) {
                             HookBridge.callStaticMethod(spClass, "get", key, "") as String
                         }.getOrDefault("")
 
-                        HookLog.i(HookLog.Module.CORE, "Spoofed getprop execution for key: $key -> $spoofedValue")
+                        HookLog.d(HookLog.Module.CORE, "Spoofed getprop execution")
 
                         this.result = MockProcess(spoofedValue + "\n")
                     }

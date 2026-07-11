@@ -16,19 +16,25 @@ import android.os.SystemClock
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.hook.IArirangService
+import asia.nana7mi.arirang.hook.IClipboardDecisionCallback
+import asia.nana7mi.arirang.hook.IConfigSnapshotCallback
 import asia.nana7mi.arirang.service.ArirangService
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * ArirangClient
  *
- * 运行环境：system_server
+ * 注入在system_server
  * 作用：
  * 1. 作为 system_server 与目标 App之间的 Binder 客户端桥接层
- * 2. 向目标 App 上报权限使用事件
- * 3. 在读取剪贴板前向目标 App 请求授权（同步阻塞等待结果）
+ * 2. 让hook与app实时通信
  *
  * 设计目标：
  * - 非阻塞 system_server 主逻辑（等待时间严格受控）
@@ -58,11 +64,17 @@ object ArirangClient {
     /** bindService 连接超时时间（兜底防死锁） */
     private const val BIND_TIMEOUT_MS = 3000L
 
-    /** getOrBind 时最大等待连接时间 */
+    /** 仅后台刷新线程允许等待连接；hook 热路径从不等待 bind。 */
     private const val BIND_WAIT_MS = 300L
 
-    /** 配置远程读取的本地缓存时间，避免热路径频繁 Binder 调用 */
+    /** 配置远程读取的本地缓存时间，过期后仅触发后台刷新。 */
     private const val CONFIG_CACHE_TTL_MS = 300L
+
+    /** 配置 Binder 调用的后台等待上限。 */
+    private const val CONFIG_CALL_TIMEOUT_MS = 1_000L
+
+    /** 管理 App 的剪贴板弹窗自身最多等待 10 秒，客户端额外留少量收尾时间。 */
+    private const val CLIPBOARD_CALL_TIMEOUT_MS = 10_500L
 
     /** 服务端定义：允许访问的返回值 */
     private const val RESULT_ALLOW = 1
@@ -91,26 +103,43 @@ object ArirangClient {
     @Volatile
     private var sBinding = false
 
-    /**
-     * 用于等待连接完成的同步器
-     *
-     * 每次 bind 创建一个新的 CountDownLatch
-     */
-    @Volatile
-    private var sConnectLatch: CountDownLatch? = null
-
     private data class CachedConfig(
         @Volatile var snapshot: String? = null,
         @Volatile var version: Long = Long.MIN_VALUE,
-        @Volatile var checkedAt: Long = 0L
+        @Volatile var checkedAt: Long = 0L,
+        val refreshInFlight: AtomicBoolean = AtomicBoolean(false)
     )
 
     private val configCache = ConcurrentHashMap<String, CachedConfig>()
 
+    private val bindGeneration = AtomicLong(0L)
+
+    private class BindingAttempt(
+        val generation: Long,
+        val context: Context,
+        val currentUser: Boolean
+    ) {
+        val latch = CountDownLatch(1)
+        lateinit var connection: ServiceConnection
+
+        @Volatile
+        var bound = false
+    }
+
+    // Process-lifetime binding owned by the injected host process; the Context is always an
+    // application/system context and is released together with the ServiceConnection.
+    @SuppressLint("StaticFieldLeak")
+    @Volatile
+    private var activeBinding: BindingAttempt? = null
+
+    private val configRefreshExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "ArirangConfigRefresh").apply { isDaemon = true }
+    }
+
     /**
      * 同步锁对象
      *
-     * 保护 sBinding 与 sConnectLatch 状态一致性
+     * 保护服务、绑定尝试与代次状态的一致性
      */
     private val LOCK = Any()
 
@@ -130,69 +159,87 @@ object ArirangClient {
         }
     }
 
-    /**
-     * 重连延迟任务
-     */
-    private val reconnectRunnable = Runnable {
-        val ctx = getSystemContext()
-        if (ctx != null && sService == null) {
-            HookLog.i(HookLog.Module.NOTIFY, "Triggering auto-reconnect...")
-            ensureBound(ctx)
+    private fun createConnection(attempt: BindingAttempt): ServiceConnection {
+        return object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                if (activeBinding !== attempt) {
+                    safeUnbind(attempt)
+                    return
+                }
+                HookLog.i(HookLog.Module.NOTIFY, "onServiceConnected $name")
+                try {
+                    val connectedService = IArirangService.Stub.asInterface(service)
+                    sService = connectedService
+                    connectionListeners.forEach { listener ->
+                        runCatching { listener.onServiceConnected() }
+                            .onFailure {
+                                HookLog.w(
+                                    HookLog.Module.NOTIFY,
+                                    "connection listener failed: ${it.message}"
+                                )
+                            }
+                    }
+                } catch (t: Throwable) {
+                    HookLog.w(HookLog.Module.NOTIFY, "asInterface failed: ${t.message}")
+                    sService = null
+                } finally {
+                    synchronized(LOCK) {
+                        if (activeBinding === attempt) sBinding = false
+                    }
+                    attempt.latch.countDown()
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {
+                if (activeBinding !== attempt) return
+                HookLog.i(HookLog.Module.NOTIFY, "onServiceDisconnected $name")
+                sService = null
+                sBinding = false
+                attempt.latch.countDown()
+                // A non-permanent disconnect keeps the binding alive; Android reconnects it.
+            }
+
+            override fun onBindingDied(name: ComponentName) {
+                HookLog.i(HookLog.Module.NOTIFY, "onBindingDied $name")
+                handlePermanentDisconnect(attempt)
+            }
+
+            override fun onNullBinding(name: ComponentName) {
+                HookLog.i(HookLog.Module.NOTIFY, "onNullBinding $name")
+                handlePermanentDisconnect(attempt)
+            }
         }
     }
 
-    /**
-     * ⚠ 注意：
-     * 在 system_server 中必须为成员变量
-     * 不能使用匿名临时对象，否则可能被 GC 回收导致连接丢失
-     */
-    private val connection = object : ServiceConnection {
-
-        /**
-         * 成功建立 Binder 连接时回调
-         */
-        override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            HookLog.i(HookLog.Module.NOTIFY, "onServiceConnected $name")
-            try {
-                sService = IArirangService.Stub.asInterface(service)
-                handler.removeCallbacks(reconnectRunnable)
-                connectionListeners.forEach { it.onServiceConnected() }
-            } catch (t: Throwable) {
-                HookLog.i(HookLog.Module.NOTIFY, "asInterface failed: ${t.stackTraceToString()}")
-                sService = null
-            } finally {
-                sBinding = false
-                sConnectLatch?.countDown()
-            }
-        }
-
-        /**
-         * 远程服务异常断开（进程死亡等）
-         */
-        override fun onServiceDisconnected(name: ComponentName) {
-            HookLog.i(HookLog.Module.NOTIFY, "onServiceDisconnected $name")
-            handleDisconnect()
-        }
-
-        override fun onBindingDied(name: ComponentName) {
-            HookLog.i(HookLog.Module.NOTIFY, "onBindingDied $name, connection is permanently dead for system auto-restart")
-            handleDisconnect()
-        }
-
-        override fun onNullBinding(name: ComponentName) {
-            HookLog.i(HookLog.Module.NOTIFY, "onNullBinding $name")
-            handleDisconnect()
-        }
-
-        private fun handleDisconnect() {
+    private fun handlePermanentDisconnect(attempt: BindingAttempt) {
+        val shouldReconnect = synchronized(LOCK) {
+            if (activeBinding !== attempt) return
+            activeBinding = null
             sService = null
             sBinding = false
-            sConnectLatch?.countDown()
-            
-            // 延迟重连（防止因 App 持续崩溃导致 system_server 死循环 bind 消耗过多 CPU）
-            handler.removeCallbacks(reconnectRunnable)
-            handler.postDelayed(reconnectRunnable, 5000L) // 5秒后尝试重连
+            bindGeneration.incrementAndGet()
+            attempt.latch.countDown()
+            true
         }
+        safeUnbind(attempt)
+        if (shouldReconnect) scheduleReconnect(attempt.context, attempt.currentUser)
+    }
+
+    private fun safeUnbind(attempt: BindingAttempt) {
+        if (!attempt.bound) return
+        attempt.bound = false
+        runCatching {
+            withCleanCallingIdentity { attempt.context.unbindService(attempt.connection) }
+        }
+    }
+
+    private fun scheduleReconnect(context: Context, currentUser: Boolean) {
+        handler.postDelayed({
+            if (sService == null && activeBinding == null) {
+                HookLog.i(HookLog.Module.NOTIFY, "Triggering auto-reconnect...")
+                if (currentUser) ensureBoundCurrentUser(context) else ensureBound(context)
+            }
+        }, 5_000L)
     }
 
     /**
@@ -216,18 +263,15 @@ object ArirangClient {
      * 异步 fire-and-forget，不等待返回值
      */
     fun notifyPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {
-        val ctx = getSystemContext() ?: return
-
-        val service = getOrBindService(ctx) ?: return
-
+        val service = sService ?: return
         try {
             withCleanCallingIdentity {
                 service.onPermissionUsed(pkgName, uid, userId, opName)
             }
+        } catch (_: DeadObjectException) {
+            clearDeadService(service)
         } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "notify failed: ${t.stackTraceToString()}")
-            // Binder 死亡，清空引用，下次自动重连
-            sService = null
+            HookLog.w(HookLog.Module.NOTIFY, "notify failed: ${t.message}")
         }
     }
 
@@ -237,8 +281,6 @@ object ArirangClient {
      * @param pkgName 调用方包名
      * @param uid     调用方 UID
      * @param userId  多用户环境下的 userId
-     * @param timeoutMs 服务端允许等待的最长时间
-     *
      * @return true = 允许读取
      *         false = 拒绝读取
      */
@@ -248,34 +290,39 @@ object ArirangClient {
         userId: Int
     ): Boolean {
 
-        val ctx = getSystemContext()
-        if (ctx == null) {
-            HookLog.i(HookLog.Module.NOTIFY, "requestClipboardReadAccess: no system context")
-            return FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
-        }
-
-        val service = getOrBindService(ctx)
-        if (service == null) {
+        // Never bind from ClipboardService.getPrimaryClip(). systemReady maintains the
+        // connection; the hook path only uses an already-connected Binder.
+        val service = sService
+        if (service == null || !service.asBinder().isBinderAlive) {
             HookLog.i(HookLog.Module.NOTIFY, "requestClipboardReadAccess: service unavailable, fail-open=$FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE")
             return FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         }
 
+        val latch = CountDownLatch(1)
+        val decision = AtomicInteger(Int.MIN_VALUE)
+        val callback = object : IClipboardDecisionCallback.Stub() {
+            override fun onDecision(result: Int) {
+                decision.set(result)
+                latch.countDown()
+            }
+        }
+
         return try {
             withCleanCallingIdentity {
-                service.requestClipboardRead(
-                    pkgName,
-                    uid,
-                    userId
-                ) == RESULT_ALLOW
+                service.requestClipboardReadAsync(pkgName, uid, userId, callback)
             }
-
-        } catch (_: DeadObjectException) {
-            // 远程进程已死亡
-            sService = null
+            if (!latch.await(CLIPBOARD_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                HookLog.w(HookLog.Module.NOTIFY, "clipboard request timed out")
+                FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
+            } else {
+                decision.get() == RESULT_ALLOW
+            }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
             FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "requestClipboardReadAccess failed: ${t.stackTraceToString()}")
-            sService = null
+            if (t is DeadObjectException) clearDeadService(service)
+            HookLog.w(HookLog.Module.NOTIFY, "requestClipboardReadAccess failed: ${t.message}")
             FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
         }
     }
@@ -291,10 +338,57 @@ object ArirangClient {
         val now = SystemClock.uptimeMillis()
         val cache = configCache.getOrPut(configName) { CachedConfig() }
         val cachedSnapshot = cache.snapshot
-        if (!force && cachedSnapshot != null && now - cache.checkedAt < CONFIG_CACHE_TTL_MS) {
-            return cachedSnapshot
+        if (cachedSnapshot == null || force || now - cache.checkedAt >= CONFIG_CACHE_TTL_MS) {
+            refreshConfigAsync(
+                configName = configName,
+                cache = cache,
+                force = force,
+                allowBind = allowBind,
+                bindContext = bindContext,
+                bindCurrentUser = bindCurrentUser,
+                logName = logName
+            )
         }
+        return cachedSnapshot
+    }
 
+    private fun refreshConfigAsync(
+        configName: String,
+        cache: CachedConfig,
+        force: Boolean,
+        allowBind: Boolean,
+        bindContext: Context?,
+        bindCurrentUser: Boolean,
+        logName: String
+    ) {
+        if (!cache.refreshInFlight.compareAndSet(false, true)) return
+        configRefreshExecutor.execute {
+            try {
+                refreshConfig(
+                    configName,
+                    cache,
+                    force,
+                    allowBind,
+                    bindContext,
+                    bindCurrentUser,
+                    logName
+                )
+            } finally {
+                cache.checkedAt = SystemClock.uptimeMillis()
+                cache.refreshInFlight.set(false)
+            }
+        }
+    }
+
+    private fun refreshConfig(
+        configName: String,
+        cache: CachedConfig,
+        force: Boolean,
+        allowBind: Boolean,
+        bindContext: Context?,
+        bindCurrentUser: Boolean,
+        logName: String
+    ) {
         // system 绑定路径（bindServiceAsUser(SYSTEM) + unstopPackage）依赖
         // system_server 的权限，只有在 system_server 进程中才可用。在独立宿主
         // 进程（如 com.android.bluetooth）里这些特权调用会失败，导致永远绑不上
@@ -308,8 +402,8 @@ object ArirangClient {
                 ?: (if (useCurrentUser) hostAppContext() else null)
                 ?: getSystemContext()
             if (ctx == null) {
-                HookLog.i(HookLog.Module.NOTIFY, "read $logName config snapshot: no context")
-                return cachedSnapshot
+                HookLog.d(HookLog.Module.NOTIFY, "read $logName config snapshot: no context")
+                return
             }
             if (useCurrentUser) {
                 getOrBindServiceCurrentUser(ctx)
@@ -318,28 +412,60 @@ object ArirangClient {
             }
         } else {
             sService
-        } ?: return cachedSnapshot
+        } ?: return
 
-        return try {
-            withCleanCallingIdentity {
-                val version = service.readConfigVersion(configName)
-                if (force || cachedSnapshot == null || version != cache.version) {
-                    val snapshot = service.readConfigSnapshot(configName)?.takeIf { it.isNotBlank() }
-                    if (snapshot != null) {
-                        cache.snapshot = snapshot
-                        cache.version = version
-                    }
-                }
-                cache.checkedAt = now
-                cache.snapshot
+        val latch = CountDownLatch(1)
+        val receivedVersion = AtomicLong(Long.MIN_VALUE)
+        val receivedSnapshot = AtomicReference<String?>(null)
+        val callback = object : IConfigSnapshotCallback.Stub() {
+            override fun onConfig(version: Long, snapshot: String?) {
+                receivedVersion.set(version)
+                receivedSnapshot.set(snapshot)
+                latch.countDown()
             }
-        } catch (_: DeadObjectException) {
-            sService = null
-            cachedSnapshot
+        }
+
+        try {
+            withCleanCallingIdentity {
+                service.readConfigAsync(configName, callback)
+            }
+            if (!latch.await(CONFIG_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                HookLog.w(HookLog.Module.NOTIFY, "read $logName config snapshot timed out")
+                return
+            }
+            val version = receivedVersion.get()
+            if (force || cache.snapshot == null || version != cache.version) {
+                val snapshot = receivedSnapshot.get()?.takeIf { it.isNotBlank() }
+                if (snapshot != null) {
+                    cache.snapshot = snapshot
+                    cache.version = version
+                }
+            }
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
         } catch (t: Throwable) {
-            HookLog.i(HookLog.Module.NOTIFY, "read $logName config snapshot failed: ${t.stackTraceToString()}")
+            if (t is DeadObjectException) clearDeadService(service)
+            HookLog.w(HookLog.Module.NOTIFY, "read $logName config snapshot failed: ${t.message}")
+        }
+    }
+
+    private fun clearDeadService(service: IArirangService) {
+        val deadBinding = synchronized(LOCK) {
+            if (sService !== service) return
             sService = null
-            cachedSnapshot
+            val attempt = activeBinding
+            if (attempt != null) {
+                activeBinding = null
+                sBinding = false
+                bindGeneration.incrementAndGet()
+                attempt.latch.countDown()
+            }
+            attempt
+        }
+        if (deadBinding != null) {
+            // Clearing activeBinding first makes a racing onBindingDied callback a no-op.
+            safeUnbind(deadBinding)
+            scheduleReconnect(deadBinding.context, deadBinding.currentUser)
         }
     }
 
@@ -347,17 +473,7 @@ object ArirangClient {
      * 确保已发起 bind 操作
      */
     private fun ensureBound(ctx: Context) {
-
-        var connectLatch: CountDownLatch? = null
-
-        synchronized(LOCK) {
-            // 已经在绑定 或 已连接
-            if (sBinding || sService != null) return
-
-            sBinding = true
-            connectLatch = CountDownLatch(1)
-            sConnectLatch = connectLatch
-        }
+        val attempt = beginBinding(ctx, currentUser = false) ?: return
 
         // 在 system_server 中强制将包设置为“已启动”状态
         // 这样可以绕过系统对未启动 App 的 Intent 过滤
@@ -384,7 +500,7 @@ object ArirangClient {
             val success = withCleanCallingIdentity {
                 ctx.bindServiceAsUser(
                     intent,
-                    connection,
+                    attempt.connection,
                     Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT or Context.BIND_ABOVE_CLIENT,
                     systemUser
                 )
@@ -392,38 +508,21 @@ object ArirangClient {
 
             if (!success) {
                 HookLog.i(HookLog.Module.NOTIFY, "bindServiceAsUser returned false")
-                sBinding = false
-                connectLatch?.countDown()
+                failBinding(attempt, scheduleReconnect = true)
+                return
             }
+            attempt.bound = true
 
-            /**
-             * 🔴 兜底超时机制
-             */
-            handler.postDelayed({
-                if (sService == null && sBinding) {
-                    HookLog.i(HookLog.Module.NOTIFY, "bind timeout, reset binding")
-                    sBinding = false
-                    connectLatch?.countDown()
-                }
-            }, BIND_TIMEOUT_MS)
+            scheduleBindTimeout(attempt, "bind")
 
         } catch (t: Throwable) {
             HookLog.i(HookLog.Module.NOTIFY, "bind exception: ${t.stackTraceToString()}")
-            sBinding = false
-            connectLatch?.countDown()
+            failBinding(attempt, scheduleReconnect = true)
         }
     }
 
     private fun ensureBoundCurrentUser(ctx: Context) {
-        var connectLatch: CountDownLatch? = null
-
-        synchronized(LOCK) {
-            if (sBinding || sService != null) return
-
-            sBinding = true
-            connectLatch = CountDownLatch(1)
-            sConnectLatch = connectLatch
-        }
+        val attempt = beginBinding(ctx, currentUser = true) ?: return
 
         val intent = Intent().apply {
             component = ComponentName(TARGET_PKG, ArirangService::class.java.name)
@@ -435,28 +534,71 @@ object ArirangClient {
             val success = withCleanCallingIdentity {
                 ctx.bindService(
                     intent,
-                    connection,
+                    attempt.connection,
                     Context.BIND_AUTO_CREATE
                 )
             }
 
             if (!success) {
                 HookLog.i(HookLog.Module.NOTIFY, "current-user bindService returned false")
-                sBinding = false
-                connectLatch?.countDown()
+                failBinding(attempt, scheduleReconnect = true)
+                return
             }
+            attempt.bound = true
 
-            handler.postDelayed({
-                if (sService == null && sBinding) {
-                    HookLog.i(HookLog.Module.NOTIFY, "current-user bind timeout, reset binding")
-                    sBinding = false
-                    connectLatch?.countDown()
-                }
-            }, BIND_TIMEOUT_MS)
+            scheduleBindTimeout(attempt, "current-user bind")
         } catch (t: Throwable) {
             HookLog.i(HookLog.Module.NOTIFY, "current-user bind exception: ${t.stackTraceToString()}")
+            failBinding(attempt, scheduleReconnect = true)
+        }
+    }
+
+    private fun beginBinding(ctx: Context, currentUser: Boolean): BindingAttempt? {
+        synchronized(LOCK) {
+            if (sBinding || sService != null || activeBinding != null) return null
+            val attempt = BindingAttempt(bindGeneration.incrementAndGet(), ctx, currentUser)
+            attempt.connection = createConnection(attempt)
+            activeBinding = attempt
+            sBinding = true
+            return attempt
+        }
+    }
+
+    private fun scheduleBindTimeout(attempt: BindingAttempt, label: String) {
+        handler.postDelayed({
+            val timedOut = synchronized(LOCK) {
+                if (activeBinding !== attempt || attempt.generation != bindGeneration.get() ||
+                    sService != null || !sBinding
+                ) {
+                    false
+                } else {
+                    activeBinding = null
+                    sBinding = false
+                    bindGeneration.incrementAndGet()
+                    attempt.latch.countDown()
+                    true
+                }
+            }
+            if (timedOut) {
+                HookLog.w(HookLog.Module.NOTIFY, "$label timeout; abandoning generation ${attempt.generation}")
+                safeUnbind(attempt)
+                scheduleReconnect(attempt.context, attempt.currentUser)
+            }
+        }, BIND_TIMEOUT_MS)
+    }
+
+    private fun failBinding(attempt: BindingAttempt, scheduleReconnect: Boolean) {
+        val owned = synchronized(LOCK) {
+            if (activeBinding !== attempt) return
+            activeBinding = null
             sBinding = false
-            connectLatch?.countDown()
+            bindGeneration.incrementAndGet()
+            attempt.latch.countDown()
+            true
+        }
+        if (owned) {
+            safeUnbind(attempt)
+            if (scheduleReconnect) scheduleReconnect(attempt.context, attempt.currentUser)
         }
     }
 
@@ -502,7 +644,7 @@ object ArirangClient {
 
         ensureBound(ctx)
 
-        val latch = sConnectLatch
+        val latch = activeBinding?.latch
         if (latch != null) {
             runCatching {
                 latch.await(BIND_WAIT_MS, TimeUnit.MILLISECONDS)
@@ -517,7 +659,7 @@ object ArirangClient {
 
         ensureBoundCurrentUser(ctx)
 
-        val latch = sConnectLatch
+        val latch = activeBinding?.latch
         if (latch != null) {
             runCatching {
                 latch.await(BIND_WAIT_MS, TimeUnit.MILLISECONDS)

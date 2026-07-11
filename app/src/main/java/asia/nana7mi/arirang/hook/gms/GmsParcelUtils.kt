@@ -22,10 +22,15 @@ internal fun Parcel.replaceWithStringResult(value: String) {
 }
 
 internal fun <T> Parcel.readParcelableAfterInterfaceToken(creator: Parcelable.Creator<T>): T? {
-    setDataPosition(0)
-    readString()
-    val present = readInt()
-    return if (present != 0) creator.createFromParcel(this) else null
+    val oldPosition = dataPosition()
+    return try {
+        setDataPosition(0)
+        readString()
+        val present = readInt()
+        if (present != 0) creator.createFromParcel(this) else null
+    } finally {
+        setDataPosition(oldPosition)
+    }
 }
 
 internal fun Parcel.writeParcelableCompat(value: Parcelable?, flags: Int) {

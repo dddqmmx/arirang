@@ -2,12 +2,12 @@ package asia.nana7mi.arirang.hook.gms
 
 import android.content.Context
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
+import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.util.orFalse
 import de.robv.android.xposed.XSharedPreferences
-import org.json.JSONObject
 
 internal data class GmsIdentifierConfig(
     val enabled: Boolean = false,
@@ -19,14 +19,14 @@ internal class GmsIdentifierConfigStore(
     private val contextProvider: () -> Context?
 ) {
     private val configFile = HookConfigFile(
-        configName = "unique_identifier",
+        configName = ConfigIds.UNIQUE_IDENTIFIER,
         prefsName = UniqueIdentifierPrefs.PREFS_NAME,
         defaultValue = GmsIdentifierConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
             val context = contextProvider()
             ArirangClient.readConfigSnapshot(
-                configName = "unique_identifier",
+                configName = ConfigIds.UNIQUE_IDENTIFIER,
                 force = force,
                 allowBind = context != null,
                 bindContext = context,
@@ -39,26 +39,19 @@ internal class GmsIdentifierConfigStore(
     )
 
     fun current(): GmsIdentifierConfig {
-        if (DEBUG_HARDCODE_IDS) {
-            return GmsIdentifierConfig(
-                enabled = true,
-                gaid = DEBUG_GAID,
-                appSetId = DEBUG_APP_SET_ID
-            )
-        }
         return configFile.current()
     }
 
     private fun parseSnapshot(snapshot: String): GmsIdentifierConfig? {
         return runCatching {
-            val root = JSONObject(snapshot)
-            if (!root.optString(KEY_ENABLED).toBooleanStrictOrNull().orFalse()) {
+            val schema = IdentifierConfigSchema.fromJson(snapshot)
+            if (!schema.enabled) {
                 return@runCatching GmsIdentifierConfig()
             }
             GmsIdentifierConfig(
                 enabled = true,
-                gaid = root.optString(KEY_GAID),
-                appSetId = root.optString(KEY_APP_SET_ID)
+                gaid = schema.gaid,
+                appSetId = schema.appSetId
             )
         }.onFailure {
             HookLog.i(HookLog.Module.GMS, "failed to parse GMS identifier config: ${it.message}")
@@ -81,8 +74,5 @@ internal class GmsIdentifierConfigStore(
         private const val KEY_APP_SET_ID = "app_set_id"
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
 
-        private const val DEBUG_HARDCODE_IDS = false
-        private const val DEBUG_GAID = "00000000-0000-4000-8000-000000000001"
-        private const val DEBUG_APP_SET_ID = "00000000-0000-4000-8000-000000000002"
     }
 }

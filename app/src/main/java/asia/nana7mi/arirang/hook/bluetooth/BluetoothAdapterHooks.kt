@@ -13,9 +13,6 @@ internal class BluetoothAdapterHooks(
 ) {
     private val hookedClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
 
-    @Volatile
-    private var spoofedDeviceMap: Map<String, BluetoothDeviceProfile> = emptyMap()
-
     fun hookAdapterService(classLoader: ClassLoader): Boolean {
         val serviceClass = HookBridge.findClassIfExists(
             ADAPTER_SERVICE_CLASS,
@@ -36,6 +33,8 @@ internal class BluetoothAdapterHooks(
                     method.returnType == String::class.java -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getAddress()")
                     HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
+                        if (result == null) return@afterHookedMethod
                         val config = currentConfig()
                         if (!config.enabled) return@afterHookedMethod
                         result = SPOOFED_LOCAL_MAC
@@ -45,15 +44,17 @@ internal class BluetoothAdapterHooks(
                 method.name == "getBondedDevices" &&
                     method.returnsListOfBluetoothDevice() -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getBondedDevices()")
-                    HookBridge.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        if (config.hideConnectedDevices) {
-                            result = emptyList<BluetoothDevice>()
-                            return@beforeHookedMethod
+                        if (!config.enabled) return@afterHookedMethod
+                        val devices = if (config.hideConnectedDevices) {
+                            emptyList()
+                        } else {
+                            if (!containsBluetoothDevices(result)) return@afterHookedMethod
+                            createFakeBluetoothDevices(config.connectedDevices) ?: return@afterHookedMethod
                         }
-                        refreshSpoofedDeviceMap(config)
-                        result = config.connectedDevices.mapNotNull { createFakeBluetoothDevice(it) }
+                        method.coerceBluetoothDevices(devices)?.let { result = it }
                     })
                 }
 
@@ -61,12 +62,16 @@ internal class BluetoothAdapterHooks(
                     method.parameterTypes.size == 1 &&
                     BluetoothDevice::class.java.isAssignableFrom(method.parameterTypes[0]) -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking AdapterService.getRemoteName()")
-                    HookBridge.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
+                        if (result == null) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        val device = args[0] as? BluetoothDevice ?: return@beforeHookedMethod
-                        val address = runCatching { device.address }.getOrNull() ?: return@beforeHookedMethod
-                        val spoofed = spoofedDeviceMap[address] ?: return@beforeHookedMethod
+                        if (!config.enabled || config.hideConnectedDevices) return@afterHookedMethod
+                        val device = args[0] as? BluetoothDevice ?: return@afterHookedMethod
+                        val address = runCatching { device.address }.getOrNull() ?: return@afterHookedMethod
+                        val spoofed = config.connectedDevices.firstOrNull {
+                            it.address.equals(address, ignoreCase = true)
+                        } ?: return@afterHookedMethod
                         result = spoofed.name
                     })
                 }
@@ -97,17 +102,18 @@ internal class BluetoothAdapterHooks(
                     method.returnType == String::class.java -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking ${propertiesClass.name}.getName()")
                     HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
                         val original = result as? String
                         if (!config.enabled) {
-                            HookLog.i(
+                            HookLog.d(
                                 HookLog.Module.BLUETOOTH,
                                 "AdapterProperties.getName() hit but config.enabled=false (original=$original)"
                             )
                             return@afterHookedMethod
                         }
                         result = config.deviceName
-                        HookLog.i(
+                        HookLog.d(
                             HookLog.Module.BLUETOOTH,
                             "AdapterProperties.getName(): $original -> ${config.deviceName}"
                         )
@@ -119,6 +125,7 @@ internal class BluetoothAdapterHooks(
                     method.returnType == ByteArray::class.java -> {
                     HookLog.i(HookLog.Module.BLUETOOTH, "Hooking ${propertiesClass.name}.getAddress()")
                     HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
                         if (!config.enabled) return@afterHookedMethod
                         result = macToBytes(SPOOFED_LOCAL_MAC)
@@ -126,28 +133,16 @@ internal class BluetoothAdapterHooks(
                 }
 
                 method.name == "getBondedDevices" && method.returnsBluetoothDeviceCollection() -> {
-                    HookBridge.hookMethod(method, beforeHookedMethod {
+                    HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
-                        if (config.hideConnectedDevices) {
-                            result = if (method.returnType.isArray) {
-                                java.lang.reflect.Array.newInstance(BluetoothDevice::class.java, 0)
-                            } else {
-                                emptyList<BluetoothDevice>()
-                            }
-                            return@beforeHookedMethod
-                        }
-                        refreshSpoofedDeviceMap(config)
-                        val devices = config.connectedDevices.mapNotNull { createFakeBluetoothDevice(it) }
-                        if (method.returnType.isArray) {
-                            val array = java.lang.reflect.Array.newInstance(BluetoothDevice::class.java, devices.size)
-                            devices.forEachIndexed { index, device ->
-                                java.lang.reflect.Array.set(array, index, device)
-                            }
-                            result = array
+                        if (!config.enabled) return@afterHookedMethod
+                        val devices = if (config.hideConnectedDevices) {
+                            emptyList()
                         } else {
-                            result = devices
+                            createFakeBluetoothDevices(config.connectedDevices) ?: return@afterHookedMethod
                         }
+                        method.coerceBluetoothDevices(devices)?.let { result = it }
                     })
                 }
             }
@@ -155,9 +150,19 @@ internal class BluetoothAdapterHooks(
         return true
     }
 
-    private fun refreshSpoofedDeviceMap(config: BluetoothHookConfig) {
-        spoofedDeviceMap = config.connectedDevices.associateBy { it.address }
-            .ifEmpty { emptyMap() }
+    private fun createFakeBluetoothDevices(profiles: List<BluetoothDeviceProfile>): List<BluetoothDevice>? {
+        val devices = profiles.map(::createFakeBluetoothDevice)
+        if (devices.any { it == null }) return null
+        return devices.filterNotNull()
+    }
+
+    private fun containsBluetoothDevices(value: Any?): Boolean {
+        return when {
+            value == null -> false
+            value.javaClass.isArray -> java.lang.reflect.Array.getLength(value) > 0
+            value is Collection<*> -> value.isNotEmpty()
+            else -> false
+        }
     }
 
     private fun beforeHookedMethod(

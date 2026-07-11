@@ -1,31 +1,43 @@
 package asia.nana7mi.arirang.hook.packagelist
 
+import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.data.config.ConfigIds
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-
-import asia.nana7mi.arirang.BuildConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
 internal class PackageListHookConfig(private val prefsName: String) {
-    var enabled = false
-        private set
+    private data class State(
+        val enabled: Boolean = false,
+        val defaultMode: String = MODE_ALL_VISIBLE,
+        val defaultTemplateId: String? = null,
+        val templates: Map<String, Template> = emptyMap(),
+        val appRules: Map<String, AppRule> = emptyMap(),
+        val resolvedTemplates: Map<String, ResolvedTemplate> = emptyMap(),
+        val timestamp: Long = INITIAL_TIMESTAMP
+    )
 
-    private var defaultMode = MODE_ALL_VISIBLE
-    private var defaultTemplateId: String? = null
-    private val templates = mutableMapOf<String, Template>()
-    private val appRules = mutableMapOf<String, AppRule>()
-    private val resolvedTemplateCache = mutableMapOf<String, Pair<Set<String>, Boolean>>()
-    private var lastLoadedTimestamp = -1L
+    private data class ResolvedTemplate(
+        val packages: Set<String>,
+        val isBlacklist: Boolean
+    )
+
+    @Volatile
+    private var state = State()
+
+    val enabled: Boolean
+        get() = state.enabled
 
     private val pref by lazy {
         HookConfigFile.xSharedPreferences(prefsName)
     }
 
+    @Synchronized
     fun loadIfUpdated() {
         val snapshot = ArirangClient.readConfigSnapshot(
-            configName = "package_list",
+            configName = ConfigIds.PACKAGE_LIST,
             force = false,
             allowBind = false,
             logName = "Package List"
@@ -43,33 +55,44 @@ internal class PackageListHookConfig(private val prefsName: String) {
         callingPackages: Set<String>,
         targetPackage: String
     ): Boolean {
-        if (!enabled) return true
-        if (callingUid < 10000) return true
+        val current = state
+        if (!current.enabled) return true
+        if (Math.floorMod(callingUid, PER_USER_RANGE) < 10000) return true
         if (targetPackage == "android" || targetPackage == BuildConfig.APPLICATION_ID) return true
 
-        if (callingPackages.isEmpty()) return true
+        if (callingPackages.isEmpty()) return false
         if (BuildConfig.APPLICATION_ID in callingPackages) return true
         if (targetPackage in callingPackages) return true
 
-        return callingPackages.any { shouldKeep(it, targetPackage) }
+        // A shared UID must not borrow a more permissive sibling package rule.
+        return callingPackages.all { shouldKeep(current, it, targetPackage) }
     }
 
     private fun loadFromSnapshot(snapshot: String) {
         runCatching {
             val json = JSONObject(snapshot)
-            val newTimestamp = json.optLong(KEY_LAST_MODIFIED, -1L)
-            if (newTimestamp == lastLoadedTimestamp) return
-            lastLoadedTimestamp = newTimestamp
+            val newTimestamp = json.optLongCompat(KEY_LAST_MODIFIED, KEY_LAST_MODIFIED_LEGACY)
+            if (newTimestamp == state.timestamp) return
 
-            enabled = json.optBoolean(KEY_ENABLED, false)
-            defaultMode = json.optString(KEY_DEFAULT_MODE, MODE_ALL_VISIBLE)
-            defaultTemplateId = json.optString(KEY_DEFAULT_TEMPLATE_ID).takeIf { it.isNotEmpty() }
-            parseTemplates(json.optString(KEY_TEMPLATES).takeIf { it.isNotEmpty() })
-            parseAppRules(json.optString(KEY_APP_RULES).takeIf { it.isNotEmpty() })
+            val templates = parseTemplates(json.optArrayCompat(KEY_TEMPLATES, KEY_TEMPLATES_LEGACY))
+            val appRules = parseAppRules(json.optArrayCompat(KEY_APP_RULES, KEY_APP_RULES_LEGACY))
+            val updated = buildState(
+                enabled = json.optBoolean(KEY_ENABLED, false),
+                defaultMode = json.optStringCompat(KEY_DEFAULT_MODE, KEY_DEFAULT_MODE_LEGACY)
+                    ?: MODE_ALL_VISIBLE,
+                defaultTemplateId = json.optStringCompat(
+                    KEY_DEFAULT_TEMPLATE_ID,
+                    KEY_DEFAULT_TEMPLATE_ID_LEGACY
+                ),
+                templates = templates,
+                appRules = appRules,
+                timestamp = newTimestamp
+            )
+            state = updated
 
             HookLog.i(
                 HookLog.Module.PACKAGE_LIST,
-                "reloaded snapshot enabled=$enabled defaultMode=$defaultMode defaultTemplateId=$defaultTemplateId"
+                "reloaded snapshot enabled=${updated.enabled} defaultMode=${updated.defaultMode}"
             )
         }.onFailure {
             HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to parse package list snapshot", it)
@@ -78,121 +101,163 @@ internal class PackageListHookConfig(private val prefsName: String) {
 
     private fun loadFromPrefs() {
         if (!pref.file.canRead()) {
-            if (lastLoadedTimestamp != PREFS_UNREADABLE_TIMESTAMP) {
+            if (state.timestamp != PREFS_UNREADABLE_TIMESTAMP) {
                 HookLog.d(
                     HookLog.Module.PACKAGE_LIST,
-                    "config snapshot empty and XSharedPreferences file ${pref.file.absolutePath} is not readable"
+                    "config snapshot empty and XSharedPreferences file is not readable"
                 )
-                lastLoadedTimestamp = PREFS_UNREADABLE_TIMESTAMP
-                enabled = false
-                templates.clear()
-                appRules.clear()
+                state = State(timestamp = PREFS_UNREADABLE_TIMESTAMP)
             }
             return
         }
 
         pref.reload()
-        val newTimestamp = pref.getLong(KEY_LAST_MODIFIED, -1L)
-        if (newTimestamp == lastLoadedTimestamp) return
-        lastLoadedTimestamp = newTimestamp
+        val newTimestamp = pref.getLong(KEY_LAST_MODIFIED_LEGACY, INITIAL_TIMESTAMP)
+        if (newTimestamp == state.timestamp) return
 
-        enabled = pref.getBoolean(KEY_ENABLED, false)
-        defaultMode = pref.getString(KEY_DEFAULT_MODE, MODE_ALL_VISIBLE) ?: MODE_ALL_VISIBLE
-        defaultTemplateId = pref.getString(KEY_DEFAULT_TEMPLATE_ID, null)
-        parseTemplates(pref.getString(KEY_TEMPLATES, null))
-        parseAppRules(pref.getString(KEY_APP_RULES, null))
+        val updated = buildState(
+            enabled = pref.getBoolean(KEY_ENABLED, false),
+            defaultMode = pref.getString(KEY_DEFAULT_MODE_LEGACY, MODE_ALL_VISIBLE) ?: MODE_ALL_VISIBLE,
+            defaultTemplateId = pref.getString(KEY_DEFAULT_TEMPLATE_ID_LEGACY, null),
+            templates = parseTemplates(parseJsonArray(pref.getString(KEY_TEMPLATES_LEGACY, null))),
+            appRules = parseAppRules(parseJsonArray(pref.getString(KEY_APP_RULES_LEGACY, null))),
+            timestamp = newTimestamp
+        )
+        state = updated
 
         HookLog.i(
             HookLog.Module.PACKAGE_LIST,
-            "reloaded XSharedPreferences enabled=$enabled defaultMode=$defaultMode defaultTemplateId=$defaultTemplateId"
+            "reloaded XSharedPreferences enabled=${updated.enabled} defaultMode=${updated.defaultMode}"
         )
     }
 
-    private fun parseTemplates(templatesJson: String?) {
-        templates.clear()
-        resolvedTemplateCache.clear()
-        if (templatesJson.isNullOrBlank()) return
+    private fun buildState(
+        enabled: Boolean,
+        defaultMode: String,
+        defaultTemplateId: String?,
+        templates: Map<String, Template>,
+        appRules: Map<String, AppRule>,
+        timestamp: Long
+    ): State {
+        return State(
+            enabled = enabled,
+            defaultMode = defaultMode,
+            defaultTemplateId = defaultTemplateId,
+            templates = templates,
+            appRules = appRules,
+            resolvedTemplates = templates.keys.associateWith { resolveTemplate(it, templates) },
+            timestamp = timestamp
+        )
+    }
 
-        runCatching {
-            val array = JSONArray(templatesJson)
+    private fun parseTemplates(array: JSONArray?): Map<String, Template> {
+        if (array == null) return emptyMap()
+        return buildMap {
             for (index in 0 until array.length()) {
-                val obj = array.getJSONObject(index)
-                val id = obj.getString("id")
-                val visiblePackages = obj.optJSONArray("visiblePackages").asStringSet()
-                val listMode = obj.optString("listMode", MODE_WHITELIST)
-                templates[id] = Template(
-                    id = id,
-                    parentId = obj.optString("parentId").takeIf { it.isNotEmpty() },
-                    visiblePackages = visiblePackages,
-                    isBlacklist = listMode == MODE_BLACKLIST
+                val obj = array.optJSONObject(index) ?: continue
+                val id = obj.optString("id").takeIf { it.isNotBlank() } ?: continue
+                put(
+                    id,
+                    Template(
+                        id = id,
+                        parentId = obj.optString("parentId").takeIf { it.isNotBlank() },
+                        visiblePackages = obj.optJSONArray("visiblePackages").asStringSet(),
+                        isBlacklist = obj.optString("listMode", MODE_WHITELIST) == MODE_BLACKLIST
+                    )
                 )
             }
-        }.onFailure {
-            HookLog.w(HookLog.Module.PACKAGE_LIST, "failed to parse package templates: ${it.message}")
         }
     }
 
-    private fun parseAppRules(appRulesJson: String?) {
-        appRules.clear()
-        if (appRulesJson.isNullOrBlank()) return
-
-        runCatching {
-            val array = JSONArray(appRulesJson)
+    private fun parseAppRules(array: JSONArray?): Map<String, AppRule> {
+        if (array == null) return emptyMap()
+        return buildMap {
             for (index in 0 until array.length()) {
-                val obj = array.getJSONObject(index)
-                val packageName = obj.getString("packageName")
-                appRules[packageName] = AppRule(
-                    mode = obj.optString("mode", MODE_DEFAULT),
-                    templateId = obj.optString("templateId").takeIf { it.isNotEmpty() },
-                    visiblePackages = obj.optJSONArray("visiblePackages").asStringSet()
+                val obj = array.optJSONObject(index) ?: continue
+                val packageName = obj.optString("packageName").takeIf { it.isNotBlank() } ?: continue
+                put(
+                    packageName,
+                    AppRule(
+                        mode = obj.optString("mode", MODE_DEFAULT),
+                        templateId = obj.optString("templateId").takeIf { it.isNotBlank() },
+                        visiblePackages = obj.optJSONArray("visiblePackages").asStringSet()
+                    )
                 )
             }
-        }.onFailure {
-            HookLog.w(HookLog.Module.PACKAGE_LIST, "failed to parse package app rules: ${it.message}")
         }
     }
 
-    private fun resolvedTemplatePackages(templateId: String): Pair<Set<String>, Boolean> {
+    private fun resolveTemplate(templateId: String, templates: Map<String, Template>): ResolvedTemplate {
         val visited = mutableSetOf<String>()
         val packages = mutableSetOf<String>()
-        var current = templates[templateId]
-        val isBlacklist = current?.isBlacklist ?: false
+        val startingTemplate = templates[templateId]
+        var current = startingTemplate
         while (current != null && visited.add(current.id)) {
             packages.addAll(current.visiblePackages)
-            current = current.parentId?.let { templates[it] }
+            current = current.parentId?.let(templates::get)
         }
-        return packages to isBlacklist
+        // The selected (child) template mode governs the inherited package set. This matches
+        // the manager UI resolver and makes mixed-mode inheritance deterministic.
+        return ResolvedTemplate(packages, startingTemplate?.isBlacklist ?: false)
     }
 
-    private fun shouldKeep(callingPackage: String, targetPackage: String): Boolean {
-        if (!enabled) return true
+    private fun shouldKeep(current: State, callingPackage: String, targetPackage: String): Boolean {
         if (callingPackage == targetPackage) return true
-        if (targetPackage == "android" || targetPackage == BuildConfig.APPLICATION_ID) return true
 
-        val rule = appRules[callingPackage]
+        val rule = current.appRules[callingPackage]
         val requestedMode = rule?.mode ?: MODE_DEFAULT
-        val resolvedMode = if (requestedMode == MODE_DEFAULT) defaultMode else requestedMode
-        val resolvedTemplateId = if (requestedMode == MODE_DEFAULT) defaultTemplateId else rule?.templateId
+        val resolvedMode = if (requestedMode == MODE_DEFAULT) current.defaultMode else requestedMode
+        val resolvedTemplateId = if (requestedMode == MODE_DEFAULT) current.defaultTemplateId else rule?.templateId
 
         return when (resolvedMode) {
             MODE_ALL_VISIBLE -> true
             MODE_ALL_HIDDEN -> false
-            MODE_TEMPLATE -> keepByTemplate(resolvedTemplateId, targetPackage)
+            MODE_TEMPLATE -> keepByTemplate(current, resolvedTemplateId, targetPackage)
             MODE_CUSTOM -> rule?.visiblePackages?.contains(targetPackage) == true
             else -> true
         }
     }
 
-    private fun keepByTemplate(templateId: String?, targetPackage: String): Boolean {
-        if (templateId == null) return true
-        val (templatePackages, isBlacklist) = resolvedTemplateCache.getOrPut(templateId) {
-            resolvedTemplatePackages(templateId)
-        }
-        return if (isBlacklist) {
-            !templatePackages.contains(targetPackage)
+    private fun keepByTemplate(current: State, templateId: String?, targetPackage: String): Boolean {
+        val resolved = templateId?.let(current.resolvedTemplates::get) ?: return true
+        return if (resolved.isBlacklist) {
+            targetPackage !in resolved.packages
         } else {
-            templatePackages.contains(targetPackage)
+            targetPackage in resolved.packages
         }
+    }
+
+    private fun JSONObject.optLongCompat(primary: String, legacy: String): Long {
+        return when {
+            has(primary) -> optLong(primary, INITIAL_TIMESTAMP)
+            has(legacy) -> optLong(legacy, INITIAL_TIMESTAMP)
+            else -> INITIAL_TIMESTAMP
+        }
+    }
+
+    private fun JSONObject.optStringCompat(primary: String, legacy: String): String? {
+        return when {
+            has(primary) -> optString(primary).takeIf { it.isNotBlank() }
+            has(legacy) -> optString(legacy).takeIf { it.isNotBlank() }
+            else -> null
+        }
+    }
+
+    private fun JSONObject.optArrayCompat(primary: String, legacy: String): JSONArray? {
+        val value = when {
+            has(primary) -> opt(primary)
+            has(legacy) -> opt(legacy)
+            else -> null
+        }
+        return when (value) {
+            is JSONArray -> value
+            is String -> value.takeIf { it.isNotBlank() }?.let(::JSONArray)
+            else -> null
+        }
+    }
+
+    private fun parseJsonArray(raw: String?): JSONArray? {
+        return raw?.takeIf { it.isNotBlank() }?.let { runCatching { JSONArray(it) }.getOrNull() }
     }
 
     private fun JSONArray?.asStringSet(): Set<String> {
@@ -219,11 +284,17 @@ internal class PackageListHookConfig(private val prefsName: String) {
 
     private companion object {
         private const val KEY_ENABLED = "enabled"
-        private const val KEY_LAST_MODIFIED = "last_modified"
-        private const val KEY_DEFAULT_MODE = "default_display_mode"
-        private const val KEY_DEFAULT_TEMPLATE_ID = "default_template_id"
-        private const val KEY_TEMPLATES = "visibility_templates"
-        private const val KEY_APP_RULES = "visibility_app_rules"
+        private const val KEY_LAST_MODIFIED = "lastModified"
+        private const val KEY_DEFAULT_MODE = "defaultMode"
+        private const val KEY_DEFAULT_TEMPLATE_ID = "defaultTemplateId"
+        private const val KEY_TEMPLATES = "templates"
+        private const val KEY_APP_RULES = "appRules"
+
+        private const val KEY_LAST_MODIFIED_LEGACY = "last_modified"
+        private const val KEY_DEFAULT_MODE_LEGACY = "default_display_mode"
+        private const val KEY_DEFAULT_TEMPLATE_ID_LEGACY = "default_template_id"
+        private const val KEY_TEMPLATES_LEGACY = "visibility_templates"
+        private const val KEY_APP_RULES_LEGACY = "visibility_app_rules"
 
         private const val MODE_DEFAULT = "DEFAULT"
         private const val MODE_ALL_VISIBLE = "ALL_VISIBLE"
@@ -233,6 +304,8 @@ internal class PackageListHookConfig(private val prefsName: String) {
         private const val MODE_WHITELIST = "WHITELIST"
         private const val MODE_BLACKLIST = "BLACKLIST"
 
+        private const val INITIAL_TIMESTAMP = -1L
         private const val PREFS_UNREADABLE_TIMESTAMP = -2L
+        private const val PER_USER_RANGE = 100_000
     }
 }

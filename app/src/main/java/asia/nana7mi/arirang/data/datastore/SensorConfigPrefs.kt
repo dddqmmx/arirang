@@ -3,6 +3,7 @@ package asia.nana7mi.arirang.data.datastore
 import android.content.Context
 import androidx.core.content.edit
 import asia.nana7mi.arirang.data.datastore.schema.SensorConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.SensorEntrySchema
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
@@ -117,6 +118,39 @@ object SensorConfigPrefs {
         SubmoduleConfigFiles.write(context)
     }
 
+    fun importSchema(context: Context, schema: SensorConfigSchema) {
+        val seenIds = mutableSetOf<String>()
+        val legacy = loadConfig(context).takeIf {
+            schema.schemaVersion < SensorConfigSchema.SCHEMA_VERSION
+        }
+        saveConfig(
+            context,
+            Config(
+                enabled = schema.enabled,
+                hideAll = schema.hideAll,
+                precisionBySensorType = (legacy?.precisionBySensorType ?: schema.precisionBySensorType)
+                    .entries.asSequence()
+                    .filter { (type, level) -> type > 0 && level in PRECISION_ORIGINAL..PRECISION_HIGH }
+                    .take(MAX_SENSOR_TYPES)
+                    .associate { it.toPair() },
+                sensorEntries = (legacy?.sensorEntries?.map { entry ->
+                    SensorEntrySchema(
+                        name = entry.name,
+                        vendor = entry.vendor,
+                        type = entry.type,
+                        hidden = entry.hidden,
+                        isCustom = entry.isCustom,
+                        id = entry.id
+                    )
+                } ?: schema.sensorEntries).asSequence().take(MAX_SENSOR_ENTRIES)
+                    .mapNotNull { entry -> entry.toEntryOrNull(seenIds) }
+                    .toList(),
+                vendorReplacement = (legacy?.vendorReplacement ?: schema.vendorReplacement).take(MAX_TEXT_LENGTH),
+                vendorKeywords = (legacy?.vendorKeywords ?: schema.vendorKeywords).take(MAX_TEXT_LENGTH)
+            )
+        )
+    }
+
     fun lastModified(context: Context): Long {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getLong(KEY_LAST_MODIFIED, 0L)
@@ -127,10 +161,37 @@ object SensorConfigPrefs {
         return SensorConfigSchema(
             enabled = config.enabled,
             hideAll = config.hideAll,
+            precisionBySensorType = config.precisionBySensorType,
+            sensorEntries = config.sensorEntries.map { entry ->
+                SensorEntrySchema(
+                    name = entry.name,
+                    vendor = entry.vendor,
+                    type = entry.type,
+                    hidden = entry.hidden,
+                    isCustom = entry.isCustom,
+                    id = entry.id
+                )
+            },
+            vendorReplacement = config.vendorReplacement,
+            vendorKeywords = config.vendorKeywords,
             blacklistSize = config.sensorEntries.count { it.hidden },
             injectionSize = config.sensorEntries.count { it.isCustom },
             lastModified = lastModified(context)
         ).toJson()
+    }
+
+    private fun SensorEntrySchema.toEntryOrNull(seenIds: MutableSet<String>): SensorEntry? {
+        if (type <= 0) return null
+        val normalizedId = id.trim().take(MAX_ID_LENGTH)
+        if (normalizedId.isBlank() || !seenIds.add(normalizedId)) return null
+        return SensorEntry(
+            name = name.take(MAX_TEXT_LENGTH),
+            vendor = vendor.take(MAX_TEXT_LENGTH),
+            type = type,
+            hidden = hidden,
+            isCustom = isCustom,
+            id = normalizedId
+        )
     }
 
     fun applyCaseAwareReplace(original: String, replacement: String, keywords: List<String>): String {
@@ -154,4 +215,9 @@ object SensorConfigPrefs {
             else -> replacement
         }
     }
+
+    private const val MAX_SENSOR_TYPES = 256
+    private const val MAX_SENSOR_ENTRIES = 1_024
+    private const val MAX_TEXT_LENGTH = 1_024
+    private const val MAX_ID_LENGTH = 128
 }

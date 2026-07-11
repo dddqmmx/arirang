@@ -2,7 +2,11 @@
 <resources>
     <string-array name="xposedscope">
         <item>android</item>
+        <item>asia.nana7mi.arirang</item>
         <item>com.android.phone</item>
+        <item>com.android.providers.settings</item>
+        <item>com.android.wifi</item>
+        <item>com.android.location.fused</item>
         <item>com.google.android.gms</item>
         <item>com.android.bluetooth</item>
         <item>com.google.android.bluetooth</item>

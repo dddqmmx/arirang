@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,12 +34,14 @@ import androidx.core.os.LocaleListCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.AppPreferences
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
+import asia.nana7mi.arirang.data.config.ConfigBackupManager
 import asia.nana7mi.arirang.ui.component.dialog.HookLogDialog
-import asia.nana7mi.arirang.util.ZipUtils
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.system.exitProcess
 
 @Composable
@@ -46,6 +49,7 @@ fun SettingsScreen(
     onNavigateToAdvanced: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val languageNames = stringArrayResource(R.array.language_names)
     val languageCodes = stringArrayResource(R.array.language_codes)
     val logModules = remember {
@@ -58,21 +62,22 @@ fun SettingsScreen(
         contract = ActivityResultContracts.CreateDocument("application/zip")
     ) { uri ->
         if (uri != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    val deContext = context.createDeviceProtectedStorageContext()
-                    val dirsToZip = listOf(
-                        File(context.filesDir.parentFile, "shared_prefs"),
-                        context.filesDir,
-                        File(deContext.filesDir.parentFile, "shared_prefs"),
-                        deContext.filesDir,
-                        File(context.filesDir.parentFile, "databases")
-                    )
-                    ZipUtils.zipFiles(dirsToZip, outputStream)
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val output = context.contentResolver.openOutputStream(uri)
+                            ?: error("Unable to open backup destination")
+                        output.use { ConfigBackupManager.export(context, it) }
+                    }
+                }.onSuccess {
+                    Toast.makeText(context, R.string.save_success, Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.export_failed_message, it.message.orEmpty()),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
-                Toast.makeText(context, R.string.save_success, Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, context.getString(R.string.export_failed_message, it.message.orEmpty()), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -81,27 +86,29 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            runCatching {
-                val destDir = context.filesDir.parentFile ?: context.filesDir
-                val deDestDir = context.createDeviceProtectedStorageContext().filesDir.parentFile ?: destDir
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val bytes = inputStream.readBytes()
-                    bytes.inputStream().use { ceStream ->
-                        ZipUtils.unzipFiles(ceStream, destDir)
+            scope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("Unable to open backup")
+                        input.use { ConfigBackupManager.import(context, it) }
                     }
-                    bytes.inputStream().use { deStream ->
-                        ZipUtils.unzipFiles(deStream, deDestDir)
+                }.onSuccess {
+                    Toast.makeText(context, R.string.import_success_restart, Toast.LENGTH_LONG).show()
+                    val component = context.packageManager
+                        .getLaunchIntentForPackage(context.packageName)
+                        ?.component
+                    if (component != null) {
+                        context.startActivity(Intent.makeRestartActivityTask(component))
+                        exitProcess(0)
                     }
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.import_failed_message, it.message.orEmpty()),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
-                Toast.makeText(context, R.string.import_success_restart, Toast.LENGTH_LONG).show()
-                val packageManager = context.packageManager
-                val intent = packageManager.getLaunchIntentForPackage(context.packageName)
-                val componentName = intent?.component
-                val mainIntent = Intent.makeRestartActivityTask(componentName)
-                context.startActivity(mainIntent)
-                exitProcess(0)
-            }.onFailure {
-                Toast.makeText(context, context.getString(R.string.import_failed_message, it.message.orEmpty()), Toast.LENGTH_SHORT).show()
             }
         }
     }

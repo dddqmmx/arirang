@@ -1,6 +1,8 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
 import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
+import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
@@ -26,13 +28,13 @@ internal data class BluetoothDeviceProfile(
 
 internal class BluetoothConfigStore {
     private val configFile = HookConfigFile(
-        configName = "bluetooth",
+        configName = ConfigIds.BLUETOOTH,
         prefsName = BluetoothConfigPrefs.PREFS_NAME,
         defaultValue = BluetoothHookConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
             ArirangClient.readConfigSnapshot(
-                configName = "bluetooth",
+                configName = ConfigIds.BLUETOOTH,
                 force = force,
                 allowBind = true,
                 logName = "Bluetooth"
@@ -46,22 +48,17 @@ internal class BluetoothConfigStore {
 
     private fun parseSnapshot(snapshot: String): BluetoothHookConfig? {
         return runCatching {
-            val json = JSONObject(snapshot)
+            val schema = BluetoothConfigSchema.fromJson(snapshot)
             BluetoothHookConfig(
-                enabled = json.optBoolean(BluetoothConfigPrefs.KEY_ENABLED, false),
-                deviceName = json.optString(BluetoothConfigPrefs.KEY_DEVICE_NAME, "")
+                enabled = schema.enabled,
+                deviceName = schema.deviceName
                     .takeIf { it.isNotBlank() } ?: "Arirang",
-                connectedDevices = parseDevices(
-                    json.optJSONArray(BluetoothConfigPrefs.KEY_CONNECTED_DEVICES)?.toString()
-                ),
-                hideConnectedDevices = json.optBoolean(
-                    BluetoothConfigPrefs.KEY_HIDE_CONNECTED_DEVICES,
-                    false
-                ),
-                hideScanResults = json.optBoolean(BluetoothConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),
-                scanResults = parseDevices(
-                    json.optJSONArray(BluetoothConfigPrefs.KEY_SCAN_RESULTS)?.toString()
-                )
+                connectedDevices = schema.connectedDevices.map { BluetoothDeviceProfile(it.name, it.address) }
+                    .filter { it.name.isNotBlank() && isValidBluetoothAddress(it.address) },
+                hideConnectedDevices = schema.hideConnectedDevices,
+                hideScanResults = schema.hideScanResults,
+                scanResults = schema.scanResults.map { BluetoothDeviceProfile(it.name, it.address) }
+                    .filter { it.name.isNotBlank() && isValidBluetoothAddress(it.address) }
             )
         }.onFailure {
             HookLog.w(HookLog.Module.BLUETOOTH, "failed to parse Bluetooth config snapshot: ${it.message}")
@@ -86,7 +83,7 @@ internal class BluetoothConfigStore {
     }
 
     private fun parseDevices(json: String?): List<BluetoothDeviceProfile> {
-        if (json.isNullOrBlank()) return listOf(BluetoothDeviceProfile())
+        if (json.isNullOrBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(json)
             List(array.length()) { index ->
@@ -96,9 +93,8 @@ internal class BluetoothConfigStore {
                     address = item.optString("address", BluetoothConfigPrefs.DEFAULT_DEVICE_ADDRESS)
                 )
             }
-        }.getOrDefault(listOf(BluetoothDeviceProfile()))
-            .filter { it.name.isNotBlank() || it.address.isNotBlank() }
-            .ifEmpty { listOf(BluetoothDeviceProfile()) }
+        }.getOrDefault(emptyList())
+            .filter { it.name.isNotBlank() && isValidBluetoothAddress(it.address) }
     }
 
     private companion object {

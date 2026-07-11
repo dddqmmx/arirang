@@ -17,7 +17,9 @@ import android.os.IInterface
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
+import asia.nana7mi.arirang.data.config.ConfigIds
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.lang.ref.WeakReference
 import java.lang.reflect.Method
 import java.util.Collections
 import java.util.WeakHashMap
@@ -33,6 +35,7 @@ class FuckLocation : BaseHookModule(
 
     private companion object {
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
+        private const val STATUS_DELIVERY_DEDUP_WINDOW_MS = 1_000L
 
         private val GNSS_CLASSES = arrayOf(
             "com.android.server.location.gnss.hal.GnssNative",
@@ -49,20 +52,22 @@ class FuckLocation : BaseHookModule(
     private val receiverPackages = Collections.synchronizedMap(WeakHashMap<IBinder, String>())
     private val activeDeliveryPackage = ThreadLocal<String?>()
 
-    private val deliveredStatusCallbacks = Collections.newSetFromMap(ConcurrentHashMap<IBinder, Boolean>())
+    private val deliveredStatusCallbacks = Collections.synchronizedSet(
+        Collections.newSetFromMap(WeakHashMap<IBinder, Boolean>())
+    )
 
     @Volatile
     private var gmsContext: Context? = null
 
     private val configFile = HookConfigFile(
-        configName = "location",
+        configName = ConfigIds.LOCATION,
         prefsName = LocationConfigPrefs.PREFS_NAME,
         defaultValue = LocationHookConfig(),
         refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
         readRealtimeSnapshot = { force ->
             val context = gmsContext
             ArirangClient.readConfigSnapshot(
-                configName = "location",
+                configName = ConfigIds.LOCATION,
                 force = force,
                 allowBind = true,
                 bindContext = context,
@@ -90,7 +95,7 @@ class FuckLocation : BaseHookModule(
                     hookAndroidFusedProvider(lpparam.classLoader)
                     hookFrameworkLocationResult(lpparam.classLoader)
                 }
-                "com.google.android.gms", BuildConfig.APPLICATION_ID -> {
+                "com.google.android.gms" -> {
                     hookApplicationContext(lpparam.classLoader)
                     hookGmsReceiverBinding(lpparam.classLoader)
                     hookLocationAccessors()
@@ -149,7 +154,7 @@ class FuckLocation : BaseHookModule(
 
     private fun captureReceiverBinding(holder: Any?) {
         holder ?: return
-        val pkg = callingPackageForBinding()
+        val pkg = LocationCallerResolver.packageNameFromObject(holder) ?: callingPackageForBinding()
 
         // 1) 绑定所有投递 binder（ILocationCallback / ILocationListener / IFusedLocationProviderCallback）。
         var current: Class<*>? = holder.javaClass
@@ -205,23 +210,42 @@ class FuckLocation : BaseHookModule(
         val cl = holder.javaClass.classLoader
 
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            if (deliveredStatusCallbacks.contains(binder)) return@postDelayed
+            if (!markStatusDelivered(binder)) return@postDelayed
 
             runCatching {
                 val statusClass = HookBridge.findClass("com.google.android.gms.common.api.Status", cl)
                 val statusOk = HookBridge.getStaticObjectField(statusClass, "b")
                 val fakeLoc = fakeLocation(profile)
                 HookBridge.callMethod(callbackProxy, "a", statusOk, fakeLoc)
-                deliveredStatusCallbacks.add(binder)
                 HookLog.d(HookLog.Module.LOCATION, "proactive fake delivery for getCurrentLocation")
+            }.onFailure {
+                synchronized(deliveredStatusCallbacks) {
+                    deliveredStatusCallbacks.remove(binder)
+                }
             }
         }, 200L)
+    }
+
+    private fun markStatusDelivered(binder: IBinder): Boolean {
+        val added = synchronized(deliveredStatusCallbacks) {
+            deliveredStatusCallbacks.add(binder)
+        }
+        if (added) {
+            val binderRef = WeakReference(binder)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                val liveBinder = binderRef.get() ?: return@postDelayed
+                synchronized(deliveredStatusCallbacks) {
+                    deliveredStatusCallbacks.remove(liveBinder)
+                }
+            }, STATUS_DELIVERY_DEDUP_WINDOW_MS)
+        }
+        return added
     }
 
     private fun bindBinder(binder: IBinder, pkg: String?) {
         pkg ?: return
         receiverPackages[binder] = pkg
-        HookLog.d(HookLog.Module.LOCATION, "bound GMS delivery binder -> $pkg")
+        HookLog.d(HookLog.Module.LOCATION, "bound GMS delivery binder to caller profile")
     }
 
     /**
@@ -256,10 +280,10 @@ class FuckLocation : BaseHookModule(
                         args.forEachIndexed { index, arg ->
                             if (arg == null && method.parameterTypes[index] == Location::class.java) {
                                 args[index] = fakeLocation(profile)
-                                (thisObject as? IInterface)?.asBinder()?.let { deliveredStatusCallbacks.add(it) }
+                                (thisObject as? IInterface)?.asBinder()?.let(::markStatusDelivered)
                             } else {
                                 rewriteLocationContainer(arg, profile)?.let { args[index] = it }
-                                (thisObject as? IInterface)?.asBinder()?.let { deliveredStatusCallbacks.add(it) }
+                                (thisObject as? IInterface)?.asBinder()?.let(::markStatusDelivered)
                             }
                         }
                     }
@@ -276,7 +300,6 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun currentConfig(): LocationHookConfig {
-        if (LocationDebugConfig.DEBUG_HARDCODED_CONFIG) return LocationDebugConfig.debugConfig
         return configFile.current()
     }
 
@@ -300,7 +323,8 @@ class FuckLocation : BaseHookModule(
         }
 
         if (profile.enabled) {
-            HookLog.d(HookLog.Module.LOCATION, "resolved profile for pkg=$pkg uid=$callingUid: lat=${profile.latitude} lon=${profile.longitude}")
+            val source = if (pkg != null && config.perPackage.containsKey(pkg)) "per-package" else "default"
+            HookLog.d(HookLog.Module.LOCATION, "resolved $source location profile for uid=$callingUid")
             return profile
         }
         return null

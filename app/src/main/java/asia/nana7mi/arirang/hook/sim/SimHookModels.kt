@@ -91,8 +91,6 @@ internal data class UniqueIdentifierHookConfig(
     val imeiBySlot: Map<Int, String> = SimHookDefaults.PROFILES_BY_SLOT.mapValues { it.value.imei },
     val tacBySlot: Map<Int, String> = SimHookDefaults.PROFILES_BY_SLOT.mapValues { it.value.typeAllocationCode }
 ) {
-    val slotLimit: Int = imeiBySlot.size.coerceAtLeast(1)
-
     fun imeiForSlot(slotIndex: Int?, fallback: String?): String? {
         if (!enabled) return fallback
         if (slotIndex != null) {

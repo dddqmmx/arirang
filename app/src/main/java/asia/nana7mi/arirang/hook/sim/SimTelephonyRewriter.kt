@@ -5,6 +5,8 @@ import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.util.getFieldValue
 import asia.nana7mi.arirang.hook.util.setFieldValueIfExists
 
+import java.util.Collections
+import java.util.IdentityHashMap
 
 internal fun rewriteSubscriptionInfo(subscriptionInfo: Any?, profile: SimProfile) {
     if (subscriptionInfo == null) return
@@ -36,7 +38,17 @@ internal fun rewriteSubscriptionInfo(subscriptionInfo: Any?, profile: SimProfile
 }
 
 internal fun rewriteServiceState(serviceState: Any?, profile: SimProfile) {
-    if (serviceState == null) return
+    val visited = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>())
+    rewriteServiceState(serviceState, profile, visited, 0)
+}
+
+private fun rewriteServiceState(
+    serviceState: Any?,
+    profile: SimProfile,
+    visited: MutableSet<Any>,
+    depth: Int
+) {
+    if (serviceState == null || depth > MAX_REWRITE_DEPTH || !visited.add(serviceState)) return
 
     setFieldValueIfExists(serviceState, "mOperatorAlphaLong", profile.alphaLong)
     setFieldValueIfExists(serviceState, "mOperatorAlphaShort", profile.alphaShort)
@@ -56,10 +68,12 @@ internal fun rewriteServiceState(serviceState: Any?, profile: SimProfile) {
 
     runCatching {
         val networkRegistrationInfos = getFieldValue(serviceState, "mNetworkRegistrationInfos") as? List<*>
-        networkRegistrationInfos?.forEach { rewriteNestedTelephonyObject(it, profile) }
+        networkRegistrationInfos?.forEach {
+            rewriteNestedTelephonyObject(it, profile, visited, depth + 1)
+        }
     }
 
-    rewriteServiceStateNestedLists(serviceState, profile)
+    rewriteServiceStateNestedLists(serviceState, profile, visited, depth + 1)
 
     runCatching {
         HookBridge.callMethod(
@@ -73,12 +87,34 @@ internal fun rewriteServiceState(serviceState: Any?, profile: SimProfile) {
 }
 
 internal fun rewriteNestedTelephonyObject(value: Any?, profile: SimProfile) {
+    val visited = Collections.newSetFromMap(IdentityHashMap<Any, Boolean>())
+    rewriteNestedTelephonyObject(value, profile, visited, 0)
+}
+
+private fun rewriteNestedTelephonyObject(
+    value: Any?,
+    profile: SimProfile,
+    visited: MutableSet<Any>,
+    depth: Int
+) {
+    if (value == null || depth > MAX_REWRITE_DEPTH) return
+    if (value.javaClass.name.startsWith("android.telephony.ServiceState")) {
+        rewriteServiceState(value, profile, visited, depth)
+        return
+    }
+    if (!visited.add(value)) return
+
     when (value) {
-        null -> return
-        is Iterable<*> -> value.forEach { rewriteNestedTelephonyObject(it, profile) }
-        is Array<*> -> value.forEach { rewriteNestedTelephonyObject(it, profile) }
-        is Map<*, *> -> value.values.forEach { rewriteNestedTelephonyObject(it, profile) }
-        else -> rewriteKnownTelephonyObject(value, profile)
+        is Iterable<*> -> value.forEach {
+            rewriteNestedTelephonyObject(it, profile, visited, depth + 1)
+        }
+        is Array<*> -> value.forEach {
+            rewriteNestedTelephonyObject(it, profile, visited, depth + 1)
+        }
+        is Map<*, *> -> value.values.forEach {
+            rewriteNestedTelephonyObject(it, profile, visited, depth + 1)
+        }
+        else -> rewriteKnownTelephonyObject(value, profile, visited, depth)
     }
 }
 
@@ -139,7 +175,12 @@ internal fun rewriteTelephonyDebugString(value: String, profile: SimProfile): St
     }
 }
 
-private fun rewriteServiceStateNestedLists(serviceState: Any, profile: SimProfile) {
+private fun rewriteServiceStateNestedLists(
+    serviceState: Any,
+    profile: SimProfile,
+    visited: MutableSet<Any>,
+    depth: Int
+) {
     listOf(
         "mNetworkRegistrationInfos",
         "mCellIdentityList",
@@ -147,17 +188,17 @@ private fun rewriteServiceStateNestedLists(serviceState: Any, profile: SimProfil
         "mCellInfo",
         "mOperatorInfo"
     ).forEach { fieldName ->
-        rewriteNestedTelephonyObject(getFieldValue(serviceState, fieldName), profile)
+        rewriteNestedTelephonyObject(getFieldValue(serviceState, fieldName), profile, visited, depth)
     }
 }
 
-private fun rewriteKnownTelephonyObject(value: Any, profile: SimProfile) {
+private fun rewriteKnownTelephonyObject(
+    value: Any,
+    profile: SimProfile,
+    visited: MutableSet<Any>,
+    depth: Int
+) {
     val className = value.javaClass.name
-    if (className.startsWith("android.telephony.ServiceState")) {
-        rewriteServiceState(value, profile)
-        return
-    }
-
     if (!className.startsWith("android.telephony.NetworkRegistrationInfo") &&
         !className.startsWith("android.telephony.CellInfo") &&
         !className.startsWith("android.telephony.CellIdentity") &&
@@ -180,7 +221,7 @@ private fun rewriteKnownTelephonyObject(value: Any, profile: SimProfile) {
                 field.isAccessible = true
                 val child = field.get(value)
                 if (child != null && child !== value && !child.javaClass.isPrimitive) {
-                    rewriteNestedTelephonyObject(child, profile)
+                    rewriteNestedTelephonyObject(child, profile, visited, depth + 1)
                 }
             }
         }
@@ -194,3 +235,5 @@ private fun replaceDebugField(value: String, fieldName: String, replacement: Str
         match.groupValues[1] + replacement
     }
 }
+
+private const val MAX_REWRITE_DEPTH = 8
