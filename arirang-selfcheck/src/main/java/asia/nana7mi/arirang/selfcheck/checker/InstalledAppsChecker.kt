@@ -196,7 +196,7 @@ class InstalledAppsChecker : SelfChecker {
                 }
                 if (uidExtra.isNotEmpty()) {
                     appendLine()
-                    appendLine("--- getPackagesForUid ⭐ Attack Surface ---")
+                    appendLine("--- getPackagesForUid ---")
                     appendLine("Found ${uidExtra.size} packages NOT returned by getInstalledApplications:")
                     uidExtra.take(30).forEach { appendLine(it) }
                     if (uidExtra.size > 30) appendLine("... and ${uidExtra.size - 30} more")
