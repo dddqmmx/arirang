@@ -6,7 +6,10 @@ Review date: 2026-06-29
 
 ## P0 Critical
 
-No P0 issue found in this pass.
+- [x] Fail open for unresolvable package-list callers (isolated/sandboxed UIDs).
+  - File: `packagelist/PackageListHookConfig.kt:63`
+  - Impact: `shouldKeepForPackages()` returned `false` when `getPackagesForUid()` resolved the caller to an empty set. Isolated/sandboxed UIDs (Chrome/WebView renderer sandboxes, GMS chimera `IsolatedBoundBrokerService`) never resolve to packages, so every package — including the caller's own — was hidden from them whenever the feature was enabled, regardless of rules. Confirmed on device: 114 dropbox crashes (81 Chrome, 29 WebView, 3 GMS chimera) with `IllegalStateException: Unable to get package info for <own package>; is package not installed?` from `LoadedApk.initializeJavaContextClassLoader()`.
+  - Fix: return `true` when the caller package set is empty (found via on-device diagnosis 2026-07-18).
 
 ## P1 High
 

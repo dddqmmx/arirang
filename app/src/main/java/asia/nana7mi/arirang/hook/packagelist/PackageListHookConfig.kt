@@ -60,7 +60,11 @@ internal class PackageListHookConfig(private val prefsName: String) {
         if (Math.floorMod(callingUid, PER_USER_RANGE) < 10000) return true
         if (targetPackage == "android" || targetPackage == BuildConfig.APPLICATION_ID) return true
 
-        if (callingPackages.isEmpty()) return false
+        // Callers whose UID resolves to no package (isolated/sandboxed processes such as
+        // Chrome/WebView renderer sandboxes and GMS chimera containers) must fail open.
+        // Failing closed hides every package from them, including their own, which crashes
+        // the process during app startup (LoadedApk.initializeJavaContextClassLoader).
+        if (callingPackages.isEmpty()) return true
         if (BuildConfig.APPLICATION_ID in callingPackages) return true
         if (targetPackage in callingPackages) return true
 
