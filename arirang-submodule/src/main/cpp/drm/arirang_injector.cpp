@@ -17,6 +17,11 @@
 //      the dlopen() return value.
 //   5. Restore registers, PTRACE_DETACH.
 //
+// Every step from PTRACE_ATTACH onward is guarded by PtraceGuard: whatever
+// register/memory state has been saved so far is restored and the tracee is
+// detached on any exit from do_inject(), success or failure alike, instead
+// of relying on manual cleanup duplicated at each error site.
+//
 // Errors are reported on stderr and propagated as non-zero exit codes.
 
 #include <cerrno>
@@ -28,7 +33,6 @@
 #include <elf.h>
 #include <fcntl.h>
 #include <link.h>
-#include <linux/uio.h>
 #include <string>
 #include <sys/mman.h>
 #include <sys/ptrace.h>
@@ -48,16 +52,6 @@ constexpr const char *kLinkerNames[] = {
     "/apex/com.android.runtime/bin/linker64",
     nullptr,
 };
-
-void die(const char *msg) {
-    std::fprintf(stderr, "[arirang_injector] %s: %s\n", msg, std::strerror(errno));
-    std::exit(2);
-}
-
-void die_no_errno(const char *msg) {
-    std::fprintf(stderr, "[arirang_injector] %s\n", msg);
-    std::exit(2);
-}
 
 struct MapEntry {
     uintptr_t start;
@@ -118,6 +112,43 @@ std::vector<MapEntry> read_maps(pid_t pid) {
     return out;
 }
 
+// Mirrors module/service.sh's arirang_pid_start_time(): strip through the
+// LAST ") " in the stat line (comm can itself contain ')'), then take the
+// 20th whitespace-separated field of the remainder, which is proc(5)'s
+// starttime field (field 22 of the whole line). Used to re-verify identity
+// after PTRACE_ATTACH has stopped the process.
+bool read_pid_start_time(pid_t pid, long long *out) {
+    char path[64];
+    std::snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+    const std::string content = read_file(path);
+    if (content.empty()) return false;
+
+    const size_t rparen = content.rfind(") ");
+    if (rparen == std::string::npos) return false;
+    const std::string remainder = content.substr(rparen + 2);
+
+    size_t pos = 0;
+    std::string field;
+    for (int i = 0; i < 20; ++i) {
+        while (pos < remainder.size() && (remainder[pos] == ' ' || remainder[pos] == '\t')) ++pos;
+        const size_t start = pos;
+        while (pos < remainder.size() && remainder[pos] != ' ' && remainder[pos] != '\t') ++pos;
+        if (start == pos) return false;
+        field = remainder.substr(start, pos - start);
+    }
+    if (field.empty()) return false;
+    for (char c : field) {
+        if (c < '0' || c > '9') return false;
+    }
+
+    errno = 0;
+    char *end = nullptr;
+    const long long value = std::strtoll(field.c_str(), &end, 10);
+    if (errno != 0 || end == field.c_str() || *end != '\0') return false;
+    *out = value;
+    return true;
+}
+
 const MapEntry *find_first_executable(const std::vector<MapEntry> &maps,
                                        const char *substr) {
     for (const auto &e : maps) {
@@ -128,6 +159,10 @@ const MapEntry *find_first_executable(const std::vector<MapEntry> &maps,
     return nullptr;
 }
 
+// Returns 0 on failure (never a valid resolved symbol address). Only reads
+// local process info and the target's /proc/<pid>/maps; does not touch
+// target registers or memory, so it is safe to call without any ptrace
+// cleanup obligations of its own.
 uintptr_t resolve_dlopen_in_target(pid_t pid) {
     auto maps = read_maps(pid);
 
@@ -135,27 +170,29 @@ uintptr_t resolve_dlopen_in_target(pid_t pid) {
     // into the target process. Android's linker is mapped at a different base
     // per process, but the relative offset of dlopen inside the same linker
     // image is stable.
-    void* sym_addr = dlsym(RTLD_DEFAULT, "dlopen");
+    void *sym_addr = dlsym(RTLD_DEFAULT, "dlopen");
     if (!sym_addr) {
-        die_no_errno("dlsym(RTLD_DEFAULT, dlopen) failed");
+        std::fprintf(stderr, "[arirang_injector] dlsym(RTLD_DEFAULT, dlopen) failed\n");
+        return 0;
     }
 
     Dl_info info;
     if (!dladdr(sym_addr, &info)) {
-        die_no_errno("dladdr failed for dlopen");
+        std::fprintf(stderr, "[arirang_injector] dladdr failed for dlopen\n");
+        return 0;
     }
 
     uintptr_t local_base = reinterpret_cast<uintptr_t>(info.dli_fbase);
     uintptr_t local_offset = reinterpret_cast<uintptr_t>(sym_addr) - local_base;
 
-    const char* basename = std::strrchr(info.dli_fname, '/');
+    const char *basename = std::strrchr(info.dli_fname, '/');
     basename = basename ? basename + 1 : info.dli_fname;
 
-    const MapEntry* remote = nullptr;
+    const MapEntry *remote = nullptr;
     // Prefer the same mapped object that supplied our local dlopen. On Android
     // this is normally linker64 or the runtime APEX linker. If basename lookup
     // fails due to path differences, fall back to known linker paths.
-    for (const auto& e : maps) {
+    for (const auto &e : maps) {
         if (e.path.find(basename) != std::string::npos) {
             if (!remote || e.start < remote->start) {
                 remote = &e;
@@ -167,7 +204,11 @@ uintptr_t resolve_dlopen_in_target(pid_t pid) {
         for (const char *const *name = kLinkerNames; *name != nullptr && !remote; ++name) {
             remote = find_first_executable(maps, *name);
         }
-        if (!remote) die_no_errno("could not find module containing dlopen in target maps");
+        if (!remote) {
+            std::fprintf(stderr,
+                         "[arirang_injector] could not find module containing dlopen in target maps\n");
+            return 0;
+        }
     }
 
     uintptr_t remote_sym = remote->start + local_offset;
@@ -180,101 +221,198 @@ uintptr_t resolve_dlopen_in_target(pid_t pid) {
     return remote_sym;
 }
 
-const MapEntry *find_rw_scratch(const std::vector<MapEntry> &maps) {
+// Requires every candidate region to hold at least path_len + 0x100 bytes so
+// the caller's `end - 0x100 - path_len` computation can never underflow,
+// regardless of which branch below selects the region.
+const MapEntry *find_rw_scratch(const std::vector<MapEntry> &maps, size_t path_len) {
+    const size_t floor = path_len + 0x100;
+    const size_t fallback_floor = floor > 4096 ? floor : 4096;
+
     // Reuse existing writable memory instead of making a remote mmap call.
     // That keeps the remote call setup to a single dlopen invocation and avoids
     // needing to resolve two libc/linker symbols in the target.
     for (const auto &e : maps) {
         if (e.perms[0] == 'r' && e.perms[1] == 'w' &&
-            e.path.find("[anon:libc_malloc]") != std::string::npos) {
+            e.path.find("[anon:libc_malloc]") != std::string::npos &&
+            (e.end - e.start) >= floor) {
             return &e;
         }
     }
-    // Fallback: any rw anonymous region with size >= 256 bytes.
+    // Fallback: any sufficiently large rw anonymous region.
     for (const auto &e : maps) {
         if (e.perms[0] == 'r' && e.perms[1] == 'w' &&
-            (e.end - e.start) >= 4096) {
+            (e.end - e.start) >= fallback_floor) {
             return &e;
         }
     }
     return nullptr;
 }
 
-void ptrace_write_memory(pid_t pid, uintptr_t addr, const void *buf, size_t len) {
+bool ptrace_write_memory(pid_t pid, uintptr_t addr, const void *buf, size_t len) {
     iovec local{const_cast<void *>(buf), len};
     iovec remote{reinterpret_cast<void *>(addr), len};
     ssize_t written = process_vm_writev(pid, &local, 1, &remote, 1, 0);
-    if (written < 0 || static_cast<size_t>(written) != len) {
-        die("process_vm_writev");
-    }
+    return written >= 0 && static_cast<size_t>(written) == len;
 }
 
-void ptrace_read_memory(pid_t pid, uintptr_t addr, void *buf, size_t len) {
+bool ptrace_read_memory(pid_t pid, uintptr_t addr, void *buf, size_t len) {
     iovec local{buf, len};
     iovec remote{reinterpret_cast<void *>(addr), len};
     ssize_t got = process_vm_readv(pid, &local, 1, &remote, 1, 0);
-    if (got < 0 || static_cast<size_t>(got) != len) {
-        die("process_vm_readv");
-    }
+    return got >= 0 && static_cast<size_t>(got) == len;
 }
 
-void wait_for_stop(pid_t pid, const char *what) {
+enum class WaitOutcome { kStopped, kExited, kWaitFailed };
+
+WaitOutcome wait_for_stop(pid_t pid) {
     int status = 0;
     while (true) {
         pid_t w = waitpid(pid, &status, __WALL);
         if (w < 0) {
             if (errno == EINTR) continue;
-            die("waitpid");
+            return WaitOutcome::kWaitFailed;
         }
-        if (WIFSTOPPED(status)) return;
-        if (WIFEXITED(status) || WIFSIGNALED(status)) {
-            std::fprintf(stderr, "[arirang_injector] target died during %s\n", what);
-            std::exit(3);
-        }
+        if (WIFSTOPPED(status)) return WaitOutcome::kStopped;
+        if (WIFEXITED(status) || WIFSIGNALED(status)) return WaitOutcome::kExited;
     }
 }
 
-void get_regs(pid_t pid, user_regs_struct *regs) {
+bool get_regs(pid_t pid, user_regs_struct *regs) {
     iovec iov{regs, sizeof(*regs)};
-    if (ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &iov) < 0) die("PTRACE_GETREGSET");
+    return ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &iov) >= 0;
 }
 
-void set_regs(pid_t pid, user_regs_struct *regs) {
+bool set_regs(pid_t pid, user_regs_struct *regs) {
     iovec iov{regs, sizeof(*regs)};
-    if (ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &iov) < 0) die("PTRACE_SETREGSET");
+    return ptrace(PTRACE_SETREGSET, pid, NT_PRSTATUS, &iov) >= 0;
 }
 
-int do_inject(pid_t pid, const char *so_path) {
-    if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) die("PTRACE_ATTACH");
-    wait_for_stop(pid, "attach");
+// Restores whatever register/scratch-memory state has been recorded so far
+// and detaches, on ANY exit from do_inject() (success, error return, or an
+// exception unwind). This replaces the previous pattern of calling
+// exit()/die() directly from deep call sites, which skipped this cleanup
+// entirely and could leave a live, system-critical daemon's registers
+// pointed mid-call at dlopen with no restore and no detach.
+class PtraceGuard {
+public:
+    explicit PtraceGuard(pid_t pid) : pid_(pid) {}
+    PtraceGuard(const PtraceGuard &) = delete;
+    PtraceGuard &operator=(const PtraceGuard &) = delete;
 
-    // Registers and scratch bytes are restored even if dlopen returns NULL.
-    // The only lasting side effect intended here is the dynamic library mapping
-    // created by a successful dlopen.
+    ~PtraceGuard() {
+        if (!attached_) return;
+        // Best-effort: if the target has already died, these all fail
+        // harmlessly (ESRCH) and PTRACE_DETACH below is a no-op as well.
+        if (scratch_saved_) {
+            iovec local{scratch_bytes_.data(), scratch_bytes_.size()};
+            iovec remote{reinterpret_cast<void *>(scratch_addr_), scratch_bytes_.size()};
+            process_vm_writev(pid_, &local, 1, &remote, 1, 0);
+        }
+        if (regs_saved_) {
+            iovec iov{&saved_regs_, sizeof(saved_regs_)};
+            ptrace(PTRACE_SETREGSET, pid_, NT_PRSTATUS, &iov);
+        }
+        ptrace(PTRACE_DETACH, pid_, 0, 0);
+    }
+
+    void mark_attached() { attached_ = true; }
+
+    void save_regs(const user_regs_struct &regs) {
+        saved_regs_ = regs;
+        regs_saved_ = true;
+    }
+
+    void save_scratch(uintptr_t addr, std::vector<uint8_t> bytes) {
+        scratch_addr_ = addr;
+        scratch_bytes_ = std::move(bytes);
+        scratch_saved_ = true;
+    }
+
+private:
+    pid_t pid_;
+    bool attached_ = false;
+    bool regs_saved_ = false;
+    bool scratch_saved_ = false;
+    user_regs_struct saved_regs_{};
+    uintptr_t scratch_addr_ = 0;
+    std::vector<uint8_t> scratch_bytes_;
+};
+
+int do_inject(pid_t pid, const char *so_path, const long long *expected_start_time) {
+    if (ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) {
+        std::fprintf(stderr, "[arirang_injector] PTRACE_ATTACH: %s\n", std::strerror(errno));
+        return 2;
+    }
+    PtraceGuard guard(pid);
+    guard.mark_attached();
+
+    const WaitOutcome attach_wait = wait_for_stop(pid);
+    if (attach_wait == WaitOutcome::kExited) {
+        std::fprintf(stderr, "[arirang_injector] target died during attach\n");
+        return 3;
+    }
+    if (attach_wait == WaitOutcome::kWaitFailed) {
+        std::fprintf(stderr, "[arirang_injector] waitpid: %s\n", std::strerror(errno));
+        return 2;
+    }
+
+    // The shell caller (module/service.sh) verifies process identity/start
+    // time immediately before exec, but a PID can still be reused by an
+    // unrelated process in the window before PTRACE_ATTACH actually stops
+    // it. When the caller supplies the expected start time, repeat the
+    // check now that the process is guaranteed stopped.
+    if (expected_start_time != nullptr) {
+        long long actual_start = 0;
+        if (!read_pid_start_time(pid, &actual_start) || actual_start != *expected_start_time) {
+            std::fprintf(stderr,
+                         "[arirang_injector] pid start time changed after attach; aborting\n");
+            return 6;
+        }
+    }
+
+    // Registers and scratch bytes are restored by PtraceGuard even if dlopen
+    // returns NULL. The only lasting side effect intended here is the
+    // dynamic library mapping created by a successful dlopen.
     user_regs_struct saved{};
-    get_regs(pid, &saved);
+    if (!get_regs(pid, &saved)) {
+        std::fprintf(stderr, "[arirang_injector] PTRACE_GETREGSET: %s\n", std::strerror(errno));
+        return 2;
+    }
+    guard.save_regs(saved);
 
     auto maps = read_maps(pid);
-    const MapEntry *scratch = find_rw_scratch(maps);
+    const size_t path_len = std::strlen(so_path) + 1;
+    const MapEntry *scratch = find_rw_scratch(maps, path_len);
     if (scratch == nullptr) {
-        ptrace(PTRACE_DETACH, pid, 0, 0);
-        die_no_errno("could not find rw scratch region in target");
+        std::fprintf(stderr, "[arirang_injector] could not find rw scratch region in target\n");
+        return 2;
     }
     // Use the END of the rw region (minus a buffer) for our string. Less
-    // likely to collide with active allocations.
-    const size_t path_len = std::strlen(so_path) + 1;
+    // likely to collide with active allocations. find_rw_scratch() already
+    // guarantees the region is large enough that this cannot underflow.
     const uintptr_t string_addr = scratch->end - 0x100 - path_len;
     if (string_addr < scratch->start) {
-        ptrace(PTRACE_DETACH, pid, 0, 0);
-        die_no_errno("scratch region too small");
+        std::fprintf(stderr, "[arirang_injector] scratch region too small\n");
+        return 2;
     }
 
     // Save original bytes so we can restore them after the call.
     std::vector<uint8_t> saved_bytes(path_len);
-    ptrace_read_memory(pid, string_addr, saved_bytes.data(), path_len);
-    ptrace_write_memory(pid, string_addr, so_path, path_len);
+    if (!ptrace_read_memory(pid, string_addr, saved_bytes.data(), path_len)) {
+        std::fprintf(stderr, "[arirang_injector] process_vm_readv: %s\n", std::strerror(errno));
+        return 2;
+    }
+    if (!ptrace_write_memory(pid, string_addr, so_path, path_len)) {
+        std::fprintf(stderr, "[arirang_injector] process_vm_writev: %s\n", std::strerror(errno));
+        return 2;
+    }
+    guard.save_scratch(string_addr, saved_bytes);
 
     const uintptr_t dlopen_addr = resolve_dlopen_in_target(pid);
+    if (dlopen_addr == 0) {
+        std::fprintf(stderr, "[arirang_injector] failed to resolve dlopen in target\n");
+        return 2;
+    }
 
     user_regs_struct regs = saved;
     regs.regs[0] = string_addr;       // x0 = path
@@ -288,27 +426,42 @@ int do_inject(pid_t pid, const char *so_path) {
     // Realign SP to 16 bytes (AArch64 ABI requirement).
     regs.sp &= ~static_cast<uint64_t>(0xF);
 
-    set_regs(pid, &regs);
+    if (!set_regs(pid, &regs)) {
+        std::fprintf(stderr, "[arirang_injector] PTRACE_SETREGSET: %s\n", std::strerror(errno));
+        return 2;
+    }
 
     // We do not plant a breakpoint instruction. LR=0 makes the remote call
     // fault after dlopen returns, which gives us a reliable stop point while
     // leaving target code pages untouched.
-    if (ptrace(PTRACE_CONT, pid, 0, 0) < 0) die("PTRACE_CONT");
-    wait_for_stop(pid, "remote call");
+    if (ptrace(PTRACE_CONT, pid, 0, 0) < 0) {
+        std::fprintf(stderr, "[arirang_injector] PTRACE_CONT: %s\n", std::strerror(errno));
+        return 2;
+    }
+
+    const WaitOutcome call_wait = wait_for_stop(pid);
+    if (call_wait == WaitOutcome::kExited) {
+        std::fprintf(stderr, "[arirang_injector] target died during remote call\n");
+        return 3;
+    }
+    if (call_wait == WaitOutcome::kWaitFailed) {
+        std::fprintf(stderr, "[arirang_injector] waitpid: %s\n", std::strerror(errno));
+        return 2;
+    }
 
     user_regs_struct after{};
-    get_regs(pid, &after);
+    if (!get_regs(pid, &after)) {
+        std::fprintf(stderr, "[arirang_injector] PTRACE_GETREGSET (post-call): %s\n",
+                     std::strerror(errno));
+        return 2;
+    }
     const uintptr_t dl_result = static_cast<uintptr_t>(after.regs[0]);
     std::fprintf(stderr, "[arirang_injector] dlopen returned 0x%lx (pc=0x%llx)\n",
                  (unsigned long)dl_result,
                  (unsigned long long)after.pc);
 
-    // Restore scratch bytes and original registers.
-    ptrace_write_memory(pid, string_addr, saved_bytes.data(), path_len);
-    set_regs(pid, &saved);
-
-    if (ptrace(PTRACE_DETACH, pid, 0, 0) < 0) die("PTRACE_DETACH");
-
+    // Falling out of scope here runs PtraceGuard's destructor, which
+    // restores the saved scratch bytes and registers and detaches.
     if (dl_result == 0) {
         std::fprintf(stderr, "[arirang_injector] dlopen returned NULL\n");
         return 4;
@@ -343,7 +496,7 @@ int do_config(const char *path, const char *key) {
 int main(int argc, char **argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage:\n");
-        std::fprintf(stderr, "  %s <pid> <absolute-path-to-.so>\n", argv[0]);
+        std::fprintf(stderr, "  %s <pid> <absolute-path-to-.so> [expected-start-time]\n", argv[0]);
         std::fprintf(stderr, "  %s config <path> <key>\n", argv[0]);
         return 1;
     }
@@ -356,8 +509,9 @@ int main(int argc, char **argv) {
         return do_config(argv[2], argv[3]);
     }
 
-    if (argc != 3) {
-        std::fprintf(stderr, "usage: %s <pid> <absolute-path-to-.so>\n", argv[0]);
+    if (argc != 3 && argc != 4) {
+        std::fprintf(stderr, "usage: %s <pid> <absolute-path-to-.so> [expected-start-time]\n",
+                     argv[0]);
         return 1;
     }
 
@@ -367,5 +521,30 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "invalid pid\n");
         return 1;
     }
-    return do_inject(pid, path);
+
+    long long expected_start = 0;
+    const long long *expected_start_ptr = nullptr;
+    if (argc == 4) {
+        const char *start_str = argv[3];
+        if (*start_str == '\0') {
+            std::fprintf(stderr, "invalid start time argument\n");
+            return 1;
+        }
+        for (const char *p = start_str; *p != '\0'; ++p) {
+            if (*p < '0' || *p > '9') {
+                std::fprintf(stderr, "invalid start time argument\n");
+                return 1;
+            }
+        }
+        errno = 0;
+        char *end = nullptr;
+        expected_start = std::strtoll(start_str, &end, 10);
+        if (errno != 0 || end == start_str || *end != '\0') {
+            std::fprintf(stderr, "invalid start time argument\n");
+            return 1;
+        }
+        expected_start_ptr = &expected_start;
+    }
+
+    return do_inject(pid, path, expected_start_ptr);
 }

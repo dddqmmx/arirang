@@ -16,6 +16,7 @@
 // instruction encodings. It will NOT work on x86, x86_64, or ARM32.
 
 #include "drm_hook_entry.hpp"
+#include "drm_symbol_classifier.hpp"
 #include "logging.hpp"
 #include "symbol_resolver.hpp"
 #include "vtable_hook.hpp"
@@ -39,23 +40,7 @@ const char *const kCandidateLibraries[] = {
     nullptr,
 };
 
-bool symbol_is_hidl_target(const std::string &mangled) {
-    return mangled.find("11hidl_string") != std::string::npos &&
-           mangled.find("8function") != std::string::npos &&
-           mangled.find("8hidl_vec") != std::string::npos;
-}
-
-bool symbol_is_aidl_target(const std::string &mangled) {
-    return mangled.find("basic_string") != std::string::npos &&
-           mangled.find("vector") != std::string::npos &&
-           !symbol_is_hidl_target(mangled);
-}
-
 } // anonymous namespace
-
-extern "C" void *g_trampoline;
-extern "C" void *g_hidl_trampoline;
-extern const char *g_hook_method;
 
 namespace drm_vtable {
 
@@ -73,18 +58,24 @@ bool install_hook_in_library(const char *library_path) {
 
     for (auto &sym : symbols) {
         void *hook = nullptr;
-        void **trampoline_slot = nullptr;
+        int hidl = 0;
         const char *flavor = nullptr;
-        if (symbol_is_aidl_target(sym.name)) {
+        const drm::HookAbi abi =
+            drm::classify_get_property_byte_array(library_path, sym.name);
+        if (abi == drm::HookAbi::kAidl) {
             hook = arirang_drm_aidl_entry_get();
-            trampoline_slot = &g_trampoline;
             flavor = "AIDL";
-        } else if (symbol_is_hidl_target(sym.name)) {
+        } else if (abi == drm::HookAbi::kHidl) {
             hook = arirang_drm_hidl_hook_get();
-            trampoline_slot = &g_hidl_trampoline;
+            hidl = 1;
             flavor = "HIDL";
         }
         if (hook == nullptr) continue;
+
+        // The vtable store can become visible to another HAL thread before
+        // vtable_hook_install returns. Publish the original first so the hook
+        // can always call through safely.
+        arirang_drm_publish_original(hidl, sym.address);
 
         std::vector<arirang::VtablePatch> patches;
         if (!arirang::vtable_hook_install(library_path, sym.name.c_str(),
@@ -94,10 +85,12 @@ bool install_hook_in_library(const char *library_path) {
             continue;
         }
 
-        if (!patches.empty()) {
-            *trampoline_slot = patches[0].original_function;
+        if (!patches.empty() && patches[0].original_function != sym.address) {
+            arirang::vtable_hook_uninstall(patches);
+            arirang::log_warn("drm_vtable: original slot did not match resolved symbol");
+            continue;
         }
-        g_hook_method = "vtable";
+        arirang_drm_publish_hook_method("vtable");
         __android_log_print(ANDROID_LOG_INFO, "ArirangDrmHook",
                             "vtable hook success for %s %s", flavor, sym.name.c_str());
         arirang::log_info(std::string("drm_vtable: hooked ") + flavor +
@@ -110,7 +103,7 @@ bool install_hook_in_library(const char *library_path) {
     return false;
 }
 
-void *poll_libraries() {
+bool poll_libraries() {
     for (int attempt = 0; attempt < 120; ++attempt) {
         for (const char *const *p = kCandidateLibraries; *p != nullptr; ++p) {
             const char *path = *p;
@@ -121,13 +114,13 @@ void *poll_libraries() {
             dlclose(handle);
 
             if (install_hook_in_library(path)) {
-                return nullptr;
+                return true;
             }
         }
         usleep(500 * 1000);
     }
     arirang::log_warn("drm_vtable: Widevine plugin .so never appeared; giving up");
-    return nullptr;
+    return false;
 }
 
 } // namespace drm_vtable

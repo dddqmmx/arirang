@@ -75,6 +75,26 @@ const Elf64_Dyn *find_dynamic_segment(const dl_phdr_info *info, uintptr_t load_b
     return nullptr;
 }
 
+// GNU hash 表的字段值（nbuckets/symoffset/bloom_size 及派生的 buckets/chain
+// 地址）来自被扫描目标的内存，不受我们控制。在解引用前确认整段地址范围落在
+// 某个 PT_LOAD 段内，防止损坏或恶意构造的 ELF 让哈希表遍历越过已映射内存。
+bool address_range_in_load_segment(const dl_phdr_info *info,
+                                   uintptr_t load_base,
+                                   uintptr_t addr,
+                                   size_t length) {
+    if (length == 0 || addr > UINTPTR_MAX - length) return false;
+
+    for (uint16_t i = 0; i < info->dlpi_phnum; ++i) {
+        if (info->dlpi_phdr[i].p_type != PT_LOAD) continue;
+
+        const uintptr_t seg_start = load_base + info->dlpi_phdr[i].p_vaddr;
+        const uintptr_t seg_end = seg_start + info->dlpi_phdr[i].p_memsz;
+        if (addr >= seg_start && addr + length <= seg_end) return true;
+    }
+
+    return false;
+}
+
 uint32_t largest_gnu_hash_bucket(const uint32_t *buckets, uint32_t nbuckets) {
     uint32_t last_symbol = 0;
     for (uint32_t i = 0; i < nbuckets; ++i) {
@@ -86,9 +106,19 @@ uint32_t largest_gnu_hash_bucket(const uint32_t *buckets, uint32_t nbuckets) {
 
 size_t count_gnu_hash_chain_symbols(const uint32_t *chain,
                                     uint32_t symoffset,
-                                    uint32_t last_symbol) {
+                                    uint32_t last_symbol,
+                                    const dl_phdr_info *info,
+                                    uintptr_t load_base) {
     for (size_t scanned = 0; scanned <= kMaxSymbolsScanned; ++scanned) {
-        if (chain[last_symbol - symoffset] & 1u) return static_cast<size_t>(last_symbol) + 1;
+        const uint32_t chain_index = last_symbol - symoffset;
+        const auto *entry = chain + chain_index;
+        if (!address_range_in_load_segment(info, load_base,
+                                           reinterpret_cast<uintptr_t>(entry),
+                                           sizeof(uint32_t))) {
+            log_warn("symbol_resolver: gnu_hash chain walk left mapped segment");
+            return 0;
+        }
+        if (*entry & 1u) return static_cast<size_t>(last_symbol) + 1;
 
         ++last_symbol;
     }
@@ -96,27 +126,42 @@ size_t count_gnu_hash_chain_symbols(const uint32_t *chain,
     return 0;
 }
 
-size_t symbol_count_from_gnu_hash(const Elf64_Dyn *dyn, uintptr_t load_base) {
+size_t symbol_count_from_gnu_hash(const Elf64_Dyn *dyn,
+                                  const dl_phdr_info *info,
+                                  uintptr_t load_base) {
     const Elf64_Dyn *gnu_hash = find_dynamic_entry(dyn, DT_GNU_HASH);
     if (gnu_hash == nullptr) return 0;
 
     // GNU hash 没有直接保存符号总数，只能从 bucket 最大符号下标继续沿
     // chain 走到最低 bit 为 1 的结尾项。这里最多扫描 kMaxSymbolsScanned
-    // 个 chain 项，防止损坏 ELF 让我们越走越远。
+    // 个 chain 项，防止损坏 ELF 让我们越走越远。所有地址在解引用前都会
+    // 先确认落在某个 PT_LOAD 段内，避免损坏的哈希表把遍历带出映射范围。
     const auto *hash = reinterpret_cast<const uint32_t *>(
         rebase_dynamic_pointer(load_base, gnu_hash->d_un.d_ptr));
+    if (!address_range_in_load_segment(info, load_base,
+                                       reinterpret_cast<uintptr_t>(hash),
+                                       3 * sizeof(uint32_t))) {
+        log_warn("symbol_resolver: gnu_hash header outside mapped segment");
+        return 0;
+    }
     const uint32_t nbuckets = hash[0];
     const uint32_t symoffset = hash[1];
     const uint32_t bloom_size = hash[2];
     if (nbuckets == 0) return 0;
 
     const auto *buckets = reinterpret_cast<const uint32_t *>(
-        reinterpret_cast<uintptr_t>(hash) + 16 + 8 * bloom_size);
+        reinterpret_cast<uintptr_t>(hash) + 16 + 8 * static_cast<uintptr_t>(bloom_size));
+    if (!address_range_in_load_segment(info, load_base,
+                                       reinterpret_cast<uintptr_t>(buckets),
+                                       static_cast<size_t>(nbuckets) * sizeof(uint32_t))) {
+        log_warn("symbol_resolver: gnu_hash buckets outside mapped segment");
+        return 0;
+    }
     const auto *chain = buckets + nbuckets;
     const uint32_t last_symbol = largest_gnu_hash_bucket(buckets, nbuckets);
     if (last_symbol < symoffset) return 0;
 
-    return count_gnu_hash_chain_symbols(chain, symoffset, last_symbol);
+    return count_gnu_hash_chain_symbols(chain, symoffset, last_symbol, info, load_base);
 }
 
 size_t symbol_count_from_sysv_hash(const Elf64_Dyn *dyn, uintptr_t load_base) {
@@ -129,14 +174,15 @@ size_t symbol_count_from_sysv_hash(const Elf64_Dyn *dyn, uintptr_t load_base) {
     return hdr[1];
 }
 
-size_t resolve_symbol_count(const Elf64_Dyn *dyn, uintptr_t load_base) {
-    const size_t gnu_count = symbol_count_from_gnu_hash(dyn, load_base);
+size_t resolve_symbol_count(const Elf64_Dyn *dyn, const dl_phdr_info *info, uintptr_t load_base) {
+    const size_t gnu_count = symbol_count_from_gnu_hash(dyn, info, load_base);
     if (gnu_count != 0) return gnu_count;
 
     return symbol_count_from_sysv_hash(dyn, load_base);
 }
 
-bool load_symbol_tables(const Elf64_Dyn *dyn, uintptr_t load_base, SymbolTables *out) {
+bool load_symbol_tables(const Elf64_Dyn *dyn, const dl_phdr_info *info, uintptr_t load_base,
+                        SymbolTables *out) {
     const Elf64_Dyn *sym_entry = find_dynamic_entry(dyn, DT_SYMTAB);
     const Elf64_Dyn *str_entry = find_dynamic_entry(dyn, DT_STRTAB);
     if (sym_entry == nullptr || str_entry == nullptr) {
@@ -148,7 +194,7 @@ bool load_symbol_tables(const Elf64_Dyn *dyn, uintptr_t load_base, SymbolTables 
         rebase_dynamic_pointer(load_base, sym_entry->d_un.d_ptr));
     out->strings = reinterpret_cast<const char *>(
         rebase_dynamic_pointer(load_base, str_entry->d_un.d_ptr));
-    out->count = resolve_symbol_count(dyn, load_base);
+    out->count = resolve_symbol_count(dyn, info, load_base);
     if (out->count != 0 && out->count <= kMaxSymbolsScanned) return true;
 
     log_warn(std::string("symbol_resolver: unexpected symbol count=") +
@@ -196,7 +242,7 @@ int phdr_callback(dl_phdr_info *info, size_t /*size*/, void *data) {
     if (dyn == nullptr) return 0;
 
     SymbolTables tables;
-    if (!load_symbol_tables(dyn, load_base, &tables)) return 1;
+    if (!load_symbol_tables(dyn, info, load_base, &tables)) return 1;
 
     collect_matching_symbols(tables, load_base, ctx->substring, ctx->results);
     return 1; // 已处理目标库，停止继续遍历其它 so。

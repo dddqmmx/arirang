@@ -9,11 +9,23 @@
 
 #include <string>
 
+namespace {
+
+// AOSP Process.PHONE_UID / android.uid.phone. Process-name matching alone is
+// insufficient because an untrusted APK can request a misleading nice name.
+constexpr jint kAndroidPhoneUid = 1001;
+
+} // namespace
+
 class ArirangZygisk final : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
         api_ = api;
         env_ = env;
+        if (api_ == nullptr || env_ == nullptr) {
+            arirang::log_warn("onLoad: Zygisk API or JNIEnv unavailable; module disabled for this process");
+            return;
+        }
         // Prefer direct disk config because it is available even if the Zygisk
         // companion socket is unavailable in this implementation. Fall back to
         // the companion for environments where the module process cannot read
@@ -32,11 +44,14 @@ public:
         // Copy it while the JNIEnv/string is still valid; later callbacks only
         // use the cached std::string.
         current_app_process_.clear();
-        if (args != nullptr && args->nice_name != nullptr) {
+        keep_module_loaded_in_app_ = false;
+        if (env_ != nullptr && args != nullptr && args->nice_name != nullptr) {
             const char *nice_name = env_->GetStringUTFChars(args->nice_name, nullptr);
             if (nice_name != nullptr) {
                 current_app_process_ = nice_name;
                 env_->ReleaseStringUTFChars(args->nice_name, nice_name);
+            } else if (env_->ExceptionCheck()) {
+                env_->ExceptionClear();
             }
         }
         
@@ -51,12 +66,14 @@ public:
          * 3. Hooks are reserved EXCLUSIVELY for framework-level components that serve
          *    as data providers (e.g., com.android.phone for SIM/IMEI data).
          */
-        keep_module_loaded_in_app_ = (current_app_process_ == "com.android.phone");
+        keep_module_loaded_in_app_ = args != nullptr &&
+                                     args->uid == kAndroidPhoneUid &&
+                                     current_app_process_ == "com.android.phone";
                                      
         if (!keep_module_loaded_in_app_) {
             // Unload from ordinary app processes immediately after specialization
             // so no native hooks, globals, or background work remain mapped there.
-            api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            if (api_ != nullptr) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
         }
     }
 

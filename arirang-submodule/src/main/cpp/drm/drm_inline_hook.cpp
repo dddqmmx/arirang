@@ -18,6 +18,7 @@
 // and will NOT assemble or work on any other architecture.
 
 #include "drm_hook_entry.hpp"
+#include "drm_symbol_classifier.hpp"
 #include "inline_hook.hpp"
 #include "logging.hpp"
 #include "symbol_resolver.hpp"
@@ -33,7 +34,6 @@ constexpr const char *kSymbolNeedle = "getPropertyByteArray";
 
 extern "C" void *g_trampoline;
 extern "C" void *g_hidl_trampoline;
-extern const char *g_hook_method;
 
 namespace drm_inline {
 
@@ -57,11 +57,10 @@ bool install_hook_in_library(const char *library_path) {
         void **trampoline_slot = nullptr;
         const char *flavor = nullptr;
 
-        bool is_aidl = sym.name.find("basic_string") != std::string::npos &&
-                       sym.name.find("vector") != std::string::npos;
-        bool is_hidl = sym.name.find("11hidl_string") != std::string::npos &&
-                       sym.name.find("8function") != std::string::npos &&
-                       sym.name.find("8hidl_vec") != std::string::npos;
+        const drm::HookAbi abi =
+            drm::classify_get_property_byte_array(library_path, sym.name);
+        const bool is_aidl = abi == drm::HookAbi::kAidl;
+        const bool is_hidl = abi == drm::HookAbi::kHidl;
 
         if (is_aidl) {
             hook = arirang_drm_aidl_entry_get();
@@ -74,23 +73,13 @@ bool install_hook_in_library(const char *library_path) {
         }
         if (hook == nullptr) continue;
 
-        // Strategy 1: absolute-jump trampoline (works at any address range).
-        void *trampoline = nullptr;
-        if (arirang::inline_hook_install(target, hook, &trampoline)) {
-            *trampoline_slot = trampoline;
-            g_hook_method = "inline_abs";
-            arirang::log_info(std::string("drm_inline: absolute-jump trampoline hooked ") +
-                              flavor + " " + sym.name);
-            __android_log_print(ANDROID_LOG_INFO, "ArirangDrmHook",
-                                "inline hook success (abs tramp) for %s %s",
-                                flavor, sym.name.c_str());
-            return true;
-        }
-
-        // Strategy 2: B-instruction trampoline (handler must be within ±128MB).
-        if (arirang::inline_hook_branch(target, hook)) {
-            *trampoline_slot = target;
-            g_hook_method = "inline_branch";
+        // Publish a callable original before atomically replacing one entry
+        // instruction with a branch to a nearby relay. The hook helper writes
+        // trampoline_slot with release ordering before the live CAS.
+        if (arirang::inline_hook_branch(target, hook, trampoline_slot)) {
+            arirang_drm_publish_original(is_hidl,
+                                         __atomic_load_n(trampoline_slot, __ATOMIC_ACQUIRE));
+            arirang_drm_publish_hook_method("inline_branch");
             arirang::log_info(std::string("drm_inline: B-instruction trampoline hooked ") +
                               flavor + " " + sym.name);
             __android_log_print(ANDROID_LOG_INFO, "ArirangDrmHook",
@@ -99,7 +88,7 @@ bool install_hook_in_library(const char *library_path) {
             return true;
         }
 
-        arirang::log_warn(std::string("drm_inline: all inline strategies failed for ") +
+        arirang::log_warn(std::string("drm_inline: atomic branch strategy failed for ") +
                           flavor + " " + sym.name);
     }
 

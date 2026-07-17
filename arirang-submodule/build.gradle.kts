@@ -1,5 +1,10 @@
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.bundling.Zip
+import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.zip.ZipFile
 
 plugins {
     base
@@ -25,10 +30,26 @@ val rootMethod = providers.gradleProperty("arirang.root")
 fun adbCommand(vararg args: String): List<String> = buildList {
     add(adbPath)
     adbSerial.orNull?.takeIf { it.isNotBlank() }?.let {
+        if (it.length > 128 || !it.matches(Regex("[A-Za-z0-9._:-]+"))) {
+            throw GradleException("Invalid arirang.device serial: $it")
+        }
         add("-s")
         add(it)
     }
     addAll(args)
+}
+
+fun sha256Hex(input: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    input.inputStream().buffered().use { stream ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val count = stream.read(buffer)
+            if (count < 0) break
+            if (count > 0) digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
 
 fun installShellCommand(reboot: Boolean, forcedRootMethod: String? = null): String {
@@ -37,26 +58,86 @@ fun installShellCommand(reboot: Boolean, forcedRootMethod: String? = null): Stri
         throw GradleException("Unsupported arirang.root: $root. Use magisk, ksu, kernelsu, ap, or apatch.")
     }
 
-    val args = mutableListOf(remoteZipPath)
-    if (root.isNotEmpty()) args += root
-    if (reboot) args += "--reboot"
-    return "sh $remoteInstallScriptPath ${args.joinToString(" ")}"
+    val zipFile = outputZip.get().asFile
+    val scriptFile = file("scripts/install_module.sh")
+    if (!zipFile.isFile || Files.isSymbolicLink(zipFile.toPath())) {
+        throw GradleException("Packaged module is missing or is not a regular file: $zipFile")
+    }
+    if (!scriptFile.isFile || Files.isSymbolicLink(scriptFile.toPath())) {
+        throw GradleException("Installer is missing or is not a regular file: $scriptFile")
+    }
+
+    val zipSize = zipFile.length()
+    val scriptSize = scriptFile.length()
+    if (zipSize !in 1..(128L * 1024 * 1024) || scriptSize !in 1..(1024L * 1024)) {
+        throw GradleException("Refusing to install an empty or oversized module/installer artifact")
+    }
+    val zipBlocks = (zipSize + 4095) / 4096
+    val scriptBlocks = (scriptSize + 4095) / 4096
+    val zipHash = sha256Hex(zipFile)
+    val scriptHash = sha256Hex(scriptFile)
+
+    val installerArgs = buildList {
+        add("\"\$private_script\"")
+        add("\"\$private_zip\"")
+        if (root.isNotEmpty()) add(shellQuote(root))
+    }.joinToString(" ")
+
+    return listOf(
+        "set -eu",
+        "umask 077",
+        // A PID-based directory name (the previous "-\$\$" suffix) is
+        // predictable to any other process on the device and can be raced by
+        // a symlink planted ahead of mkdir. mktemp's random suffix removes
+        // that guess, and the ownership/mode checks on /data/adb mirror
+        // scripts/install_module.sh's prepare_module_snapshot() so a
+        // tampered or non-root /data/adb is rejected before anything is
+        // written under it.
+        "[ -d /data/adb ] && [ ! -L /data/adb ]",
+        "[ \"\$(/system/bin/toybox stat -c '%u' /data/adb)\" = \"0\" ]",
+        "case \"\$(/system/bin/toybox stat -c '%A' /data/adb)\" in ?????w????|????????w?) exit 1;; esac",
+        "private_dir=\$(/system/bin/toybox mktemp -d /data/adb/.arirang-install.XXXXXX)",
+        "/system/bin/toybox chown 0:0 \"\$private_dir\"",
+        "/system/bin/toybox chmod 700 \"\$private_dir\"",
+        "private_zip=\"\$private_dir/module.zip\"",
+        "private_script=\"\$private_dir/install.sh\"",
+        "cleanup() { /system/bin/toybox rm -rf \"\$private_dir\"; }",
+        "trap cleanup EXIT",
+        "trap 'exit 129' HUP",
+        "trap 'exit 130' INT",
+        "trap 'exit 143' TERM",
+        "/system/bin/toybox timeout -s KILL 30 /system/bin/toybox dd if=${shellQuote(remoteZipPath)} of=\"\$private_zip\" bs=4096 count=$zipBlocks 2>/dev/null",
+        "/system/bin/toybox timeout -s KILL 10 /system/bin/toybox dd if=${shellQuote(remoteInstallScriptPath)} of=\"\$private_script\" bs=4096 count=$scriptBlocks 2>/dev/null",
+        "[ \"\$(/system/bin/toybox wc -c < \"\$private_zip\")\" = ${shellQuote(zipSize.toString())} ]",
+        "[ \"\$(/system/bin/toybox wc -c < \"\$private_script\")\" = ${shellQuote(scriptSize.toString())} ]",
+        "zip_actual=\$(/system/bin/toybox sha256sum \"\$private_zip\")",
+        "zip_actual=\${zip_actual%% *}",
+        "script_actual=\$(/system/bin/toybox sha256sum \"\$private_script\")",
+        "script_actual=\${script_actual%% *}",
+        "[ \"\$zip_actual\" = ${shellQuote(zipHash)} ]",
+        "[ \"\$script_actual\" = ${shellQuote(scriptHash)} ]",
+        "/system/bin/toybox chmod 600 \"\$private_zip\"",
+        "/system/bin/toybox chmod 700 \"\$private_script\"",
+        "/system/bin/sh $installerArgs",
+        "cleanup",
+        "trap - EXIT HUP INT TERM",
+        if (reboot) "/system/bin/svc power reboot || /system/bin/reboot" else ":"
+    ).joinToString("; ")
 }
 
 fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
 
 fun privilegedShellCommand(command: String): String =
-    "if [ \"\$(id -u)\" = \"0\" ]; then " +
+    "if [ \"\$(/system/bin/id -u)\" = \"0\" ]; then " +
         "$command; " +
     "else " +
-        "for su_bin in su /system/bin/su /system/xbin/su /data/adb/ksu/bin/su /debug_ramdisk/su; do " +
-            "\"\$su_bin\" -c 'id -u' >/dev/null 2>/data/local/tmp/arirang_su_error || continue; " +
+        "for su_bin in /system/bin/su /system/xbin/su /data/adb/ksu/bin/su /debug_ramdisk/su /sbin/su; do " +
+            "[ -x \"\$su_bin\" ] || continue; " +
+            "[ \"\$(\"\$su_bin\" -c '/system/bin/id -u' 2>/dev/null)\" = \"0\" ] || continue; " +
             "\"\$su_bin\" -c ${shellQuote(command)}; " +
             "exit \$?; " +
         "done; " +
         "echo \"adb shell is not root and no usable su binary was found. Grant ADB shell/root access in KernelSU Next, then rerun this task.\" >&2; " +
-        "if [ -s /data/local/tmp/arirang_su_error ]; then cat /data/local/tmp/arirang_su_error >&2; fi; " +
-        "rm -f /data/local/tmp/arirang_su_error; " +
         "exit 1; " +
     "fi"
 
@@ -83,6 +164,29 @@ val arirangApplicationId = rootProject.extra["arirangApplicationId"] as String
 val arirangSubmoduleConfigDir = rootProject.extra["arirangSubmoduleConfigDir"] as String
 val arirangSubmoduleConfigFile = rootProject.extra["arirangSubmoduleConfigFile"] as String
 
+val moduleLibrarySources = listOf(
+    "common.sh",
+    "resetprop.sh",
+    "staging.sh",
+    "vendor_bind.sh",
+    "widevine.sh"
+)
+val packagedModuleFiles = setOf(
+    "module.prop",
+    "post-fs-data.sh",
+    "service.sh",
+    "sepolicy.rule",
+    "lib/common.sh",
+    "lib/resetprop.sh",
+    "lib/staging.sh",
+    "lib/vendor_bind.sh",
+    "lib/widevine.sh",
+    "zygisk/arm64-v8a.so",
+    "lib/libarirang_drm_hook.so",
+    "bin/arirang_injector"
+)
+val packagedModuleDirectories = setOf("bin/", "lib/", "zygisk/")
+
 val configureNative by tasks.registering(Exec::class) {
     inputs.files(fileTree("src/main/cpp"))
     inputs.file("CMakeLists.txt")
@@ -96,6 +200,17 @@ val configureNative by tasks.registering(Exec::class) {
         if (!file(toolchain).exists()) {
             throw GradleException("Android toolchain not found at $toolchain. Check your NDK installation.")
         }
+        val sourceProperties = file("${ndkDir.get()}/source.properties")
+        val ndkProperties = java.util.Properties()
+        if (!sourceProperties.isFile) {
+            throw GradleException("NDK source.properties not found at $sourceProperties")
+        }
+        sourceProperties.inputStream().use { ndkProperties.load(it) }
+        if (ndkProperties.getProperty("Pkg.Revision") != ndkVersion) {
+            throw GradleException(
+                "Expected NDK $ndkVersion but found ${ndkProperties.getProperty("Pkg.Revision")} at ${ndkDir.get()}"
+            )
+        }
         commandLine(
             "cmake",
             "-S", projectDir.absolutePath,
@@ -103,6 +218,7 @@ val configureNative by tasks.registering(Exec::class) {
             "-DCMAKE_TOOLCHAIN_FILE=$toolchain",
             "-DANDROID_ABI=arm64-v8a",
             "-DANDROID_PLATFORM=android-31",
+            "-DCMAKE_BUILD_TYPE=Release",
             // These are generated into arirang_build_config.hpp and must stay
             // in sync with the app module. The native code uses them to locate
             // the manager app's runtime config without hard-coding app paths in
@@ -130,28 +246,59 @@ val buildNative by tasks.registering(Exec::class) {
     }
 }
 
-val stageModule by tasks.registering(Copy::class) {
+val stageModule by tasks.registering(Sync::class) {
     dependsOn(buildNative)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    dirPermissions { unix("rwxr-xr-x") }
+
+    doFirst {
+        val sourceFiles = listOf(
+            file("module/module.prop"),
+            file("module/post-fs-data.sh"),
+            file("module/service.sh"),
+            file("module/sepolicy.rule")
+        ) + moduleLibrarySources.map { file("module/lib/$it") }
+        sourceFiles.forEach { source ->
+            if (!source.isFile || Files.isSymbolicLink(source.toPath())) {
+                throw GradleException("Module source is missing or unsafe: $source")
+            }
+        }
+        listOf(
+            nativeBuildDir.get().file("libarirang_zygisk.so").asFile,
+            nativeBuildDir.get().file("libarirang_drm_hook.so").asFile,
+            nativeBuildDir.get().file("arirang_injector").asFile
+        ).forEach { artifact ->
+            if (!artifact.isFile || Files.isSymbolicLink(artifact.toPath())) {
+                throw GradleException("Native artifact is missing or unsafe: $artifact")
+            }
+        }
+    }
     // Stage the exact Magisk/KernelSU/APatch module root. Files copied here are
     // zipped without an extra directory level, so paths must match the runtime
     // module layout expected by post-fs-data.sh and service.sh.
     from("module/module.prop") {
         into("")
+        filePermissions { unix("rw-r--r--") }
     }
     from("module/post-fs-data.sh") {
         into("")
+        filePermissions { unix("rwxr-xr-x") }
     }
     from("module/service.sh") {
         into("")
+        filePermissions { unix("rwxr-xr-x") }
     }
     from("module/sepolicy.rule") {
         into("")
+        filePermissions { unix("rw-r--r--") }
     }
-    from("module/lib") {
+    from(moduleLibrarySources.map { file("module/lib/$it") }) {
         into("lib")
+        filePermissions { unix("rw-r--r--") }
     }
     from(nativeBuildDir.map { it.file("libarirang_zygisk.so") }) {
         into("zygisk")
+        filePermissions { unix("rw-r--r--") }
         // Root managers discover the Zygisk library by ABI-specific filename.
         // Do not rename this to the CMake target name.
         rename { "arm64-v8a.so" }
@@ -162,11 +309,13 @@ val stageModule by tasks.registering(Copy::class) {
     // KSU metamodule overlay.
     from(nativeBuildDir.map { it.file("libarirang_drm_hook.so") }) {
         into("lib")
+        filePermissions { unix("rw-r--r--") }
     }
     from(nativeBuildDir.map { it.file("arirang_injector") }) {
         // service.sh executes this directly from the module directory after
         // boot, so keep it outside zygisk/ and lib/.
         into("bin")
+        filePermissions { unix("rwxr-xr-x") }
     }
     into(stageDir)
 }
@@ -175,7 +324,68 @@ val packageModule by tasks.registering(Zip::class) {
     dependsOn(stageModule)
     archiveFileName.set("arirang-submodule.zip")
     destinationDirectory.set(outputDir)
-    from(stageDir)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+    from(stageDir) {
+        eachFile {
+            val executable = path == "post-fs-data.sh" || path == "service.sh" ||
+                path == "bin/arirang_injector"
+            permissions {
+                unix(if (executable) "rwxr-xr-x" else "rw-r--r--")
+            }
+        }
+        dirPermissions { unix("rwxr-xr-x") }
+    }
+
+    doFirst {
+        val root = stageDir.get().asFile.toPath().toAbsolutePath().normalize()
+        Files.walk(root).use { paths ->
+            paths.forEach { path ->
+                val normalized = path.toAbsolutePath().normalize()
+                if (!normalized.startsWith(root) || Files.isSymbolicLink(path)) {
+                    throw GradleException("Unsafe staged module path: $path")
+                }
+            }
+        }
+    }
+
+    doLast {
+        val seenFiles = mutableSetOf<String>()
+        val seenEntries = mutableSetOf<String>()
+        var totalSize = 0L
+        ZipFile(archiveFile.get().asFile).use { archive ->
+            val entries = archive.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                val name = entry.name
+                val components = name.removeSuffix("/").split('/')
+                val unsafeName = name.isEmpty() || name.startsWith('/') || '\\' in name ||
+                    name.any { it.code < 0x20 } || components.any { it.isEmpty() || it == "." || it == ".." }
+                if (unsafeName || name == "vendor/" || name.startsWith("vendor/") ||
+                    !seenEntries.add(name)) {
+                    throw GradleException("Unsafe or duplicate module zip entry: $name")
+                }
+                if (entry.isDirectory) {
+                    if (name !in packagedModuleDirectories) {
+                        throw GradleException("Unexpected module zip directory: $name")
+                    }
+                    continue
+                }
+                if (name !in packagedModuleFiles || entry.size <= 0 || entry.size > 128L * 1024 * 1024) {
+                    throw GradleException("Unexpected or invalid module zip file: $name")
+                }
+                totalSize = Math.addExact(totalSize, entry.size)
+                if (totalSize > 256L * 1024 * 1024) {
+                    throw GradleException("Module zip expands beyond the permitted size")
+                }
+                seenFiles += name
+            }
+        }
+        if (seenFiles != packagedModuleFiles) {
+            throw GradleException("Module zip allowlist mismatch: expected=$packagedModuleFiles actual=$seenFiles")
+        }
+    }
 }
 
 val pushModuleZipToDevice by tasks.registering(Exec::class) {

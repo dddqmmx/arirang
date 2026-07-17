@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
+#include <mutex>
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -28,6 +29,8 @@ struct MapEntry {
     bool readable = false;
     bool writable = false;
     bool executable = false;
+    bool private_mapping = false;
+    int protection = 0;
     std::string path;
 };
 
@@ -35,6 +38,8 @@ struct ScanStats {
     size_t scanned = 0;
     size_t patched = 0;
 };
+
+std::mutex g_patch_mutex;
 
 bool path_matches(const char *full, const char *needle) {
     if (full == nullptr || needle == nullptr) return false;
@@ -74,6 +79,11 @@ bool parse_maps_line(const char *line, MapEntry *out) {
     entry.readable = perms[0] == 'r';
     entry.writable = perms[1] == 'w';
     entry.executable = perms[2] == 'x';
+    entry.private_mapping = perms[3] == 'p';
+    entry.protection = (entry.readable ? PROT_READ : 0) |
+                       (entry.writable ? PROT_WRITE : 0) |
+                       (entry.executable ? PROT_EXEC : 0);
+    if (entry.start >= entry.end) return false;
     if (matched >= 7) {
         entry.path = trim_leading_space(path_buf);
     }
@@ -109,13 +119,13 @@ std::vector<MapEntry> read_self_maps() {
     return out;
 }
 
-bool set_page_writable(uintptr_t addr, bool writable) {
+bool set_page_protection(uintptr_t addr, int protection) {
     const long page_size = sysconf(_SC_PAGESIZE);
     if (page_size <= 0) return false;
 
     const uintptr_t aligned = addr & ~static_cast<uintptr_t>(page_size - 1);
-    const int prot = writable ? (PROT_READ | PROT_WRITE) : PROT_READ;
-    return mprotect(reinterpret_cast<void *>(aligned), static_cast<size_t>(page_size), prot) == 0;
+    return mprotect(reinterpret_cast<void *>(aligned), static_cast<size_t>(page_size),
+                    protection) == 0;
 }
 
 bool address_range_fits(uintptr_t addr, size_t size) {
@@ -149,7 +159,7 @@ bool is_library_data_map(const MapEntry &entry, const char *library_path) {
 
     // vtable / method table 通常在 .data.rel.ro 或 .data：可读、不可执行。
     // 可写与否不作为过滤条件，因为 .data.rel.ro 会在重定位后变只读。
-    return entry.readable && !entry.executable;
+    return entry.readable && !entry.executable && entry.private_mapping;
 }
 
 uintptr_t align_up(uintptr_t value, size_t alignment) {
@@ -175,8 +185,14 @@ bool address_with_delta(uintptr_t base, intptr_t delta, size_t min_addr, uintptr
 }
 
 uintptr_t relative_slot_destination(uintptr_t slot) {
-    const int32_t rel = *reinterpret_cast<int32_t *>(slot);
-    return static_cast<uintptr_t>(static_cast<intptr_t>(slot) + rel);
+    const int32_t rel = __atomic_load_n(reinterpret_cast<int32_t *>(slot), __ATOMIC_ACQUIRE);
+    if (rel < 0) {
+        const uintptr_t distance = static_cast<uintptr_t>(-(static_cast<int64_t>(rel)));
+        return slot < distance ? 0 : slot - distance;
+    }
+    return UINTPTR_MAX - slot < static_cast<uint32_t>(rel)
+               ? 0
+               : slot + static_cast<uint32_t>(rel);
 }
 
 bool looks_like_relative_vtable_slot(uintptr_t slot, const std::vector<MapEntry> &maps) {
@@ -196,7 +212,8 @@ bool looks_like_relative_vtable_slot(uintptr_t slot, const std::vector<MapEntry>
 }
 
 uintptr_t absolute_slot_value(uintptr_t slot) {
-    return reinterpret_cast<uintptr_t>(*reinterpret_cast<void **>(slot));
+    return reinterpret_cast<uintptr_t>(
+        __atomic_load_n(reinterpret_cast<void **>(slot), __ATOMIC_ACQUIRE));
 }
 
 bool looks_like_absolute_vtable_slot(uintptr_t slot, const std::vector<MapEntry> &maps) {
@@ -219,25 +236,28 @@ bool looks_like_absolute_vtable_slot(uintptr_t slot, const std::vector<MapEntry>
 
 bool make_slot_writable_if_needed(const MapEntry &entry, uintptr_t addr, const char *kind) {
     if (entry.writable) return true;
-    if (set_page_writable(addr, true)) return true;
+    if (set_page_protection(addr, entry.protection | PROT_WRITE)) return true;
 
     log_warn(std::string("vtable_hook: mprotect failed for ") + kind + " @ " +
              std::to_string(addr));
     return false;
 }
 
-void restore_slot_protection_if_needed(const MapEntry &entry, uintptr_t addr) {
-    if (entry.writable) return;
-
-    set_page_writable(addr, false);
+bool restore_slot_protection_if_needed(const MapEntry &entry, uintptr_t addr) {
+    return entry.writable || set_page_protection(addr, entry.protection);
 }
 
-VtablePatch make_absolute_patch(void *slot, void *original) {
+VtablePatch make_absolute_patch(void *slot,
+                                void *original,
+                                void *replacement,
+                                int protection) {
     VtablePatch patch;
     patch.slot_address = slot;
     patch.original_function = original;
+    patch.replacement_function = replacement;
     patch.slot_type = VtableSlotType::kAbsolute64;
     patch.slot_size = kPointerSize;
+    patch.original_protection = protection;
     return patch;
 }
 
@@ -248,7 +268,7 @@ bool patch_absolute_slot(uintptr_t addr,
                          const std::vector<MapEntry> &maps,
                          std::vector<VtablePatch> *out_patches) {
     auto *slot = reinterpret_cast<void **>(addr);
-    void *const value = *slot;
+    void *const value = __atomic_load_n(slot, __ATOMIC_ACQUIRE);
     if (value != symbol.address) return false;
 
     if (!looks_like_absolute_vtable_slot(addr, maps)) {
@@ -259,12 +279,25 @@ bool patch_absolute_slot(uintptr_t addr,
 
     if (!make_slot_writable_if_needed(entry, addr, "slot")) return false;
 
-    out_patches->push_back(make_absolute_patch(slot, value));
-    *slot = hook;
-    restore_slot_protection_if_needed(entry, addr);
+    void *expected = value;
+    if (!__atomic_compare_exchange_n(slot, &expected, hook, false,
+                                     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+        restore_slot_protection_if_needed(entry, addr);
+        return false;
+    }
+    if (!restore_slot_protection_if_needed(entry, addr)) {
+        expected = hook;
+        __atomic_compare_exchange_n(slot, &expected, value, false,
+                                    __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
+        restore_slot_protection_if_needed(entry, addr);
+        log_warn("vtable_hook: protection restore failed; absolute patch rolled back");
+        return false;
+    }
 
-    log_info(std::string("vtable_hook: patched absolute slot @ ") +
-             std::to_string(addr) + " for " + symbol.name);
+    out_patches->push_back(
+        make_absolute_patch(slot, value, hook, entry.protection));
+
+    log_info(std::string("vtable_hook: patched absolute slot for ") + symbol.name);
     return true;
 }
 
@@ -294,19 +327,32 @@ bool relative_slot_matches(uintptr_t addr,
 }
 
 bool relative_offset_to_hook(uintptr_t addr, uintptr_t hook_addr, int32_t *out) {
-    const auto new_rel = static_cast<intptr_t>(hook_addr) - static_cast<intptr_t>(addr);
-    if (new_rel < INT32_MIN || new_rel > INT32_MAX) return false;
+    if (hook_addr >= addr) {
+        const uintptr_t distance = hook_addr - addr;
+        if (distance > static_cast<uintptr_t>(INT32_MAX)) return false;
+        *out = static_cast<int32_t>(distance);
+        return true;
+    }
 
-    *out = static_cast<int32_t>(new_rel);
+    const uintptr_t distance = addr - hook_addr;
+    if (distance > static_cast<uintptr_t>(INT32_MAX) + 1u) return false;
+    *out = distance == static_cast<uintptr_t>(INT32_MAX) + 1u
+               ? INT32_MIN
+               : -static_cast<int32_t>(distance);
     return true;
 }
 
-VtablePatch make_relative_patch(uintptr_t addr, uintptr_t target) {
+VtablePatch make_relative_patch(uintptr_t addr,
+                                uintptr_t target,
+                                uintptr_t replacement,
+                                int protection) {
     VtablePatch patch;
     patch.slot_address = reinterpret_cast<void *>(addr);
     patch.original_function = reinterpret_cast<void *>(target);
+    patch.replacement_function = reinterpret_cast<void *>(replacement);
     patch.slot_type = VtableSlotType::kRelative32;
     patch.slot_size = sizeof(int32_t);
+    patch.original_protection = protection;
     return patch;
 }
 
@@ -328,12 +374,27 @@ bool patch_relative_slot(uintptr_t addr,
 
     if (!make_slot_writable_if_needed(entry, addr, "rel slot")) return false;
 
-    out_patches->push_back(make_relative_patch(addr, target));
-    *reinterpret_cast<int32_t *>(addr) = new_rel;
-    restore_slot_protection_if_needed(entry, addr);
+    auto *slot = reinterpret_cast<int32_t *>(addr);
+    const int32_t old_rel = __atomic_load_n(slot, __ATOMIC_ACQUIRE);
+    int32_t expected = old_rel;
+    if (!__atomic_compare_exchange_n(slot, &expected, new_rel, false,
+                                     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+        restore_slot_protection_if_needed(entry, addr);
+        return false;
+    }
+    if (!restore_slot_protection_if_needed(entry, addr)) {
+        expected = new_rel;
+        __atomic_compare_exchange_n(slot, &expected, old_rel, false,
+                                    __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
+        restore_slot_protection_if_needed(entry, addr);
+        log_warn("vtable_hook: protection restore failed; relative patch rolled back");
+        return false;
+    }
 
-    log_info(std::string("vtable_hook: patched relative slot @ ") +
-             std::to_string(addr) + " for " + symbol.name);
+    out_patches->push_back(
+        make_relative_patch(addr, target, hook_addr, entry.protection));
+
+    log_info(std::string("vtable_hook: patched relative slot for ") + symbol.name);
     return true;
 }
 
@@ -393,27 +454,40 @@ void log_candidate_symbols(const std::vector<ResolvedSymbol> &symbols) {
     }
 }
 
-void restore_patch_value(const VtablePatch &patch, uintptr_t addr) {
-    if (patch.slot_type == VtableSlotType::kRelative32) {
-        const uintptr_t orig_addr = reinterpret_cast<uintptr_t>(patch.original_function);
-        const int32_t old_rel =
-            static_cast<int32_t>(static_cast<intptr_t>(orig_addr) - static_cast<intptr_t>(addr));
-        *reinterpret_cast<int32_t *>(patch.slot_address) = old_rel;
-        return;
-    }
-
-    *reinterpret_cast<void **>(patch.slot_address) = patch.original_function;
-}
-
 bool restore_patch(const VtablePatch &patch) {
     if (patch.slot_address == nullptr) return true;
 
     const uintptr_t addr = reinterpret_cast<uintptr_t>(patch.slot_address);
-    if (!set_page_writable(addr, true)) return false;
+    if (!set_page_protection(addr, patch.original_protection | PROT_WRITE)) return false;
 
-    restore_patch_value(patch, addr);
-    set_page_writable(addr, false);
-    return true;
+    bool restored = false;
+    if (patch.slot_type == VtableSlotType::kRelative32) {
+        int32_t replacement = 0;
+        int32_t original = 0;
+        if (relative_offset_to_hook(
+                addr, reinterpret_cast<uintptr_t>(patch.replacement_function), &replacement) &&
+            relative_offset_to_hook(
+                addr, reinterpret_cast<uintptr_t>(patch.original_function), &original)) {
+            restored = __atomic_compare_exchange_n(
+                reinterpret_cast<int32_t *>(patch.slot_address), &replacement, original, false,
+                __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
+        }
+    } else {
+        void *expected = patch.replacement_function;
+        restored = __atomic_compare_exchange_n(
+            reinterpret_cast<void **>(patch.slot_address), &expected, patch.original_function,
+            false, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
+    }
+
+    const bool protected_again =
+        set_page_protection(addr, patch.original_protection);
+    if (!restored) {
+        log_warn("vtable_hook: slot changed since installation; refusing to overwrite it");
+    }
+    if (!protected_again) {
+        log_warn("vtable_hook: failed to restore original slot page protection");
+    }
+    return restored && protected_again;
 }
 
 } // namespace
@@ -423,6 +497,7 @@ bool vtable_hook_install(const char *library_path,
                          void *hook,
                          std::vector<VtablePatch> *out_patches,
                          bool try_relative) {
+    std::lock_guard<std::mutex> lock(g_patch_mutex);
     if (library_path == nullptr || symbol_substring == nullptr ||
         hook == nullptr || out_patches == nullptr) {
         return false;
@@ -463,6 +538,7 @@ bool vtable_hook_install(const char *library_path,
 }
 
 bool vtable_hook_uninstall(const std::vector<VtablePatch> &patches) {
+    std::lock_guard<std::mutex> lock(g_patch_mutex);
     bool ok = true;
     for (const auto &patch : patches) {
         if (restore_patch(patch)) continue;

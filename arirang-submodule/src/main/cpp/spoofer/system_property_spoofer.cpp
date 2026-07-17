@@ -1,11 +1,19 @@
 #include "system_property_spoofer.hpp"
 
+#include "jni_utils.hpp"
 #include "logging.hpp"
+#include "runtime_config.hpp"
 #include "hook/inline_hook.hpp"
 
-#include <ctime>
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cerrno>
 #include <cstring>
 #include <dlfcn.h>
+#include <limits.h>
+#include <memory>
+#include <mutex>
 #include <sys/system_properties.h>
 
 namespace arirang {
@@ -14,45 +22,44 @@ namespace {
 using NativeGetWithDefault = jstring (*)(JNIEnv *, jclass, jstring, jstring);
 using NativeGetLong = jlong (*)(JNIEnv *, jclass, jstring, jlong);
 
-NativeGetWithDefault original_native_get_with_default = nullptr;
-NativeGetLong original_native_get_long = nullptr;
+std::atomic<NativeGetWithDefault> original_native_get_with_default{nullptr};
+std::atomic<NativeGetLong> original_native_get_long{nullptr};
 
 using LibcSystemPropertyGet = int (*)(const char *, char *);
-LibcSystemPropertyGet original_system_property_get = nullptr;
+void *original_system_property_get = nullptr;
 
 using LibcSystemPropertyReadCallback = void (*)(const prop_info *, void (*)(void *, const char *, const char *, uint32_t), void *);
-LibcSystemPropertyReadCallback original_system_property_read_callback = nullptr;
+void *original_system_property_read_callback = nullptr;
 
 using LibcSystemPropertyRead = int (*)(const prop_info *, char *, char *);
-LibcSystemPropertyRead original_system_property_read = nullptr;
+void *original_system_property_read = nullptr;
 
 using LibcExecve = int (*)(const char *, char *const [], char *const []);
-LibcExecve original_execve = nullptr;
+void *original_execve = nullptr;
 
-const SubmoduleConfig *active_config = nullptr;
-SubmoduleConfig runtime_config;
-bool active_process = false;
-long long last_config_reload_ms = 0;
+std::atomic<bool> active_process{false};
+std::mutex install_mutex;
+bool hooks_installed = false;
 
-long long monotonic_ms() {
-    timespec ts{};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<long long>(ts.tv_sec) * 1000LL + ts.tv_nsec / 1000000LL;
+template <typename Function>
+Function load_original(void *const *slot) {
+    return reinterpret_cast<Function>(__atomic_load_n(slot, __ATOMIC_ACQUIRE));
 }
 
-const SubmoduleConfig *current_config() {
-    if (active_config == nullptr) return nullptr;
-    const long long now = monotonic_ms();
-    if (now - last_config_reload_ms > 1000) {
-        // Native property reads are common, so do not hit disk on every call.
-        // A one-second refresh window is enough for UI-driven config changes
-        // while keeping libc/JNI property hooks cheap.
-        if (load_config_from_disk(runtime_config)) {
-            active_config = &runtime_config;
-        }
-        last_config_reload_ms = now;
-    }
-    return active_config;
+bool install_libc_hook(void *target, void *handler, void **original, const char *name) {
+    if (target == nullptr) return false;
+    if (inline_hook_branch(target, handler, original)) return true;
+    log_warn(std::string("failed to install atomic libc hook: ") + name);
+    return false;
+}
+
+size_t copy_property_value(char *destination, const std::string &replacement) {
+    if (destination == nullptr) return 0;
+    const size_t copy_size = std::min(replacement.size(),
+                                      static_cast<size_t>(PROP_VALUE_MAX - 1));
+    std::memcpy(destination, replacement.data(), copy_size);
+    destination[copy_size] = '\0';
+    return copy_size;
 }
 
 const std::string *replacement_for_property(const SubmoduleConfig &config, const char *key) {
@@ -156,35 +163,41 @@ bool replacement_for_long_property(const SubmoduleConfig &config, const char *ke
 }
 
 jstring call_original_jni(JNIEnv *env, jclass clazz, jstring key, jstring fallback) {
-    return original_native_get_with_default != nullptr
-        ? original_native_get_with_default(env, clazz, key, fallback)
+    const auto original = original_native_get_with_default.load(std::memory_order_acquire);
+    return original != nullptr
+        ? original(env, clazz, key, fallback)
         : fallback;
 }
 
 jstring native_get_with_default(JNIEnv *env, jclass clazz, jstring key, jstring fallback) {
-    const SubmoduleConfig *config = current_config();
-    if (!active_process || config == nullptr || !config->enabled || key == nullptr) {
+    const auto config = current_runtime_config();
+    if (!active_process.load(std::memory_order_relaxed) || config == nullptr ||
+        !config->enabled || env == nullptr || key == nullptr) {
         return call_original_jni(env, clazz, key, fallback);
     }
 
     const char *chars = env->GetStringUTFChars(key, nullptr);
-    if (chars == nullptr) return fallback;
+    if (chars == nullptr) return nullptr;
     const std::string *replacement = replacement_for_property(*config, chars);
     env->ReleaseStringUTFChars(key, chars);
     if (replacement != nullptr && !replacement->empty()) {
         // Return a fresh Java string; the config storage remains native-owned
         // and may be replaced by a later disk reload.
-        return env->NewStringUTF(replacement->c_str());
+        jstring result = new_jstring_utf8(env, *replacement);
+        if (result == nullptr && env->ExceptionCheck()) return nullptr;
+        return result != nullptr ? result : call_original_jni(env, clazz, key, fallback);
     }
 
     return call_original_jni(env, clazz, key, fallback);
 }
 
 jlong native_get_long(JNIEnv *env, jclass clazz, jstring key, jlong fallback) {
-    const SubmoduleConfig *config = current_config();
-    if (!active_process || config == nullptr || !config->enabled || key == nullptr) {
-        return original_native_get_long != nullptr
-            ? original_native_get_long(env, clazz, key, fallback)
+    const auto config = current_runtime_config();
+    if (!active_process.load(std::memory_order_relaxed) || config == nullptr ||
+        !config->enabled || env == nullptr || key == nullptr) {
+        const auto original = original_native_get_long.load(std::memory_order_acquire);
+        return original != nullptr
+            ? original(env, clazz, key, fallback)
             : fallback;
     }
 
@@ -195,25 +208,28 @@ jlong native_get_long(JNIEnv *env, jclass clazz, jstring key, jlong fallback) {
     env->ReleaseStringUTFChars(key, chars);
     if (replaced) return replacement;
 
-    return original_native_get_long != nullptr
-        ? original_native_get_long(env, clazz, key, fallback)
+    const auto original = original_native_get_long.load(std::memory_order_acquire);
+    return original != nullptr
+        ? original(env, clazz, key, fallback)
         : fallback;
 }
 
 // Libc hooks
 int fake_system_property_get(const char *name, char *value) {
-    const SubmoduleConfig *config = current_config();
-    if (active_process && config != nullptr && config->enabled && name != nullptr) {
+    const auto config = current_runtime_config();
+    if (active_process.load(std::memory_order_relaxed) && config != nullptr &&
+        config->enabled && name != nullptr && value != nullptr) {
         const std::string *replacement = replacement_for_property(*config, name);
         if (replacement != nullptr && !replacement->empty()) {
             // __system_property_get requires a NUL-terminated value no longer
             // than PROP_VALUE_MAX, even when the replacement came from JSON.
-            std::strncpy(value, replacement->c_str(), PROP_VALUE_MAX);
-            value[PROP_VALUE_MAX - 1] = '\0';
-            return static_cast<int>(std::strlen(value));
+            return static_cast<int>(copy_property_value(value, *replacement));
         }
     }
-    return original_system_property_get(name, value);
+    const auto original = load_original<LibcSystemPropertyGet>(&original_system_property_get);
+    return original != nullptr
+        ? original(name, value)
+        : 0;
 }
 
 struct CallbackWrapper {
@@ -223,13 +239,17 @@ struct CallbackWrapper {
 
 void fake_read_callback_handler(void *cookie, const char *name, const char *value, uint32_t serial) {
     auto *wrapper = static_cast<CallbackWrapper *>(cookie);
-    const SubmoduleConfig *config = current_config();
-    if (active_process && config != nullptr && config->enabled && name != nullptr) {
+    if (wrapper == nullptr || wrapper->callback == nullptr) return;
+    const auto config = current_runtime_config();
+    if (active_process.load(std::memory_order_relaxed) && config != nullptr &&
+        config->enabled && name != nullptr) {
         const std::string *replacement = replacement_for_property(*config, name);
         if (replacement != nullptr && !replacement->empty()) {
             // Preserve the original property serial. Some callers use it as a
             // change token; changing it here would make the spoof observable.
-            wrapper->callback(wrapper->cookie, name, replacement->c_str(), serial);
+            std::array<char, PROP_VALUE_MAX> bounded{};
+            copy_property_value(bounded.data(), *replacement);
+            wrapper->callback(wrapper->cookie, name, bounded.data(), serial);
             return;
         }
     }
@@ -239,22 +259,26 @@ void fake_read_callback_handler(void *cookie, const char *name, const char *valu
 void fake_system_property_read_callback(const prop_info *pi,
                                         void (*callback)(void *, const char *, const char *, uint32_t),
                                         void *cookie) {
+    const auto original = load_original<LibcSystemPropertyReadCallback>(
+        &original_system_property_read_callback);
+    if (original == nullptr || callback == nullptr) return;
     CallbackWrapper wrapper = {callback, cookie};
     // The wrapper lives on this stack because bionic invokes the callback
     // synchronously from __system_property_read_callback.
-    original_system_property_read_callback(pi, fake_read_callback_handler, &wrapper);
+    original(pi, fake_read_callback_handler, &wrapper);
 }
 
 int fake_system_property_read(const prop_info *pi, char *name, char *value) {
-    int res = original_system_property_read(pi, name, value);
-    if (res > 0 && active_process) {
-        const SubmoduleConfig *config = current_config();
+    const auto original = load_original<LibcSystemPropertyRead>(&original_system_property_read);
+    if (original == nullptr) return 0;
+    int res = original(pi, name, value);
+    if (res > 0 && active_process.load(std::memory_order_relaxed) &&
+        name != nullptr && value != nullptr) {
+        const auto config = current_runtime_config();
         if (config != nullptr && config->enabled) {
             const std::string *replacement = replacement_for_property(*config, name);
             if (replacement != nullptr && !replacement->empty()) {
-                std::strncpy(value, replacement->c_str(), PROP_VALUE_MAX);
-                value[PROP_VALUE_MAX - 1] = '\0';
-                return static_cast<int>(std::strlen(value));
+                return static_cast<int>(copy_property_value(value, *replacement));
             }
         }
     }
@@ -262,13 +286,24 @@ int fake_system_property_read(const prop_info *pi, char *name, char *value) {
 }
 
 int fake_execve(const char *pathname, char *const argv[], char *const envp[]) {
-    if (active_process && pathname != nullptr) {
-        std::string path(pathname);
-        if (path.find("getprop") != std::string::npos) {
-            log_info(std::string("intercepted execve: ") + pathname);
+    if (active_process.load(std::memory_order_relaxed) && pathname != nullptr) {
+        const size_t length = strnlen(pathname, PATH_MAX + 1U);
+        constexpr char kGetProp[] = "getprop";
+        if (length <= PATH_MAX &&
+            std::search(pathname, pathname + length, std::begin(kGetProp),
+                        std::end(kGetProp) - 1) != pathname + length) {
+            // Known limitation: this only logs the exec of an external getprop
+            // binary rather than spoofing its output. A child process invoking
+            // getprop directly bypasses the __system_property_get/JNI hooks
+            // above and can observe real property values. Logged at warn level
+            // so this gap is visible instead of blending into routine info logs.
+            log_warn("execve of external getprop binary observed; its output is not spoofed");
         }
     }
-    return original_execve(pathname, argv, envp);
+    const auto original = load_original<LibcExecve>(&original_execve);
+    if (original != nullptr) return original(pathname, argv, envp);
+    errno = ENOSYS;
+    return -1;
 }
 
 } // namespace
@@ -279,9 +314,12 @@ void install_system_property_spoofer(
     const SubmoduleConfig &config,
     bool should_spoof_process
 ) {
-    runtime_config = config;
-    active_config = &runtime_config;
-    active_process = should_spoof_process;
+    active_process.store(should_spoof_process, std::memory_order_release);
+    if (!should_spoof_process || api == nullptr || env == nullptr) return;
+    initialize_runtime_config(config);
+
+    std::lock_guard<std::mutex> lock(install_mutex);
+    if (hooks_installed) return;
 
     // Layer 1: framework Java callers normally reach android.os.SystemProperties
     // native_get/native_get_long. Zygisk gives us a stable JNI-native hook point
@@ -299,8 +337,16 @@ void install_system_property_spoofer(
         },
     };
     api->hookJniNativeMethods(env, "android/os/SystemProperties", methods, 2);
-    original_native_get_with_default = reinterpret_cast<NativeGetWithDefault>(methods[0].fnPtr);
-    original_native_get_long = reinterpret_cast<NativeGetLong>(methods[1].fnPtr);
+    if (methods[0].fnPtr != reinterpret_cast<void *>(native_get_with_default)) {
+        original_native_get_with_default.store(
+            reinterpret_cast<NativeGetWithDefault>(methods[0].fnPtr),
+            std::memory_order_release);
+    }
+    if (methods[1].fnPtr != reinterpret_cast<void *>(native_get_long)) {
+        original_native_get_long.store(
+            reinterpret_cast<NativeGetLong>(methods[1].fnPtr),
+            std::memory_order_release);
+    }
 
     // Layer 2: native libraries can bypass android.os.SystemProperties and call
     // libc property APIs directly. Inline hooks cover the common bionic entry
@@ -308,28 +354,22 @@ void install_system_property_spoofer(
     void *libc = dlopen("libc.so", RTLD_NOW);
     if (libc != nullptr) {
         void *get_fn = dlsym(libc, "__system_property_get");
-        if (get_fn != nullptr) {
-            inline_hook_install(get_fn, reinterpret_cast<void *>(fake_system_property_get),
-                                reinterpret_cast<void **>(&original_system_property_get));
-        }
+        install_libc_hook(get_fn, reinterpret_cast<void *>(fake_system_property_get),
+                          &original_system_property_get, "__system_property_get");
         void *read_fn = dlsym(libc, "__system_property_read_callback");
-        if (read_fn != nullptr) {
-            inline_hook_install(read_fn, reinterpret_cast<void *>(fake_system_property_read_callback),
-                                reinterpret_cast<void **>(&original_system_property_read_callback));
-        }
+        install_libc_hook(read_fn, reinterpret_cast<void *>(fake_system_property_read_callback),
+                          &original_system_property_read_callback,
+                          "__system_property_read_callback");
         void *read_old_fn = dlsym(libc, "__system_property_read");
-        if (read_old_fn != nullptr) {
-            inline_hook_install(read_old_fn, reinterpret_cast<void *>(fake_system_property_read),
-                                reinterpret_cast<void **>(&original_system_property_read));
-        }
+        install_libc_hook(read_old_fn, reinterpret_cast<void *>(fake_system_property_read),
+                          &original_system_property_read, "__system_property_read");
         void *execve_fn = dlsym(libc, "execve");
-        if (execve_fn != nullptr) {
-            inline_hook_install(execve_fn, reinterpret_cast<void *>(fake_execve),
-                                reinterpret_cast<void **>(&original_execve));
-        }
+        install_libc_hook(execve_fn, reinterpret_cast<void *>(fake_execve),
+                          &original_execve, "execve");
         dlclose(libc);
     }
 
+    hooks_installed = true;
     log_info("installed SystemProperties JNI and Libc hooks (expanded)");
 }
 

@@ -11,7 +11,8 @@ bool install_hook_in_library(const char *library_path);
 
 // Poll known candidate libraries for appearance, then install hooks.
 // Blocks until a hook is installed or 120 attempts (60s) have elapsed.
-// Returns nullptr (worker thread return convention).
-void *poll_libraries();
+// Returns true only when a hook was installed. Callers use this result to
+// decide whether the riskier inline fallback is necessary.
+bool poll_libraries();
 
 } // namespace drm_vtable

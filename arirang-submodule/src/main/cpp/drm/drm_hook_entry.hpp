@@ -13,6 +13,10 @@ extern "C" {
 
 void* arirang_drm_aidl_entry_get(void);
 void* arirang_drm_hidl_hook_get(void);
+void arirang_drm_publish_original(int hidl, void *original);
+void* arirang_drm_original(int hidl);
+void arirang_drm_publish_hook_method(const char *method);
+const char* arirang_drm_hook_method(void);
 
 #ifdef __cplusplus
 }

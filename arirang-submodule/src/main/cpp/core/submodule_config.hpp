@@ -94,9 +94,9 @@ struct SubmoduleConfig {
     std::string sensor_config_snapshot;
 };
 
-void apply_json_config(SubmoduleConfig &config, const std::string &json);
+bool apply_json_config(SubmoduleConfig &config, const std::string &json);
 bool load_config_from_disk(SubmoduleConfig &config);
-void load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config);
+bool load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config);
 void companion_handler(int fd);
 
 } // namespace arirang

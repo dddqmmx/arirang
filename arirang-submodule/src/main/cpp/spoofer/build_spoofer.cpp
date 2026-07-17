@@ -1,5 +1,7 @@
 #include "build_spoofer.hpp"
 
+#include "jni_utils.hpp"
+
 namespace arirang {
 namespace {
 
@@ -9,9 +11,13 @@ void set_static_string_field(JNIEnv *env, jclass clazz, const char *field_name, 
         env->ExceptionClear();
         return;
     }
-    jstring java_value = env->NewStringUTF(value.c_str());
-    if (java_value == nullptr) return;
+    jstring java_value = new_jstring_utf8(env, value);
+    if (java_value == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return;
+    }
     env->SetStaticObjectField(clazz, field, java_value);
+    if (env->ExceptionCheck()) env->ExceptionClear();
     env->DeleteLocalRef(java_value);
 }
 
@@ -22,12 +28,13 @@ void set_static_long_field(JNIEnv *env, jclass clazz, const char *field_name, jl
         return;
     }
     env->SetStaticLongField(clazz, field, value);
+    if (env->ExceptionCheck()) env->ExceptionClear();
 }
 
 } // namespace
 
 void spoof_build_fields(JNIEnv *env, const SubmoduleConfig &config) {
-    if (!config.enabled || !config.device_info_enabled) return;
+    if (env == nullptr || !config.enabled || !config.device_info_enabled) return;
 
     jclass build = env->FindClass("android/os/Build");
     if (build == nullptr) {

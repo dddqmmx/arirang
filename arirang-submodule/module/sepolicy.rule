@@ -1,22 +1,42 @@
 # Arirang Widevine HAL hook SELinux policy.
+#
+# Device SELinux type names vary across AOSP / OEM / Treble builds:
+#   - classic AOSP uses hal_drm_widevine / hal_drm_default
+#   - many vendor images (incl. this Xiaomi build) use vendor_hal_drm_widevine
+# Rules for types that do not exist on a given build are ignored by Magisk/KSU.
 
-# 1. LD_PRELOAD library load.
-allow { hal_drm_widevine hal_drm_default mediadrmserver } system_lib_file:file { read open getattr execute map }
-allow { hal_drm_widevine hal_drm_default mediadrmserver } system_lib_file:dir { search getattr }
+# Keep executable hook code separate from app-derived runtime data. The DRM
+# domains may map the hook library, but the Widevine identifier is read-only
+# data and never receives execute/map permission.
+type arirang_hook_file file_type
+typeattribute arirang_hook_file mlstrustedobject
+type arirang_data_file file_type
+typeattribute arirang_data_file mlstrustedobject
 
-# 2. Spoof config read (tmpfs fallback)
-allow { hal_drm_widevine hal_drm_default mediadrmserver } tmpfs:dir { search getattr }
-allow { hal_drm_widevine hal_drm_default mediadrmserver } tmpfs:file { read open getattr }
+# Staging dir + widevine_id (data) and the injected hook .so (code).
+allow { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } arirang_data_file dir { search getattr }
+allow { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } arirang_data_file file { read open getattr }
+allow { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } arirang_hook_file file { read open getattr execute map }
 
-# 3. Vendor file access (for bind-mounted hook .so and bind_path)
-allow { hal_drm_widevine hal_drm_default mediadrmserver } vendor_file:file { read open getattr execute map }
+# Bind-mount target under /vendor must remain readable/executable by the HAL
+# after the tmpfs cover is applied (inode label may still be vendor_file on
+# some devices before chcon takes effect).
+allow { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } vendor_file file { read open getattr execute map }
+allow { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } tmpfs dir { search getattr }
+allow { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } tmpfs file { read open getattr execute map }
 
-# 4. Injector ptrace permissions
-# service.sh runs as root (usually init or superuser domain).
-# We grant generic ptrace to allow it to attach to the HAL daemon.
-allow su { hal_drm_widevine hal_drm_default mediadrmserver } process ptrace;
-allow init { hal_drm_widevine hal_drm_default mediadrmserver } process ptrace;
+# Injector ptrace permissions. Target identity is independently constrained by
+# service.sh and revalidated by arirang_injector after the tracee is stopped.
+# service.sh runs as root under Magisk (su/init) or KernelSU (ksu).
+allow su { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } process ptrace
+allow init { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } process ptrace
+allow ksu { hal_drm_widevine vendor_hal_drm_widevine hal_drm_default mediadrmserver } process ptrace
 
-# 5. Allow system_server to read sensor/spoof config from app device-encrypted storage.
-allow system_server app_data_file:file { read open getattr };
-allow system_server app_data_file:dir { search getattr };
+# Zygote / system_server load config from the manager app's device-encrypted
+# storage. Without these, native disk config load fails closed and spoofers
+# install with empty defaults until companion reconnect (which is not always
+# available on every Zygisk implementation).
+allow zygote app_data_file dir { search getattr }
+allow zygote app_data_file file { read open getattr }
+allow system_server app_data_file dir { search getattr }
+allow system_server app_data_file file { read open getattr }

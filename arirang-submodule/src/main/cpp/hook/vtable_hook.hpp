@@ -16,9 +16,14 @@ struct VtablePatch {
     // Original function pointer stored in that slot (already resolved to an
     // absolute address for relative slots).
     void *original_function = nullptr;
+    // Hook destination installed by this patch. Uninstall verifies the slot
+    // still resolves here before restoring, so a later hook is never clobbered.
+    void *replacement_function = nullptr;
     // Size and encoding of the slot.
     VtableSlotType slot_type = VtableSlotType::kAbsolute64;
     size_t slot_size = sizeof(void *);
+    // Exact protection bits observed before installation.
+    int original_protection = 0;
 };
 
 // Install a hook by rewriting function pointers in data tables (vtables,
