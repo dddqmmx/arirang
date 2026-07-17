@@ -100,13 +100,6 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
                 if (hasThrowable()) return@afterHookedMethod
                 val method = args[0] as? String
                 val request = args[1] as? String
-                
-                // Diagnostic: Log all interesting requests
-                if (request?.contains("blue", ignoreCase = true) == true || 
-                    request?.contains("name", ignoreCase = true) == true ||
-                    request?.contains("device", ignoreCase = true) == true) {
-                    HookLog.d(HookLog.Module.SETTINGS, "Settings call: method=$method, request=$request")
-                }
 
                 // Handle Android ID (Secure)
                 val callMethodGetSecure = runCatching {
