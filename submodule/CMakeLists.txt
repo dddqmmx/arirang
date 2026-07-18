@@ -35,7 +35,7 @@ if(NOT ARIRANG_APPLICATION_ID MATCHES "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z
     message(FATAL_ERROR "ARIRANG_APPLICATION_ID is not a valid Android application id")
 endif()
 foreach(component ARIRANG_SUBMODULE_CONFIG_DIR ARIRANG_SUBMODULE_CONFIG_FILE)
-    string(LENGTH "${${component}}" component_length)
+    string(LENGTH "${${comzponent}}" component_length)
     if(component_length GREATER 128 OR
        NOT "${${component}}" MATCHES "^[A-Za-z0-9][A-Za-z0-9._-]*$" OR
        "${${component}}" STREQUAL "." OR "${${component}}" STREQUAL "..")

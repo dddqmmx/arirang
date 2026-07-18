@@ -27,5 +27,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Arirang"
 include(":app")
-include(":arirang-submodule")
-include(":arirang-selfcheck")
+include(":submodule")
+include(":selfcheck")
