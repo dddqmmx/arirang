@@ -31,7 +31,7 @@
     <string name="feature_sensor">Sensors</string>
 
     <string name="feature_device_info">Device Info</string>
-    <string name="feature_unique_identifier">Unique Identifier</string>
+    <string name="feature_unique_identifier">Identifiers</string>
     <string name="feature_sim_info">SIM Info</string>
     <string name="feature_location">Location</string>
     <string name="feature_sensor_info">Sensor Info</string>
@@ -52,7 +52,7 @@
     <string name="sim_config_title">SIM Info Configuration</string>
     <string name="sim_scope_title">SIM Modification Scope</string>
     <string name="device_info_config_title">Device Info Configuration</string>
-    <string name="unique_identifier_config_title">Unique Identifier</string>
+    <string name="unique_identifier_config_title">Identifiers</string>
     <string name="location_config_title">Virtual Location</string>
 
     <string name="hint_package_or_app_name">Package or App Name</string>
@@ -70,7 +70,7 @@
     <string name="log_module_sim">SIM</string>
     <string name="log_module_wifi">Wi-Fi</string>
     <string name="log_module_bluetooth">Bluetooth</string>
-    <string name="log_module_unique_id">Unique identifiers</string>
+    <string name="log_module_unique_id">Identifiers</string>
     <string name="log_module_notify">Hook service bridge</string>
 
     <string name="global_settings_title">Global Control</string>
