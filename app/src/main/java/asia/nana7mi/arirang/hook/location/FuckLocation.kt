@@ -12,8 +12,10 @@ import android.content.Context
 import android.location.Location
 import android.location.LocationManager
 import android.os.Binder
+import android.os.Handler
 import android.os.IBinder
 import android.os.IInterface
+import android.os.Looper
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
@@ -21,6 +23,7 @@ import asia.nana7mi.arirang.data.config.ConfigIds
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.lang.ref.WeakReference
 import java.lang.reflect.Method
+import java.lang.reflect.Modifier
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
@@ -36,6 +39,9 @@ class FuckLocation : BaseHookModule(
     private companion object {
         private const val CONFIG_REFRESH_INTERVAL_MS = 300L
         private const val STATUS_DELIVERY_DEDUP_WINDOW_MS = 1_000L
+        private const val PROACTIVE_UPDATES_DELAY_MS = 200L
+        private const val PROACTIVE_UPDATES_DEDUP_WINDOW_MS = 2_000L
+        private const val LOCATION_RECEIVER_TYPE_STATUS = 4
 
         private val GNSS_CLASSES = arrayOf(
             "com.android.server.location.gnss.hal.GnssNative",
@@ -43,6 +49,9 @@ class FuckLocation : BaseHookModule(
             "com.android.server.location.gnss.GnssLocationProviderImpl"
         )
     }
+
+    // Zygote specialize / Xposed module load 时尚无 main looper，不能在字段初始化时 new Handler。
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
     private val hookedClasses = Collections.newSetFromMap(ConcurrentHashMap<Class<*>, Boolean>())
 
@@ -53,6 +62,11 @@ class FuckLocation : BaseHookModule(
     private val activeDeliveryPackage = ThreadLocal<String?>()
 
     private val deliveredStatusCallbacks = Collections.synchronizedSet(
+        Collections.newSetFromMap(WeakHashMap<IBinder, Boolean>())
+    )
+
+    // requestLocationUpdates 主动投递去重：同一 binder 在短窗口内只推一次，避免多 provider 重复刷。
+    private val deliveredUpdateCallbacks = Collections.synchronizedSet(
         Collections.newSetFromMap(WeakHashMap<IBinder, Boolean>())
     )
 
@@ -196,34 +210,108 @@ class FuckLocation : BaseHookModule(
      * getCurrentLocation 在 gxni.f() 内异步注册监听器，仅超时或真实定位到达时才回调，
      * 而 Self-Check 客户端的 Tasks.await 超时（2.5s）远短于 GMS 默认超时（~30s）。
      *
-     * 因此对 type-4 LocationReceiver 在捕获后延迟交付一个假定位，确保客户端在超时前拿到数据。
-     * 若同步路径（getLastLocation）已先完成交付，则此处跳过，避免重复投递。
+     * requestLocationUpdates 走 ILocationListener / ILocationCallback continuous 路径；
+     * 若底层 network/gps 不产出新 fix（陈旧 last location 也会被 maxUpdateAge 丢掉），
+     * 客户端会一直收不到 onLocationChanged，因此 continuous 也需要主动推一次假定位。
+     *
+     * 若同步路径（getLastLocation）已先完成交付，则 type-4 路径跳过，避免重复投递。
      */
     private fun scheduleProactiveFakeDelivery(holder: Any, callbackProxy: IInterface) {
-        runCatching {
-            val type = HookBridge.getIntField(holder, "a")
-            if (type != 4) return
-        }.getOrElse { return }
-
+        val receiverType = runCatching { HookBridge.getIntField(holder, "a") }.getOrNull()
         val profile = resolveProfile() ?: return
-        val binder = callbackProxy.asBinder()
+        val binder = callbackProxy.asBinder() ?: return
+        val pkg = receiverPackages[binder]
         val cl = holder.javaClass.classLoader
+        val proxyRef = WeakReference(callbackProxy)
 
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            if (!markStatusDelivered(binder)) return@postDelayed
+        mainHandler.postDelayed({
+            val proxy = proxyRef.get() ?: return@postDelayed
+            if (receiverType == LOCATION_RECEIVER_TYPE_STATUS) {
+                deliverProactiveStatusLocation(proxy, binder, profile, cl)
+            } else {
+                deliverProactiveUpdateLocation(
+                    target = proxy,
+                    binder = binder,
+                    profile = profile,
+                    provider = LocationManager.FUSED_PROVIDER,
+                    packageName = pkg,
+                    classLoader = cl
+                )
+            }
+        }, PROACTIVE_UPDATES_DELAY_MS)
+    }
 
-            runCatching {
-                val statusClass = HookBridge.findClass("com.google.android.gms.common.api.Status", cl)
-                val statusOk = HookBridge.getStaticObjectField(statusClass, "b")
-                val fakeLoc = fakeLocation(profile)
-                HookBridge.callMethod(callbackProxy, "a", statusOk, fakeLoc)
-                HookLog.d(HookLog.Module.LOCATION, "proactive fake delivery for getCurrentLocation")
-            }.onFailure {
-                synchronized(deliveredStatusCallbacks) {
-                    deliveredStatusCallbacks.remove(binder)
+    private fun deliverProactiveStatusLocation(
+        callbackProxy: IInterface,
+        binder: IBinder,
+        profile: LocationProfile,
+        classLoader: ClassLoader?
+    ) {
+        if (!markStatusDelivered(binder)) return
+        runCatching {
+            val statusClass = HookBridge.findClass("com.google.android.gms.common.api.Status", classLoader)
+            val statusOk = HookBridge.getStaticObjectField(statusClass, "b")
+            val fakeLoc = fakeLocation(profile)
+            HookBridge.callMethod(callbackProxy, "a", statusOk, fakeLoc)
+            HookLog.d(HookLog.Module.LOCATION, "proactive fake delivery for getCurrentLocation")
+        }.onFailure {
+            synchronized(deliveredStatusCallbacks) {
+                deliveredStatusCallbacks.remove(binder)
+            }
+        }
+    }
+
+    private fun deliverProactiveUpdateLocation(
+        target: Any,
+        binder: IBinder?,
+        profile: LocationProfile,
+        provider: String,
+        packageName: String?,
+        classLoader: ClassLoader?
+    ) {
+        if (binder != null && !markUpdateDelivered(binder)) return
+
+        val location = fakeLocation(profile, provider)
+        if (packageName != null) {
+            activeDeliveryPackage.set(packageName)
+        }
+        try {
+            val delivered = deliverFakeLocationToTarget(target, location, classLoader)
+            if (delivered) {
+                HookLog.d(
+                    HookLog.Module.LOCATION,
+                    "proactive fake delivery for requestLocationUpdates provider=$provider caller=$packageName"
+                )
+            } else if (binder != null) {
+                synchronized(deliveredUpdateCallbacks) {
+                    deliveredUpdateCallbacks.remove(binder)
                 }
             }
-        }, 200L)
+        } finally {
+            activeDeliveryPackage.remove()
+        }
+    }
+
+    private fun scheduleProactiveUpdateDelivery(
+        target: Any,
+        profile: LocationProfile,
+        provider: String,
+        packageName: String?
+    ) {
+        val binder = (target as? IInterface)?.asBinder()
+        val targetRef = WeakReference(target)
+        val cl = target.javaClass.classLoader
+        mainHandler.postDelayed({
+            val liveTarget = targetRef.get() ?: return@postDelayed
+            deliverProactiveUpdateLocation(
+                target = liveTarget,
+                binder = binder,
+                profile = profile,
+                provider = provider,
+                packageName = packageName,
+                classLoader = cl
+            )
+        }, PROACTIVE_UPDATES_DELAY_MS)
     }
 
     private fun markStatusDelivered(binder: IBinder): Boolean {
@@ -232,7 +320,7 @@ class FuckLocation : BaseHookModule(
         }
         if (added) {
             val binderRef = WeakReference(binder)
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            mainHandler.postDelayed({
                 val liveBinder = binderRef.get() ?: return@postDelayed
                 synchronized(deliveredStatusCallbacks) {
                     deliveredStatusCallbacks.remove(liveBinder)
@@ -240,6 +328,123 @@ class FuckLocation : BaseHookModule(
             }, STATUS_DELIVERY_DEDUP_WINDOW_MS)
         }
         return added
+    }
+
+    private fun markUpdateDelivered(binder: IBinder): Boolean {
+        val added = synchronized(deliveredUpdateCallbacks) {
+            deliveredUpdateCallbacks.add(binder)
+        }
+        if (added) {
+            val binderRef = WeakReference(binder)
+            mainHandler.postDelayed({
+                val liveBinder = binderRef.get() ?: return@postDelayed
+                synchronized(deliveredUpdateCallbacks) {
+                    deliveredUpdateCallbacks.remove(liveBinder)
+                }
+            }, PROACTIVE_UPDATES_DEDUP_WINDOW_MS)
+        }
+        return added
+    }
+
+    private fun deliverFakeLocationToTarget(
+        target: Any,
+        location: Location,
+        classLoader: ClassLoader?
+    ): Boolean {
+        if (target.dispatchLocation(location)) return true
+
+        val googleResult = createLocationResult(
+            className = "com.google.android.gms.location.LocationResult",
+            classLoader = classLoader ?: target.javaClass.classLoader,
+            location = location
+        )
+        val frameworkResult = createLocationResult(
+            className = "android.location.LocationResult",
+            classLoader = classLoader ?: target.javaClass.classLoader,
+            location = location
+        )
+
+        var delivered = false
+        var current: Class<*>? = target.javaClass
+        while (current != null && current != Any::class.java) {
+            current.declaredMethods.forEach { method ->
+                if (Modifier.isStatic(method.modifiers)) return@forEach
+                if (method.parameterTypes.isEmpty()) return@forEach
+                if (!method.parameterTypes.any {
+                        it == Location::class.java || it.name.endsWith(".LocationResult")
+                    }
+                ) {
+                    return@forEach
+                }
+
+                val args = Array(method.parameterTypes.size) { index ->
+                    val type = method.parameterTypes[index]
+                    when {
+                        type == Location::class.java -> location
+                        type.name == "com.google.android.gms.location.LocationResult" -> googleResult
+                        type.name == "android.location.LocationResult" ||
+                            type.name.endsWith(".LocationResult") -> frameworkResult ?: googleResult
+                        type == Boolean::class.javaPrimitiveType -> false
+                        type == Int::class.javaPrimitiveType -> 0
+                        type == Long::class.javaPrimitiveType -> 0L
+                        type == Float::class.javaPrimitiveType -> 0f
+                        type == Double::class.javaPrimitiveType -> 0.0
+                        type == String::class.java -> location.provider
+                        List::class.java.isAssignableFrom(type) -> listOf(location)
+                        type.isArray && type.componentType == Location::class.java -> arrayOf(location)
+                        else -> null
+                    }
+                }
+
+                val missingRequiredLocation = method.parameterTypes.indices.any { index ->
+                    val type = method.parameterTypes[index]
+                    args[index] == null && (
+                        type == Location::class.java || type.name.endsWith(".LocationResult")
+                    )
+                }
+                if (missingRequiredLocation) return@forEach
+
+                val ok = runCatching {
+                    method.isAccessible = true
+                    method.invoke(target, *args)
+                    true
+                }.getOrDefault(false)
+                if (ok) delivered = true
+            }
+            current = current.superclass
+        }
+        return delivered
+    }
+
+    private fun createLocationResult(
+        className: String,
+        classLoader: ClassLoader?,
+        location: Location
+    ): Any? {
+        val resultClass = HookBridge.findClassIfExists(className, classLoader) ?: return null
+        runCatching {
+            return HookBridge.callStaticMethod(resultClass, "create", location)
+        }
+        runCatching {
+            return HookBridge.callStaticMethod(resultClass, "create", listOf(location))
+        }
+        runCatching {
+            return HookBridge.newInstance(resultClass, listOf(location))
+        }
+        return null
+    }
+
+    private fun isLocationDeliveryTarget(value: Any?): Boolean {
+        value ?: return false
+        if (value is Location || value is String || value is Number || value is Boolean) return false
+        if (value is IInterface) return true
+        if (value.javaClass.hasLocationCallbackMethod()) return true
+        return value.javaClass.declaredMethods.any { method ->
+            !Modifier.isStatic(method.modifiers) &&
+                method.parameterTypes.any {
+                    it == Location::class.java || it.name.endsWith(".LocationResult")
+                }
+        }
     }
 
     private fun bindBinder(binder: IBinder, pkg: String?) {
@@ -437,15 +642,33 @@ class FuckLocation : BaseHookModule(
             }
         })
 
-        listOf("requestLocationUpdates", "requestLocationUpdatesWithPackageName").forEach { methodName ->
-            HookBridge.hookAllMethods(lmsClass, methodName, beforeHookedMethod {
-                val profile = profileForArgs(args) ?: return@beforeHookedMethod
-                args.forEachIndexed { index, arg ->
-                    if (arg is Location) {
-                        args[index] = arg.spoofed(profile)
+        listOf(
+            "requestLocationUpdates",
+            "requestLocationUpdatesWithPackageName",
+            "registerLocationListener",
+            "registerLocationPendingIntent"
+        ).forEach { methodName ->
+            HookBridge.hookAllMethods(lmsClass, methodName, hookedMethod(
+                before = {
+                    val profile = profileForArgs(args) ?: return@hookedMethod
+                    args.forEachIndexed { index, arg ->
+                        if (arg is Location) {
+                            args[index] = arg.spoofed(profile)
+                        }
+                    }
+                },
+                after = {
+                    val profile = profileForArgs(args) ?: return@hookedMethod
+                    val provider = LocationCallerResolver.providerFromArgs(args)
+                    val pkg = LocationCallerResolver.callerFromArgs(args)
+                        ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+                    args.forEach { arg ->
+                        if (isLocationDeliveryTarget(arg)) {
+                            scheduleProactiveUpdateDelivery(arg, profile, provider, pkg)
+                        }
                     }
                 }
-            })
+            ))
         }
     }
 
@@ -455,16 +678,55 @@ class FuckLocation : BaseHookModule(
 
         receiverClasses.forEach { receiverClass ->
             if (!hookedClasses.add(receiverClass)) return@forEach
+            HookBridge.hookAllConstructors(receiverClass, afterHookedMethod {
+                val profile = profileForReceiver(thisObject)
+                    ?: profileForArgs(args)
+                    ?: profileForPackage(LocationCallerResolver.packageNameForUid(Binder.getCallingUid()))
+                    ?: return@afterHookedMethod
+                val provider = LocationCallerResolver.providerFromArgs(args)
+                val pkg = LocationCallerResolver.packageNameFromObject(thisObject)
+                    ?: LocationCallerResolver.callerFromArgs(args)
+                    ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+                // Receiver 构造后立即 + 延迟各投一次：部分版本字段在构造末尾才写完。
+                scheduleProactiveUpdateDelivery(thisObject, profile, provider, pkg)
+                val receiverRef = WeakReference(thisObject)
+                mainHandler.postDelayed({
+                    val receiver = receiverRef.get() ?: return@postDelayed
+                    deliverProactiveUpdateLocation(
+                        target = receiver,
+                        binder = null,
+                        profile = profile,
+                        provider = provider,
+                        packageName = pkg,
+                        classLoader = receiver.javaClass.classLoader
+                    )
+                }, PROACTIVE_UPDATES_DELAY_MS + 100L)
+            })
             receiverClass.declaredMethods
                 .filter { method ->
-                    method.name == "callLocationChangedLocked" &&
-                        method.parameterTypes.any { it == Location::class.java || it.name.endsWith(".LocationResult") }
+                    (
+                        method.name == "callLocationChangedLocked" ||
+                            method.name == "updateLocation" ||
+                            method.name.contains("LocationChanged", ignoreCase = true)
+                        ) &&
+                        method.parameterTypes.any {
+                            it == Location::class.java || it.name.endsWith(".LocationResult")
+                        }
                 }
                 .forEach { method ->
                     HookBridge.hookMethod(method, beforeHookedMethod {
                         val profile = profileForReceiver(thisObject) ?: return@beforeHookedMethod
                         args.forEachIndexed { index, arg ->
-                            args[index] = rewriteLocationContainer(arg, profile)
+                            when {
+                                arg is Location -> args[index] = arg.spoofed(profile)
+                                arg == null && method.parameterTypes[index] == Location::class.java -> {
+                                    args[index] = fakeLocation(
+                                        profile,
+                                        LocationCallerResolver.providerFromArgs(args)
+                                    )
+                                }
+                                else -> args[index] = rewriteLocationContainer(arg, profile)
+                            }
                         }
                         HookLog.d(
                             HookLog.Module.LOCATION,
@@ -494,6 +756,141 @@ class FuckLocation : BaseHookModule(
                 HookLog.d(HookLog.Module.LOCATION, "rewrote provider LocationResult ${report.javaClass.name}")
             }
         })
+
+        // 注册时 framework 会读 last location；若 elapsedRealtime 过旧会被 maxUpdateAge 丢掉。
+        // 对 last-location 读路径直接返回“新鲜”假坐标，确保 HelloTalk 这类仅订 network 的客户端能立刻收到。
+        listOf("getLastLocation", "getLastLocationUnsafe", "getLastLocationLocked").forEach { methodName ->
+            HookBridge.hookAllMethods(providerManagerClass, methodName, afterHookedMethod {
+                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                val provider = providerNameOf(thisObject)
+                when (val current = result) {
+                    is Location -> result = current.spoofed(profile).also {
+                        // spoofed() 已刷新 time/elapsedRealtimeNanos
+                    }
+                    null -> result = fakeLocation(profile, provider)
+                    else -> {
+                        if (current.javaClass.name.endsWith(".LocationResult")) {
+                            rewriteLocationResult(current, profile)
+                        }
+                    }
+                }
+            })
+        }
+
+        // 注册 listener 后主动 report 一次，覆盖“没有 last / last 被过滤”的路径。
+        listOf(
+            "registerLocationRequest",
+            "registerWithService",
+            "onRegistrationActive",
+            "setRealRequestLocked"
+        ).forEach { methodName ->
+            HookBridge.hookAllMethods(providerManagerClass, methodName, afterHookedMethod {
+                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                val managerRef = WeakReference(thisObject)
+                val provider = providerNameOf(thisObject)
+                mainHandler.postDelayed({
+                    val manager = managerRef.get() ?: return@postDelayed
+                    injectProviderLocation(manager, profile, provider, classLoader)
+                }, PROACTIVE_UPDATES_DELAY_MS)
+            })
+        }
+
+        // Registration 激活时也会尝试交付 last location；在 Registration 层再补一刀。
+        providerManagerClass.declaredClasses
+            .filter { it.simpleName.contains("Registration") }
+            .forEach { registrationClass ->
+                if (!hookedClasses.add(registrationClass)) return@forEach
+                listOf("onActive", "onListenerRegister", "deliverLastLocation").forEach { methodName ->
+                    HookBridge.hookAllMethods(registrationClass, methodName, afterHookedMethod {
+                        val profile = profileForReceiver(thisObject) ?: globalRewriteProfile()
+                            ?: return@afterHookedMethod
+                        val provider = providerNameOf(thisObject)
+                        scheduleProactiveUpdateDelivery(
+                            target = thisObject,
+                            profile = profile,
+                            provider = provider,
+                            packageName = LocationCallerResolver.packageNameFromObject(thisObject)
+                        )
+                    })
+                }
+                registrationClass.declaredMethods
+                    .filter { method ->
+                        method.parameterTypes.any {
+                            it == Location::class.java || it.name.endsWith(".LocationResult")
+                        } && (
+                            method.name.contains("location", ignoreCase = true) ||
+                                method.name.contains("deliver", ignoreCase = true) ||
+                                method.name.contains("accept", ignoreCase = true)
+                            )
+                    }
+                    .forEach { method ->
+                        HookBridge.hookMethod(method, beforeHookedMethod {
+                            val profile = profileForReceiver(thisObject) ?: globalRewriteProfile()
+                                ?: return@beforeHookedMethod
+                            args.forEachIndexed { index, arg ->
+                                args[index] = rewriteLocationContainer(arg, profile)
+                            }
+                        })
+                    }
+            }
+
+        HookLog.i(HookLog.Module.LOCATION, "hooked LocationProviderManager last/register inject")
+    }
+
+    private fun providerNameOf(managerOrRegistration: Any?): String {
+        managerOrRegistration ?: return LocationManager.GPS_PROVIDER
+        listOf("mName", "mProviderName", "name", "mProvider").forEach { field ->
+            (getFieldValue(managerOrRegistration, field) as? String)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { return it }
+        }
+        listOf("getName", "getProviderName", "getProvider").forEach { method ->
+            runCatching {
+                (HookBridge.callMethod(managerOrRegistration, method) as? String)
+                    ?.takeIf { it.isNotBlank() }
+            }.getOrNull()?.let { return it }
+        }
+        return LocationManager.GPS_PROVIDER
+    }
+
+    private fun injectProviderLocation(
+        manager: Any,
+        profile: LocationProfile,
+        provider: String,
+        classLoader: ClassLoader?
+    ) {
+        val location = fakeLocation(profile, provider)
+        val frameworkResult = createLocationResult(
+            className = "android.location.LocationResult",
+            classLoader = classLoader ?: manager.javaClass.classLoader,
+            location = location
+        )
+
+        val delivered = runCatching {
+            if (frameworkResult != null) {
+                HookBridge.callMethod(manager, "onReportLocation", frameworkResult)
+                true
+            } else {
+                false
+            }
+        }.getOrDefault(false) || runCatching {
+            HookBridge.callMethod(manager, "onReportLocation", location)
+            true
+        }.getOrDefault(false) || runCatching {
+            if (frameworkResult != null) {
+                HookBridge.callMethod(manager, "reportLocation", frameworkResult)
+                true
+            } else {
+                false
+            }
+        }.getOrDefault(false)
+
+        if (delivered) {
+            HookLog.d(
+                HookLog.Module.LOCATION,
+                "injected provider location provider=$provider via LocationProviderManager"
+            )
+        }
     }
 
     private fun hookAndroidFusedProvider(classLoader: ClassLoader) {
@@ -617,6 +1014,20 @@ class FuckLocation : BaseHookModule(
             })
         }
 
+        HookBridge.hookAllMethods(clientClass, "requestLocationUpdates", afterHookedMethod {
+            val profile = resolveProfile() ?: return@afterHookedMethod
+            args.forEach { arg ->
+                if (isLocationDeliveryTarget(arg)) {
+                    scheduleProactiveUpdateDelivery(
+                        target = arg,
+                        profile = profile,
+                        provider = LocationManager.FUSED_PROVIDER,
+                        packageName = activeDeliveryPackage.get()
+                    )
+                }
+            }
+        })
+
         HookLog.i(HookLog.Module.LOCATION, "hooked Google FusedLocationProviderClient")
     }
 
@@ -682,16 +1093,33 @@ class FuckLocation : BaseHookModule(
                 }
             })
 
-            HookBridge.hookAllMethods(clazz, "requestLocationUpdates", beforeHookedMethod {
-                val profile = profileForArgs(args) ?: resolveProfile() ?: return@beforeHookedMethod
-                args.forEachIndexed { index, arg ->
-                    val rewritten = rewriteLocationContainer(arg, profile)
-                    if (rewritten != null && rewritten !== arg) {
-                        args[index] = rewritten
-                        HookLog.d(HookLog.Module.LOCATION, "spoofed ${clazz.name}.requestLocationUpdates arg $index")
+            HookBridge.hookAllMethods(clazz, "requestLocationUpdates", hookedMethod(
+                before = {
+                    val profile = profileForArgs(args) ?: resolveProfile() ?: return@hookedMethod
+                    args.forEachIndexed { index, arg ->
+                        val rewritten = rewriteLocationContainer(arg, profile)
+                        if (rewritten != null && rewritten !== arg) {
+                            args[index] = rewritten
+                            HookLog.d(HookLog.Module.LOCATION, "spoofed ${clazz.name}.requestLocationUpdates arg $index")
+                        }
+                    }
+                },
+                after = {
+                    val profile = profileForArgs(args) ?: resolveProfile() ?: return@hookedMethod
+                    val pkg = LocationCallerResolver.callerFromArgs(args)
+                        ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+                    args.forEach { arg ->
+                        if (isLocationDeliveryTarget(arg)) {
+                            scheduleProactiveUpdateDelivery(
+                                target = arg,
+                                profile = profile,
+                                provider = LocationManager.FUSED_PROVIDER,
+                                packageName = pkg
+                            )
+                        }
                     }
                 }
-            })
+            ))
         }
     }
 
