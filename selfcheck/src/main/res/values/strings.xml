@@ -98,8 +98,10 @@
     <string name="self_check_wifi_current">Current network: %1$s</string>
     <string name="self_check_location_native_cache">Native Android API (cache)</string>
     <string name="self_check_location_native_realtime">Native Android API (real-time)</string>
+    <string name="self_check_location_native_updates">Native Android API (requestLocationUpdates)</string>
     <string name="self_check_location_fused_cache">Google Fused Location API (cache)</string>
     <string name="self_check_location_fused_realtime">Google Fused Location API (real-time)</string>
+    <string name="self_check_location_fused_updates">Google Fused Location API (requestLocationUpdates)</string>
     <string name="self_check_location_no_data">No data returned</string>
     <string name="self_check_location_coordinates">Coordinates: %1$.6f, %2$.6f</string>
     <string name="self_check_location_accuracy_time">Accuracy: %1$.1fm | Time: %2$s</string>

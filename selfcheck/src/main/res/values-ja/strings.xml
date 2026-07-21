@@ -57,8 +57,10 @@
     <string name="self_check_wifi_current">現在のネットワーク: %1$s</string>
     <string name="self_check_location_native_cache">ネイティブ Android API（キャッシュ）</string>
     <string name="self_check_location_native_realtime">ネイティブ Android API（リアルタイム）</string>
+    <string name="self_check_location_native_updates">ネイティブ Android API（requestLocationUpdates）</string>
     <string name="self_check_location_fused_cache">Google Fused Location API（キャッシュ）</string>
     <string name="self_check_location_fused_realtime">Google Fused Location API（リアルタイム）</string>
+    <string name="self_check_location_fused_updates">Google Fused Location API（requestLocationUpdates）</string>
     <string name="self_check_location_no_data">データは返されませんでした</string>
     <string name="self_check_location_coordinates">座標: %1$.6f, %2$.6f</string>
     <string name="self_check_location_accuracy_time">精度: %1$.1fm | 時刻: %2$s</string>

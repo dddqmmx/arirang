@@ -5,7 +5,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
 import asia.nana7mi.arirang.selfcheck.R
@@ -13,6 +15,10 @@ import asia.nana7mi.arirang.selfcheck.model.CheckDefinitions
 import asia.nana7mi.arirang.selfcheck.model.CheckResult
 import asia.nana7mi.arirang.selfcheck.model.CheckState
 import asia.nana7mi.arirang.selfcheck.util.CheckUtils.readableMessage
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -24,6 +30,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 class LocationChecker : SelfChecker {
     override val titleRes: Int = R.string.self_check_location_title
@@ -68,6 +75,13 @@ class LocationChecker : SelfChecker {
             }.getOrNull()
             values.add(formatLocationProbe(context, context.getString(R.string.self_check_location_fused_realtime), fusedRealtime))
 
+            val fusedUpdates = awaitFusedLocationUpdates(fusedLocationClient)
+            values.add(formatLocationProbe(context, context.getString(R.string.self_check_location_fused_updates), fusedUpdates))
+
+
+            val nativeUpdates = awaitNativeLocationUpdates(context, locationManager)
+            values.add(formatLocationProbe(context, context.getString(R.string.self_check_location_native_updates), nativeUpdates))
+
             val hasLocation = values.any { !it.contains(context.getString(R.string.self_check_location_no_data)) }
             Log.d(CheckDefinitions.PHONE_DIAG_TAG, "Location check: \n" + values.joinToString("\n---\n"))
             CheckResult(
@@ -98,6 +112,74 @@ class LocationChecker : SelfChecker {
         return result
     }
 
+    @SuppressLint("MissingPermission")
+    private fun awaitNativeLocationUpdates(context: Context, locationManager: LocationManager): Location? {
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<Location?>(null)
+        val executor = ContextCompat.getMainExecutor(context)
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                if (result.compareAndSet(null, location)) {
+                    latch.countDown()
+                }
+            }
+        }
+        runCatching {
+            val providers = listOf(
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.GPS_PROVIDER,
+                LocationManager.FUSED_PROVIDER
+            ).filter { provider ->
+                runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false)
+            }
+            if (providers.isEmpty()) return null
+
+            providers.forEach { provider ->
+                runCatching {
+                    locationManager.requestLocationUpdates(
+                        provider,
+                        /* minTimeMs = */ 0L,
+                        /* minDistanceM = */ 0f,
+                        executor,
+                        listener
+                    )
+                }
+            }
+            latch.await(LOCATION_UPDATES_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        }
+        runCatching { locationManager.removeUpdates(listener) }
+        return result.get()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun awaitFusedLocationUpdates(fusedLocationClient: FusedLocationProviderClient): Location? {
+        val latch = CountDownLatch(1)
+        val result = AtomicReference<Location?>(null)
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                val location = locationResult.lastLocation ?: return
+                if (result.compareAndSet(null, location)) {
+                    latch.countDown()
+                }
+            }
+        }
+        runCatching {
+            val request = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 0L)
+                .setMinUpdateIntervalMillis(0L)
+                .setMaxUpdates(1)
+                .setDurationMillis(LOCATION_UPDATES_TIMEOUT_MS)
+                .build()
+            Tasks.await(
+                fusedLocationClient.requestLocationUpdates(request, callback, Looper.getMainLooper()),
+                1500L,
+                TimeUnit.MILLISECONDS
+            )
+            latch.await(LOCATION_UPDATES_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        }
+        runCatching { Tasks.await(fusedLocationClient.removeLocationUpdates(callback), 1500L, TimeUnit.MILLISECONDS) }
+        return result.get()
+    }
+
     private fun formatLocationProbe(context: Context, label: String, location: Location?): String {
         if (location == null) {
             return "$label\n${context.getString(R.string.self_check_location_no_data)}"
@@ -109,5 +191,9 @@ class LocationChecker : SelfChecker {
             context.getString(R.string.self_check_location_accuracy_time, location.accuracy, time),
             "Provider: ${location.provider ?: context.getString(R.string.self_check_unknown_name)}"
         ).joinToString("\n")
+    }
+
+    private companion object {
+        private const val LOCATION_UPDATES_TIMEOUT_MS = 5000L
     }
 }

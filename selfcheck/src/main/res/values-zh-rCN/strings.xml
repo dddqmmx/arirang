@@ -57,8 +57,10 @@
     <string name="self_check_wifi_current">当前网络：%1$s</string>
     <string name="self_check_location_native_cache">原生 Android API（缓存）</string>
     <string name="self_check_location_native_realtime">原生 Android API（实时）</string>
+    <string name="self_check_location_native_updates">原生 Android API（requestLocationUpdates）</string>
     <string name="self_check_location_fused_cache">Google Fused Location API（缓存）</string>
     <string name="self_check_location_fused_realtime">Google Fused Location API（实时）</string>
+    <string name="self_check_location_fused_updates">Google Fused Location API（requestLocationUpdates）</string>
     <string name="self_check_location_no_data">没有返回数据</string>
     <string name="self_check_location_coordinates">经纬度：%1$.6f, %2$.6f</string>
     <string name="self_check_location_accuracy_time">精度：%1$.1fm | 时间：%2$s</string>
