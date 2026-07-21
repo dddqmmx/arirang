@@ -154,6 +154,10 @@ class ConfigSchemaTest {
             enabled = true,
             currentSsid = "MyWiFi",
             currentBssid = "02:00:00:AA:BB:CC",
+            ipAddress = "10.0.0.42",
+            gateway = "10.0.0.1",
+            dns1 = "10.0.0.1",
+            dns2 = "1.1.1.1",
             hideScanResults = false,
             scanResults = listOf(
                 WifiScanNetworkSchema("Neighbor1", "02:00:00:DD:EE:FF"),
@@ -167,6 +171,10 @@ class ConfigSchemaTest {
         assertEquals(original.enabled, restored.enabled)
         assertEquals("MyWiFi", restored.currentSsid)
         assertEquals("02:00:00:AA:BB:CC", restored.currentBssid)
+        assertEquals("10.0.0.42", restored.ipAddress)
+        assertEquals("10.0.0.1", restored.gateway)
+        assertEquals("10.0.0.1", restored.dns1)
+        assertEquals("1.1.1.1", restored.dns2)
         assertEquals(false, restored.hideScanResults)
         assertEquals(2, restored.scanResults.size)
         assertEquals("Neighbor1", restored.scanResults[0].ssid)

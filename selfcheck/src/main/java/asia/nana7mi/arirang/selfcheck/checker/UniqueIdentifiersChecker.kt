@@ -6,6 +6,9 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaDrm
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
@@ -17,7 +20,6 @@ import asia.nana7mi.arirang.selfcheck.R
 import asia.nana7mi.arirang.selfcheck.model.CheckDefinitions
 import asia.nana7mi.arirang.selfcheck.model.CheckResult
 import asia.nana7mi.arirang.selfcheck.model.CheckState
-import asia.nana7mi.arirang.selfcheck.util.CheckUtils.maskForPhoneDiag
 import asia.nana7mi.arirang.selfcheck.util.CheckUtils.maskMiddle
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import com.google.android.gms.appset.AppSet
@@ -170,21 +172,22 @@ class UniqueIdentifiersChecker : SelfChecker {
             runCatching {
                 val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 wifiManager.connectionInfo
-            }.getOrNull()?.let { connectionInfo ->
-                connectionInfo.macAddress
-                    ?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
-                    ?.let { values.add("Wi-Fi MAC: $it") }
-                connectionInfo.bssid
-                    ?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
-                    ?.let { values.add("Wi-Fi BSSID: $it") }
-            }
+            }.getOrNull()?.let { addWifiIdentifiers(values, "WifiManager.connectionInfo", it) }
+
+            runCatching {
+                val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+                val network = connectivityManager?.activeNetwork ?: return@runCatching null
+                val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return@runCatching null
+                if (!capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return@runCatching null
+                capabilities.transportInfo as? WifiInfo
+            }.getOrNull()?.let { addWifiIdentifiers(values, "ConnectivityManager.transportInfo", it) }
         }
 
         runCatching {
             NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
                 .mapNotNull { item ->
                     val mac = item.hardwareAddress?.joinToString(":") { "%02x".format(it) }
-                    mac?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
+                    mac?.takeUnless { it.isBlank() || it == REDACTED_MAC }
                         ?.let { "${item.name} MAC: $it" }
                 }
                 .take(6)
@@ -195,8 +198,23 @@ class UniqueIdentifiersChecker : SelfChecker {
                 val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
                 bluetoothManager.adapter?.address
             }.getOrNull()
-                ?.takeUnless { it.isBlank() || it == "02:00:00:00:00:00" }
+                ?.takeUnless { it.isBlank() || it == REDACTED_MAC }
                 ?.let { values.add("Bluetooth MAC: $it") }
         }
+    }
+
+    @SuppressLint("HardwareIds")
+    private fun addWifiIdentifiers(values: MutableList<String>, source: String, wifiInfo: WifiInfo) {
+        @Suppress("DEPRECATION")
+        wifiInfo.macAddress
+            ?.takeUnless { it.isBlank() || it.equals(REDACTED_MAC, ignoreCase = true) }
+            ?.let { values.add("Wi-Fi MAC ($source): $it") }
+        wifiInfo.bssid
+            ?.takeUnless { it.isBlank() || it.equals(REDACTED_MAC, ignoreCase = true) }
+            ?.let { values.add("Wi-Fi BSSID ($source): $it") }
+    }
+
+    private companion object {
+        private const val REDACTED_MAC = "02:00:00:00:00:00"
     }
 }

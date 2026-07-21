@@ -245,6 +245,10 @@ object ConfigRegistry {
             add("currentSsid must contain 1..$MAX_SSID_LENGTH characters")
         }
         if (!MAC_ADDRESS.matches(schema.currentBssid)) add("currentBssid is invalid")
+        if (!IPV4.matches(schema.ipAddress)) add("ipAddress is invalid")
+        if (!IPV4.matches(schema.gateway)) add("gateway is invalid")
+        if (!IPV4.matches(schema.dns1)) add("dns1 is invalid")
+        if (!IPV4.matches(schema.dns2)) add("dns2 is invalid")
         if (schema.scanResults.size > MAX_NETWORKS) add("scanResults exceeds $MAX_NETWORKS entries")
         schema.scanResults.forEachIndexed { index, network ->
             if (network.ssid.length > MAX_SSID_LENGTH) add("scanResults[$index].ssid is too long")
@@ -448,6 +452,9 @@ object ConfigRegistry {
     private const val MAX_SENSOR_TEXT_LENGTH = 1_024
     private const val MAX_SENSOR_ID_LENGTH = 128
     private val MAC_ADDRESS = Regex("^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$", RegexOption.IGNORE_CASE)
+    private val IPV4 = Regex(
+        "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$"
+    )
     private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+$")
     private val COUNTRY_ISO = Regex("^[A-Za-z]{2}$")
     private val MCC = Regex("^[0-9]{3}$")

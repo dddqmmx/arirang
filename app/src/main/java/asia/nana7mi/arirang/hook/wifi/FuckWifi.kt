@@ -7,7 +7,8 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 /**
  * Rewrites current Wi-Fi identity and nearby Wi-Fi scan results at the Wi-Fi
- * service layer, so callers observe spoofed data through normal framework APIs.
+ * service and Connectivity framework layers, so callers observe spoofed data
+ * through WifiManager and ConnectivityManager (including transportInfo).
  */
 class FuckWifi : BaseHookModule(
     targetPackages = setOf("android", "com.android.wifi")
@@ -15,6 +16,7 @@ class FuckWifi : BaseHookModule(
     private val configStore = WifiConfigStore()
     private val serviceHooks = WifiServiceHooks(::currentConfig)
     private val systemServiceHooks = WifiSystemServiceHooks(serviceHooks)
+    private val connectivityHooks = WifiConnectivityHooks(::currentConfig)
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
@@ -26,6 +28,7 @@ class FuckWifi : BaseHookModule(
             )
             serviceHooks.hookWifiService(lpparam.classLoader)
             systemServiceHooks.hookWifiSystemServiceManager(lpparam.classLoader)
+            connectivityHooks.hookConnectivitySurfaces(lpparam.classLoader)
             HookLog.i(HookLog.Module.WIFI, "Wi-Fi privacy hook installed for ${lpparam.packageName}")
         }.onFailure {
             HookLog.e(HookLog.Module.WIFI, "Wi-Fi privacy hook failed for ${lpparam.packageName}", it)

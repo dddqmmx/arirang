@@ -160,6 +160,10 @@
     <string name="wifi_section_scan_result">周辺 Wi-Fi</string>
     <string name="wifi_field_current_ssid">現在の SSID</string>
     <string name="wifi_field_current_bssid">現在の BSSID</string>
+    <string name="wifi_field_ip_address">IP アドレス</string>
+    <string name="wifi_field_gateway">ゲートウェイ</string>
+    <string name="wifi_field_dns1">DNS 1</string>
+    <string name="wifi_field_dns2">DNS 2</string>
     <string name="wifi_field_scan_ssid">スキャン結果 SSID</string>
     <string name="wifi_field_scan_bssid">スキャン結果 BSSID</string>
     <string name="wifi_hide_all_scan_results">周辺 Wi-Fi をすべて非表示</string>

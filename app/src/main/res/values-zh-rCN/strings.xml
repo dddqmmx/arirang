@@ -162,6 +162,10 @@
     <string name="wifi_section_scan_result">周边 Wi-Fi</string>
     <string name="wifi_field_current_ssid">当前 SSID</string>
     <string name="wifi_field_current_bssid">当前 BSSID</string>
+    <string name="wifi_field_ip_address">IP 地址</string>
+    <string name="wifi_field_gateway">网关</string>
+    <string name="wifi_field_dns1">DNS 1</string>
+    <string name="wifi_field_dns2">DNS 2</string>
     <string name="wifi_field_scan_ssid">扫描结果 SSID</string>
     <string name="wifi_field_scan_bssid">扫描结果 BSSID</string>
     <string name="wifi_hide_all_scan_results">隐藏所有周边 Wi-Fi</string>

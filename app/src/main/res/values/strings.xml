@@ -179,6 +179,10 @@
     <string name="wifi_section_scan_result">Nearby Wi-Fi</string>
     <string name="wifi_field_current_ssid">Current SSID</string>
     <string name="wifi_field_current_bssid">Current BSSID</string>
+    <string name="wifi_field_ip_address">IP address</string>
+    <string name="wifi_field_gateway">Gateway</string>
+    <string name="wifi_field_dns1">DNS 1</string>
+    <string name="wifi_field_dns2">DNS 2</string>
     <string name="wifi_field_scan_ssid">Scan result SSID</string>
     <string name="wifi_field_scan_bssid">Scan result BSSID</string>
     <string name="wifi_hide_all_scan_results">Hide all nearby Wi-Fi</string>
