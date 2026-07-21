@@ -14,6 +14,10 @@ internal data class WifiHookConfig(
     val enabled: Boolean = false,
     val currentSsid: String = WifiConfigPrefs.DEFAULT_CURRENT_SSID,
     val currentBssid: String = WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
+    val ipAddress: String = WifiConfigPrefs.DEFAULT_IP_ADDRESS,
+    val gateway: String = WifiConfigPrefs.DEFAULT_GATEWAY,
+    val dns1: String = WifiConfigPrefs.DEFAULT_DNS1,
+    val dns2: String = WifiConfigPrefs.DEFAULT_DNS2,
     val hideScanResults: Boolean = false,
     val scanResults: List<WifiScanNetwork> = listOf(WifiScanNetwork())
 )
@@ -54,6 +58,14 @@ internal class WifiConfigStore {
                     .takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
                 currentBssid = schema.currentBssid
                     .takeIf(::isValidMacAddress) ?: WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
+                ipAddress = schema.ipAddress
+                    .takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_IP_ADDRESS,
+                gateway = schema.gateway
+                    .takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_GATEWAY,
+                dns1 = schema.dns1
+                    .takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS1,
+                dns2 = schema.dns2
+                    .takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS2,
                 hideScanResults = schema.hideScanResults,
                 scanResults = schema.scanResults.map { WifiScanNetwork(it.ssid, it.bssid) }
                     .filter { it.ssid.isNotBlank() && isValidMacAddress(it.bssid) }
@@ -70,6 +82,14 @@ internal class WifiConfigStore {
                 ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
             currentBssid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_BSSID, null)
                 ?.takeIf(::isValidMacAddress) ?: WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
+            ipAddress = prefs.getString(WifiConfigPrefs.KEY_IP_ADDRESS, null)
+                ?.takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_IP_ADDRESS,
+            gateway = prefs.getString(WifiConfigPrefs.KEY_GATEWAY, null)
+                ?.takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_GATEWAY,
+            dns1 = prefs.getString(WifiConfigPrefs.KEY_DNS1, null)
+                ?.takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS1,
+            dns2 = prefs.getString(WifiConfigPrefs.KEY_DNS2, null)
+                ?.takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS2,
             hideScanResults = prefs.getBoolean(WifiConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),
             scanResults = parseScanResults(
                 prefs.getString(WifiConfigPrefs.KEY_SCAN_RESULTS, null),

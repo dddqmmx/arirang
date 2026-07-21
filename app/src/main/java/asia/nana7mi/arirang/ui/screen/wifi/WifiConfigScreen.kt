@@ -17,7 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiFind
 import androidx.compose.material3.CardDefaults
@@ -94,9 +94,29 @@ internal fun WifiConfigScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        config = WifiConfigPrefs.Config()
+                        val lan = randomLanAddresses()
+                        config = config.copy(
+                            currentBssid = randomBssid(),
+                            ipAddress = lan.ipAddress,
+                            gateway = lan.gateway,
+                            dns1 = lan.dns1,
+                            dns2 = lan.dns2,
+                            scanResults = config.scanResults.map { network ->
+                                network.copy(bssid = randomBssid())
+                            }.ifEmpty {
+                                listOf(
+                                    WifiConfigPrefs.ScanNetwork(
+                                        ssid = WifiConfigPrefs.DEFAULT_SCAN_SSID,
+                                        bssid = randomBssid()
+                                    )
+                                )
+                            }
+                        )
                     }) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.wifi_apply_defaults))
+                        Icon(
+                            Icons.Default.Shuffle,
+                            contentDescription = stringResource(R.string.unique_randomize_all)
+                        )
                     }
                     SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
                 },
@@ -167,6 +187,52 @@ internal fun WifiConfigScreen(
                         value = config.currentBssid,
                         onValueChange = { config = config.copy(currentBssid = it) },
                         onRandom = { config = config.copy(currentBssid = randomBssid()) }
+                    )
+                    WifiTextField(
+                        label = stringResource(R.string.wifi_field_ip_address),
+                        value = config.ipAddress,
+                        onValueChange = { config = config.copy(ipAddress = it) },
+                        onRandom = {
+                            val lan = randomLanAddresses()
+                            config = config.copy(
+                                ipAddress = lan.ipAddress,
+                                gateway = lan.gateway,
+                                dns1 = lan.dns1,
+                                dns2 = lan.dns2
+                            )
+                        }
+                    )
+                    WifiTextField(
+                        label = stringResource(R.string.wifi_field_gateway),
+                        value = config.gateway,
+                        onValueChange = { config = config.copy(gateway = it) },
+                        onRandom = {
+                            val lan = randomLanAddresses()
+                            config = config.copy(
+                                ipAddress = lan.ipAddress,
+                                gateway = lan.gateway,
+                                dns1 = lan.dns1,
+                                dns2 = lan.dns2
+                            )
+                        }
+                    )
+                    WifiTextField(
+                        label = stringResource(R.string.wifi_field_dns1),
+                        value = config.dns1,
+                        onValueChange = { config = config.copy(dns1 = it) },
+                        onRandom = {
+                            val dns = randomDnsPair()
+                            config = config.copy(dns1 = dns.first, dns2 = dns.second)
+                        }
+                    )
+                    WifiTextField(
+                        label = stringResource(R.string.wifi_field_dns2),
+                        value = config.dns2,
+                        onValueChange = { config = config.copy(dns2 = it) },
+                        onRandom = {
+                            val dns = randomDnsPair()
+                            config = config.copy(dns1 = dns.first, dns2 = dns.second)
+                        }
                     )
                 }
             }

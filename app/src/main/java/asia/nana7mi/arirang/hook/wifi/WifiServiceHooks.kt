@@ -126,8 +126,13 @@ internal class WifiServiceHooks(
 
         var hookedConnectionInfo = 0
         var hookedScanResults = 0
+        var hookedDhcpInfo = 0
         val candidateMethods = serviceClass.declaredMethods
-            .filter { it.name == "getConnectionInfo" || it.name == "getScanResults" }
+            .filter {
+                it.name == "getConnectionInfo" ||
+                    it.name == "getScanResults" ||
+                    it.name == "getDhcpInfo"
+            }
         HookLog.i(
             HookLog.Module.WIFI,
             "Wi-Fi service ${serviceClass.name} candidates=${candidateMethods.joinToString { it.signature() }}"
@@ -158,12 +163,23 @@ internal class WifiServiceHooks(
                     })
                     hookedScanResults++
                 }
+
+                method.name == "getDhcpInfo" && method.returnType.name == "android.net.DhcpInfo" -> {
+                    HookBridge.hookMethod(method, afterHookedMethod {
+                        if (hasThrowable()) return@afterHookedMethod
+                        val config = currentConfig()
+                        if (!config.enabled) return@afterHookedMethod
+                        result = spoofedDhcpInfo(config)
+                        HookLog.d(HookLog.Module.WIFI, "spoof getDhcpInfo via ${method.signature()}")
+                    })
+                    hookedDhcpInfo++
+                }
             }
         }
 
         HookLog.i(
             HookLog.Module.WIFI,
-            "hooked Wi-Fi service ${serviceClass.name} connectionInfo=$hookedConnectionInfo scanResults=$hookedScanResults"
+            "hooked Wi-Fi service ${serviceClass.name} connectionInfo=$hookedConnectionInfo scanResults=$hookedScanResults dhcpInfo=$hookedDhcpInfo"
         )
     }
 

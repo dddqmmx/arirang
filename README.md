@@ -91,9 +91,12 @@ Use at your own risk.
   fused location paths, Google Fused Location APIs, GNSS status, and NMEA reports.
 
 - **Wi-Fi Info Masking (Experimental)**  
-  Configure the current Wi-Fi SSID and BSSID returned from framework Wi-Fi service
-  paths on modern Android. Other `WifiInfo` fields currently use fixed spoofed
-  fallback values, including MAC address, RSSI, frequency, and network ID.
+  Configure the current Wi-Fi SSID, BSSID, IP address, gateway, and DNS returned
+  from framework Wi-Fi service paths and ConnectivityManager surfaces
+  (`NetworkCapabilities.transportInfo` / SSID, `WifiNetworkAgentSpecifier`,
+  `NetworkInfo.extraInfo`, `WifiInfo` parcel/accessors, `DhcpInfo`) on modern
+  Android. Other `WifiInfo` fields currently use fixed spoofed fallback values,
+  including MAC address, RSSI, frequency, and network ID.
 
 - **Nearby Wi-Fi List Masking (Experimental)**  
   Configure one or more nearby Wi-Fi scan result SSID/BSSID pairs, or return an empty scan list.
