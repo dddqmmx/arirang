@@ -50,9 +50,6 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Arirang.Transparent" />
         <activity
-            android:name=".ui.activity.SimScopeActivity"
-            android:exported="false" />
-        <activity
             android:name=".ui.activity.LocationConfigActivity"
             android:exported="false" />
         <activity
@@ -68,9 +65,6 @@
             android:name=".ui.activity.SimConfigActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.activity.TestActivity"
-            android:exported="false" />
-        <activity
             android:name=".ui.activity.DeviceInfoConfigActivity"
             android:exported="false" />
         <activity
@@ -78,9 +72,6 @@
             android:exported="false" />
         <activity
             android:name=".ui.activity.AdvancedSettingsActivity"
-            android:exported="false" />
-        <activity
-            android:name=".ui.activity.LanguageSettingsActivity"
             android:exported="false" />
         <activity
             android:name=".ui.activity.ClipboardConfigActivity"

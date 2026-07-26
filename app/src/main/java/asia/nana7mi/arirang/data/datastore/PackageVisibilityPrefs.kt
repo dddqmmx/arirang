@@ -13,9 +13,6 @@ object PackageVisibilityPrefs {
     const val PREFS_NAME = "clipboard_visibility_prefs"
 
     private const val KEY_ENABLED = "enabled"
-    private const val KEY_MODE = "mode"
-    private const val KEY_VISIBLE_LIST = "visible_list"
-    private const val KEY_INVISIBLE_LIST = "invisible_list"
     private const val KEY_LAST_MODIFIED = "last_modified"
 
     private const val KEY_DEFAULT_MODE = "default_display_mode"

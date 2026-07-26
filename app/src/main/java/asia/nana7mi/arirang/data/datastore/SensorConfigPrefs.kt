@@ -56,9 +56,6 @@ object SensorConfigPrefs {
     data class Config(
         val enabled: Boolean = false,
         val hideAll: Boolean = false,
-        val disableAccel: Boolean = false,
-        val disableGyro: Boolean = false,
-        val disableMagnetic: Boolean = false,
         val precisionBySensorType: Map<Int, Int> = emptyMap(),
         val sensorEntries: List<SensorEntry> = emptyList(),
         val vendorReplacement: String = "",

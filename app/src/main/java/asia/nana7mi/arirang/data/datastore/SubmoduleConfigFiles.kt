@@ -174,16 +174,6 @@ object SubmoduleConfigFiles {
         val array = JSONArray()
         if (config.hideAll) return array
 
-        if (config.disableAccel) {
-            array.put(JSONObject().put("type", android.hardware.Sensor.TYPE_ACCELEROMETER))
-        }
-        if (config.disableGyro) {
-            array.put(JSONObject().put("type", android.hardware.Sensor.TYPE_GYROSCOPE))
-        }
-        if (config.disableMagnetic) {
-            array.put(JSONObject().put("type", android.hardware.Sensor.TYPE_MAGNETIC_FIELD))
-        }
-
         config.sensorEntries.filter { it.hidden && !it.isCustom }.forEach { entry ->
             array.put(
                 JSONObject()
