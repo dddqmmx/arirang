@@ -52,7 +52,7 @@ internal class WifiConnectivityHooks(
             if (isAlreadySpoofed(wifiInfo, config) || isRedactedWifiInfo(wifiInfo)) {
                 return@beforeHookedMethod
             }
-            spoofedWifiInfo(config)?.let {
+            spoofedWifiInfo(config, wifiInfo)?.let {
                 args[0] = it
                 HookLog.d(HookLog.Module.WIFI, "spoof NetworkCapabilities.setTransportInfo")
             }
@@ -67,7 +67,7 @@ internal class WifiConnectivityHooks(
             if (isAlreadySpoofed(wifiInfo, config) || isRedactedWifiInfo(wifiInfo)) {
                 return@afterHookedMethod
             }
-            spoofedWifiInfo(config)?.let {
+            spoofedWifiInfo(config, wifiInfo)?.let {
                 result = it
                 HookLog.d(HookLog.Module.WIFI, "spoof NetworkCapabilities.getTransportInfo")
             }
@@ -240,13 +240,23 @@ internal class WifiConnectivityHooks(
             networkInfoClass,
             "writeToParcel",
             object : XC_MethodHook() {
+                // Read and write mExtraInfo directly rather than through
+                // getExtraInfo/setExtraInfo. getExtraInfo is hooked a few lines
+                // above to return the spoofed SSID, so calling it here returned
+                // the value we ourselves injected; the guard below then matched,
+                // this hook returned early, and writeToParcel went on to write
+                // the *real* SSID straight out of the field — AOSP's
+                // implementation does dest.writeString(mExtraInfo), bypassing the
+                // getter, which is the whole reason this hook exists. Every app
+                // that unmarshalled a Wi-Fi NetworkInfo saw the real network.
+                // The sibling hooks (mSsid/mBssid) already read raw fields.
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val config = currentConfig()
                     if (!config.enabled) return
                     val networkInfo = param.thisObject as? NetworkInfo ?: return
                     if (networkInfo.type != TYPE_WIFI) return
                     val current = runCatching {
-                        HookBridge.callMethod(networkInfo, "getExtraInfo") as? String
+                        HookBridge.getObjectField(networkInfo, "mExtraInfo") as? String
                     }.getOrNull()
                     if (!isVisibleSsid(current) ||
                         current?.removeSurrounding("\"") == config.currentSsid
@@ -255,9 +265,9 @@ internal class WifiConnectivityHooks(
                     }
                     param.setObjectExtra(NETWORK_INFO_RESTORE_KEY, current)
                     runCatching {
-                        HookBridge.callMethod(
+                        HookBridge.setObjectField(
                             networkInfo,
-                            "setExtraInfo",
+                            "mExtraInfo",
                             quoteSsid(config.currentSsid)
                         )
                     }
@@ -269,7 +279,7 @@ internal class WifiConnectivityHooks(
                         ?: return
                     val networkInfo = param.thisObject as? NetworkInfo ?: return
                     runCatching {
-                        HookBridge.callMethod(networkInfo, "setExtraInfo", original)
+                        HookBridge.setObjectField(networkInfo, "mExtraInfo", original)
                     }
                 }
             }

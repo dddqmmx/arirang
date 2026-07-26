@@ -145,7 +145,7 @@ internal class WifiServiceHooks(
                         if (isRedactedWifiInfo(result)) return@afterHookedMethod
                         val config = currentConfig()
                         if (!config.enabled) return@afterHookedMethod
-                        spoofedWifiInfo(config)?.let { result = it }
+                        spoofedWifiInfo(config, result)?.let { result = it }
                         HookLog.d(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
                     })
                     hookedConnectionInfo++

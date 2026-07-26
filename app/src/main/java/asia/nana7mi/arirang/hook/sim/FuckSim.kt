@@ -232,7 +232,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             hookProfileMethod(
                 phoneInterfaceManagerClass,
                 methodName,
-                beforeOriginal = true,
                 shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
             ) { param, method ->
                 val profile = when {
@@ -257,7 +256,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 "getTypeAllocationCodeForPhone",
                 "getTypeAllocationCodeForSubscriber"
             ),
-            beforeOriginal = true,
             shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
             typeAllocationCodeForCall(param, method)
@@ -316,7 +314,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 "getImei",
                 "getImeiForSubscriber"
             ),
-            beforeOriginal = true,
             shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
             imeiForCall(param, method)
@@ -331,7 +328,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 "getTypeAllocationCodeForPhone",
                 "getTypeAllocationCodeForSubscriber"
             ),
-            beforeOriginal = true,
             shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
             typeAllocationCodeForCall(param, method)
@@ -352,7 +348,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 "getTypeAllocationCodeForPhone",
                 "getTypeAllocationCodeForSubscriber"
             ),
-            beforeOriginal = true,
             shouldHandle = { it.enabled || it.uniqueIdentifiers.enabled }
         ) { param, method ->
             typeAllocationCodeForCall(param, method)
@@ -771,7 +766,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass: Class<*>,
         methodName: String,
         externalClientsOnly: Boolean = false,
-        beforeOriginal: Boolean = false,
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
         valueProvider: (XC_MethodHook.MethodHookParam, Method) -> Any?
     ) {
@@ -779,26 +773,34 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         if (methods.isEmpty()) return
 
         methods.forEach { method ->
-            HookBridge.hookMethod(method, hookedMethod(
-                before = {
-                    if (beforeOriginal) {
-                        val config = hookConfig
-                        if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
-                            result = coerceHookResult(valueProvider(this, method), null)
-                        }
-                    }
-                },
-                after = {
-                    if (!beforeOriginal) {
-                        val config = hookConfig
-                        if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
-                            result = coerceHookResult(valueProvider(this, method), result)
-                        }
-                    }
+            HookBridge.hookMethod(method, afterHookedMethod {
+                if (callerWasRefused()) return@afterHookedMethod
+                val config = hookConfig
+                if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
+                    result = coerceHookResult(valueProvider(this, method), result)
                 }
-            ))
+            })
         }
     }
+
+    /**
+     * True when the original method refused this caller on permission grounds.
+     *
+     * AOSP enforces READ_PRIVILEGED_PHONE_STATE / carrier privileges *inside*
+     * the bodies of the device-identifier getters, by throwing
+     * SecurityException. Two things used to defeat that: short-circuiting in a
+     * before-hook skipped the body entirely, and assigning `result` in an
+     * after-hook clears any pending throwable. Either way an unprivileged app
+     * calling getImei() received an identifier the platform had just refused to
+     * hand over — an information-disclosure regression, and a reliable signal to
+     * a fingerprinting SDK that the device is hooked, which defeats the point of
+     * the module.
+     *
+     * Only SecurityException is preserved. Other failures (no SIM, null phone
+     * object) are still masked with the spoofed value, as before.
+     */
+    private fun XC_MethodHook.MethodHookParam.callerWasRefused(): Boolean =
+        throwable is SecurityException
 
     private fun coerceHookResult(value: Any?, originalResult: Any?): Any? {
         return when (originalResult) {
@@ -829,19 +831,17 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         className: String,
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
-        beforeOriginal: Boolean = false,
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
         val targetClass = HookBridge.findClassIfExists(className, classLoader) ?: return
-        hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, beforeOriginal, shouldHandle, resultProvider)
+        hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, shouldHandle, resultProvider)
     }
 
     private fun hookAllExistingStringMethods(
         targetClass: Class<*>,
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
-        beforeOriginal: Boolean = false,
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
         resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
     ) {
@@ -858,27 +858,16 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 if (methodName.contains("TypeAllocationCode", ignoreCase = true)) {
                     HookLog.i(
                         HookLog.Module.UNIQUE_ID,
-                        "install TAC hook ${targetClass.name}.${method.name}(${method.parameterTypes.joinToString { it.simpleName }}) beforeOriginal=$beforeOriginal"
+                        "install TAC hook ${targetClass.name}.${method.name}(${method.parameterTypes.joinToString { it.simpleName }})"
                     )
                 }
-                HookBridge.hookMethod(method, hookedMethod(
-                    before = {
-                        if (beforeOriginal) {
-                            val config = hookConfig
-                            if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
-                                result = resultProvider(this, method)
-                            }
-                        }
-                    },
-                    after = {
-                        if (!beforeOriginal) {
-                            val config = hookConfig
-                            if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly) && (result == null || result is String)) {
-                                result = resultProvider(this, method)
-                            }
-                        }
+                HookBridge.hookMethod(method, afterHookedMethod {
+                    if (callerWasRefused()) return@afterHookedMethod
+                    val config = hookConfig
+                    if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly) && (result == null || result is String)) {
+                        result = resultProvider(this, method)
                     }
-                ))
+                })
             }
         }
     }

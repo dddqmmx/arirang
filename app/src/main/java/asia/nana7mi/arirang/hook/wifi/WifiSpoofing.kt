@@ -6,8 +6,31 @@ import android.net.DhcpInfo
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
 
-internal fun spoofedWifiInfo(config: WifiHookConfig): Any? {
-    val wifiInfo = runCatching { HookBridge.newInstance(WifiInfo::class.java) }.getOrNull() ?: return null
+/**
+ * Builds the WifiInfo callers should see.
+ *
+ * Prefers copying [original] and rewriting only the identity fields. WifiInfo's
+ * no-arg constructor runs `reset()`, which leaves `mSupplicantState =
+ * UNINITIALIZED`, `mLinkSpeed = -1`, `mCurrentSecurityType = UNKNOWN`,
+ * `mWifiStandard = UNKNOWN` and roughly fifteen other fields at their defaults.
+ * Only SSID/BSSID/MAC/RSSI/frequency/networkId were filled in on top, so a
+ * genuinely connected device reported a valid SSID *and* "not connected": the
+ * very common `info.supplicantState == SupplicantState.COMPLETED` check failed
+ * and apps fell back to cellular or showed an offline UI. That combination is
+ * also impossible on real hardware, making it a trivial fingerprint of the
+ * module.
+ *
+ * When no original is available (or the hidden copy constructor is unusable)
+ * the from-scratch path is kept, but the connection-state fields are seeded with
+ * plausible values rather than left at their reset defaults.
+ */
+internal fun spoofedWifiInfo(config: WifiHookConfig, original: Any? = null): Any? {
+    val copied = (original as? WifiInfo)
+        ?.let { runCatching { HookBridge.newInstance(WifiInfo::class.java, it) }.getOrNull() }
+    val wifiInfo = copied
+        ?: runCatching { HookBridge.newInstance(WifiInfo::class.java) }.getOrNull()
+        ?: return null
+    if (copied == null) seedPlausibleConnectionState(wifiInfo)
     wifiInfo.also {
         val wifiSsid = wifiSsid(config.currentSsid)
         val ipInt = ipv4ToInt(config.ipAddress)
@@ -30,6 +53,30 @@ internal fun spoofedWifiInfo(config: WifiHookConfig): Any? {
     }
     val bssid = runCatching { HookBridge.callMethod(wifiInfo, "getBSSID") as? String }.getOrNull()
     return wifiInfo.takeIf { bssid.equals(config.currentBssid, ignoreCase = true) }
+}
+
+/**
+ * Fills in the connection-state fields a freshly constructed WifiInfo leaves at
+ * `reset()` defaults, so a spoofed object at least describes a plausible
+ * association rather than an impossible one.
+ */
+private fun seedPlausibleConnectionState(wifiInfo: Any) {
+    runCatching {
+        val supplicantStateClass =
+            HookBridge.findClassIfExists("android.net.wifi.SupplicantState", null)
+        val completed = supplicantStateClass
+            ?.let { HookBridge.getStaticObjectField(it, "COMPLETED") }
+        if (completed != null) {
+            HookBridge.setObjectField(wifiInfo, "mSupplicantState", completed)
+        }
+    }
+    runCatching { HookBridge.setIntField(wifiInfo, "mLinkSpeed", 130) }
+    runCatching { HookBridge.setIntField(wifiInfo, "mTxLinkSpeed", 130) }
+    runCatching { HookBridge.setIntField(wifiInfo, "mRxLinkSpeed", 130) }
+    // WifiInfo.WIFI_STANDARD_11N
+    runCatching { HookBridge.setIntField(wifiInfo, "mWifiStandard", 4) }
+    // WifiInfo.SECURITY_TYPE_PSK
+    runCatching { HookBridge.setIntField(wifiInfo, "mCurrentSecurityType", 2) }
 }
 
 @Suppress("DEPRECATION")
