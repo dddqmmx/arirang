@@ -20,31 +20,40 @@ data class LocationConfigSchema(
     companion object {
         const val SCHEMA_VERSION = 1
 
+        /**
+         * Declared defaults, used as the decode fallback for absent fields, so
+         * the two cannot drift apart. schemaVersion/lastModified are excluded
+         * deliberately: an absent schemaVersion must stay 0 ("unversioned") so
+         * ManagedConfig still rejects legacy payloads.
+         */
+        private val DEFAULTS = LocationConfigSchema()
+        private val PROFILE_DEFAULTS = LocationProfileSchema()
+
         fun fromJson(json: String): LocationConfigSchema {
             val root = JSON_PARSER.parse(json).asJsonObject
             val perPackage = mutableMapOf<String, LocationProfileSchema>()
             root.get("perPackage")?.asJsonObject?.entrySet()?.forEach { (pkg, value) ->
                 val profileJson = value.asJsonObject
                 perPackage[pkg] = LocationProfileSchema(
-                    enabled = profileJson.get("enabled")?.asBoolean ?: false,
-                    latitude = profileJson.get("latitude")?.asDouble ?: 0.0,
-                    longitude = profileJson.get("longitude")?.asDouble ?: 0.0,
-                    altitude = profileJson.get("altitude")?.asDouble ?: 0.0,
-                    accuracy = profileJson.get("accuracy")?.asFloat ?: 5.0f,
-                    speed = profileJson.get("speed")?.asFloat ?: 0.0f,
-                    bearing = profileJson.get("bearing")?.asFloat ?: 0.0f,
-                    satellites = profileJson.get("satellites")?.asInt ?: 12
+                    enabled = profileJson.get("enabled")?.asBoolean ?: PROFILE_DEFAULTS.enabled,
+                    latitude = profileJson.get("latitude")?.asDouble ?: PROFILE_DEFAULTS.latitude,
+                    longitude = profileJson.get("longitude")?.asDouble ?: PROFILE_DEFAULTS.longitude,
+                    altitude = profileJson.get("altitude")?.asDouble ?: PROFILE_DEFAULTS.altitude,
+                    accuracy = profileJson.get("accuracy")?.asFloat ?: PROFILE_DEFAULTS.accuracy,
+                    speed = profileJson.get("speed")?.asFloat ?: PROFILE_DEFAULTS.speed,
+                    bearing = profileJson.get("bearing")?.asFloat ?: PROFILE_DEFAULTS.bearing,
+                    satellites = profileJson.get("satellites")?.asInt ?: PROFILE_DEFAULTS.satellites
                 )
             }
             return LocationConfigSchema(
-                enabled = root.get("enabled")?.asBoolean ?: false,
-                latitude = root.get("latitude")?.asDouble ?: 39.019444,
-                longitude = root.get("longitude")?.asDouble ?: 125.738052,
-                altitude = root.get("altitude")?.asDouble ?: 27.0,
-                accuracy = root.get("accuracy")?.asFloat ?: 5.0f,
-                speed = root.get("speed")?.asFloat ?: 0.0f,
-                bearing = root.get("bearing")?.asFloat ?: 0.0f,
-                satellites = root.get("satellites")?.asInt ?: 12,
+                enabled = root.get("enabled")?.asBoolean ?: DEFAULTS.enabled,
+                latitude = root.get("latitude")?.asDouble ?: DEFAULTS.latitude,
+                longitude = root.get("longitude")?.asDouble ?: DEFAULTS.longitude,
+                altitude = root.get("altitude")?.asDouble ?: DEFAULTS.altitude,
+                accuracy = root.get("accuracy")?.asFloat ?: DEFAULTS.accuracy,
+                speed = root.get("speed")?.asFloat ?: DEFAULTS.speed,
+                bearing = root.get("bearing")?.asFloat ?: DEFAULTS.bearing,
+                satellites = root.get("satellites")?.asInt ?: DEFAULTS.satellites,
                 perPackage = perPackage,
                 schemaVersion = root.get("schemaVersion")?.asInt ?: 0,
                 lastModified = root.get("lastModified")?.asLong ?: 0L
@@ -82,8 +91,12 @@ data class LocationConfigSchema(
 
 data class LocationProfileSchema(
     @SerializedName("enabled") val enabled: Boolean = false,
-    @SerializedName("latitude") val latitude: Double = 39.0,
-    @SerializedName("longitude") val longitude: Double = 125.0,
+    // Must match LocationConfigSchema's own defaults (and LocationConfigPrefs.
+    // DEFAULT_LATITUDE/LONGITUDE); these were rounded to 39.0/125.0 while the
+    // decoder below fell back to 0.0, i.e. a per-package profile with no
+    // coordinates resolved to Null Island rather than the configured default.
+    @SerializedName("latitude") val latitude: Double = 39.019444,
+    @SerializedName("longitude") val longitude: Double = 125.738052,
     @SerializedName("altitude") val altitude: Double = 27.0,
     @SerializedName("accuracy") val accuracy: Float = 5.0f,
     @SerializedName("speed") val speed: Float = 0.0f,

@@ -583,4 +583,60 @@ class ConfigSchemaTest {
         assertTrue("templates should be JSON array, not string", templates is org.json.JSONArray)
         assertEquals("t1", templates.getJSONObject(0).getString("id"))
     }
+
+    // A field absent from a snapshot must decode to that field's declared
+    // default. These had drifted apart: WifiConfigSchema decoded every missing
+    // string to "" (so a snapshot without dns2 produced a value that then
+    // failed ConfigRegistry's IPV4 check) and LocationProfileSchema decoded
+    // missing coordinates to 0.0 rather than the configured default.
+
+    @Test
+    fun wifiConfigSchema_absentFields_decodeToDeclaredDefaults() {
+        val defaults = WifiConfigSchema()
+        val decoded = WifiConfigSchema.fromJson("""{"schemaVersion":2}""")
+
+        assertEquals(defaults.currentSsid, decoded.currentSsid)
+        assertEquals(defaults.currentBssid, decoded.currentBssid)
+        assertEquals(defaults.ipAddress, decoded.ipAddress)
+        assertEquals(defaults.gateway, decoded.gateway)
+        assertEquals(defaults.dns1, decoded.dns1)
+        assertEquals(defaults.dns2, decoded.dns2)
+    }
+
+    @Test
+    fun bluetoothConfigSchema_absentDeviceName_decodesToDeclaredDefault() {
+        val decoded = BluetoothConfigSchema.fromJson("""{"schemaVersion":1}""")
+        assertEquals(BluetoothConfigSchema().deviceName, decoded.deviceName)
+    }
+
+    @Test
+    fun locationProfileSchema_absentCoordinates_decodeToDeclaredDefaults() {
+        val defaults = LocationProfileSchema()
+        val decoded = LocationConfigSchema.fromJson(
+            """{"schemaVersion":1,"perPackage":{"com.example":{"enabled":true}}}"""
+        )
+
+        val profile = decoded.perPackage.getValue("com.example")
+        assertEquals(defaults.latitude, profile.latitude, 0.0)
+        assertEquals(defaults.longitude, profile.longitude, 0.0)
+        assertEquals(defaults.altitude, profile.altitude, 0.0)
+        assertEquals(defaults.satellites, profile.satellites)
+    }
+
+    @Test
+    fun locationProfileSchema_defaultsMatchTopLevelSchema() {
+        // A per-package profile and the global profile describe the same thing;
+        // they drifted to 39.0/125.0 vs 39.019444/125.738052.
+        assertEquals(LocationConfigSchema().latitude, LocationProfileSchema().latitude, 0.0)
+        assertEquals(LocationConfigSchema().longitude, LocationProfileSchema().longitude, 0.0)
+    }
+
+    @Test
+    fun absentSchemaVersion_staysZero_soLegacyPayloadsAreStillRejected() {
+        // Must NOT pick up the declared SCHEMA_VERSION default, or ManagedConfig's
+        // version check would silently accept unversioned payloads.
+        assertEquals(0, WifiConfigSchema.fromJson("{}").schemaVersion)
+        assertEquals(0, BluetoothConfigSchema.fromJson("{}").schemaVersion)
+        assertEquals(0, LocationConfigSchema.fromJson("{}").schemaVersion)
+    }
 }
