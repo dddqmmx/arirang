@@ -555,23 +555,41 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private fun rewriteSubscriptionResult(
         result: Any?,
-        methodName: String,
+        method: Method,
         classLoader: ClassLoader?,
         param: XC_MethodHook.MethodHookParam
     ): Any? {
         return when (result) {
             is Iterable<*> -> buildSubscriptionInfoList(result.filterNotNull(), classLoader)
             is Array<*> -> buildSubscriptionArray(result, classLoader)
-            else -> {
-                val profile = profileForSubscriptionQuery(methodName, param.args)
-                    ?: profileForSubscriptionInfo(result)
-                if (result == null && profile == null) {
-                    null
-                } else {
-                    copyOrRewriteSubscriptionInfo(result, classLoader, profile ?: hookConfig.primaryProfile)
-                }
-            }
+            // Dispatching on the runtime value alone mistook a list-shaped method
+            // that returned null for a single-object getter, and substituted one
+            // SubscriptionInfo into a List-returning method -- ART's return-type
+            // check then threw ClassCastException inside com.android.phone or
+            // system_server. AOSP's getAvailable/getAccessibleSubscriptionInfoList
+            // return null whenever isSubInfoReady() is false or eUICC is absent,
+            // i.e. during early boot and on a device with no SIM, which is
+            // precisely this module's target population. Leave those alone: the
+            // platform's own contract allows null, and fabricating a value here
+            // cannot produce a correctly typed one.
+            null -> if (returnsSubscriptionCollection(method)) null else rewriteSingle(result, method, param, classLoader)
+            else -> rewriteSingle(result, method, param, classLoader)
         }
+    }
+
+    private fun returnsSubscriptionCollection(method: Method): Boolean =
+        method.returnType.isArray || Iterable::class.java.isAssignableFrom(method.returnType)
+
+    private fun rewriteSingle(
+        result: Any?,
+        method: Method,
+        param: XC_MethodHook.MethodHookParam,
+        classLoader: ClassLoader?
+    ): Any? {
+        val profile = profileForSubscriptionQuery(method.name, param.args)
+            ?: profileForSubscriptionInfo(result)
+        if (result == null && profile == null) return null
+        return copyOrRewriteSubscriptionInfo(result, classLoader, profile ?: hookConfig.primaryProfile)
     }
 
     private fun buildSubscriptionArray(original: Array<*>, classLoader: ClassLoader?): Any {
@@ -754,7 +772,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return@afterHookedMethod
                 result = rewriteSubscriptionResult(
                     result = result,
-                    methodName = method.name,
+                    method = method,
                     classLoader = targetClass.classLoader,
                     param = this
                 )
