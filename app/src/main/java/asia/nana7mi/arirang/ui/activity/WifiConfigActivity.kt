@@ -1,34 +1,21 @@
 package asia.nana7mi.arirang.ui.activity
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.ExperimentalMaterial3Api
-import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
 import asia.nana7mi.arirang.ui.screen.wifi.WifiConfigScreen
-import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class WifiConfigActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        val initialConfig = WifiConfigPrefs.loadConfig(this)
-
-        setContent {
-            ArirangTheme {
-                WifiConfigScreen(
-                    initialConfig = initialConfig,
-                    onBack = { finish() },
-                    onSave = { config ->
-                        WifiConfigPrefs.saveConfig(this, config)
-                        Toast.makeText(this, getString(R.string.save_success), Toast.LENGTH_SHORT).show()
-                    }
-                )
+        setConfigScreenContent(
+            load = { WifiConfigPrefs.loadConfig(this) },
+            save = { WifiConfigPrefs.saveConfig(this, it) },
+            screen = { initialConfig, onBack, onSave ->
+                WifiConfigScreen(initialConfig, onBack, onSave)
             }
-        }
+        )
     }
 }
