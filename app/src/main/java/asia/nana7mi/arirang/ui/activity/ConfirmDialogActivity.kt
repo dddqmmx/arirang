@@ -9,7 +9,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import asia.nana7mi.arirang.ui.screen.clipboard.ConfirmDialogScreen
-import asia.nana7mi.arirang.ui.component.clipboard.DynamicArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class ConfirmDialogActivity : ComponentActivity() {
     companion object {
@@ -37,7 +37,7 @@ class ConfirmDialogActivity : ComponentActivity() {
         val receiver = getResultReceiver()
 
         setContent {
-            DynamicArirangTheme {
+            ArirangTheme {
                 ConfirmDialogScreen(
                     appName = appName,
                     pkgName = pkgName,
