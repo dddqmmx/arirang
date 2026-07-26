@@ -20,6 +20,8 @@ local.properties
 *.keystore
 /app/release/
 /android-source
-/arirang-selfcheck/build
+/app/build
+/selfcheck/build
+/submodule/build
 /.kotlin/
 /graphify-out
