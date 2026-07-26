@@ -59,6 +59,39 @@ class SubmoduleConfigFilesTest {
         assertEquals("46705,25001", json.getString("gsmSimOperatorNumeric"))
     }
 
+    // SubmoduleConfigFiles.write salvages a config that fails validation from the
+    // previously written file, looking it up via SNAPSHOT_KEY_PREFIX. If that map
+    // drifts from the keys write() actually emits, the salvage silently stops
+    // working and a broken config reverts to unspoofed defaults instead.
+    @Test
+    fun snapshotKeyPrefixes_matchTheKeysWriteEmits() {
+        val json = buildMinimalConfigJson()
+        for ((configId, prefix) in SubmoduleConfigFiles.SNAPSHOT_KEY_PREFIX) {
+            assertTrue(
+                "SNAPSHOT_KEY_PREFIX['$configId'] = '$prefix' but ${prefix}Snapshot is not written",
+                json.has("${prefix}Snapshot")
+            )
+            assertTrue(
+                "SNAPSHOT_KEY_PREFIX['$configId'] = '$prefix' but ${prefix}Version is not written",
+                json.has("${prefix}Version")
+            )
+        }
+    }
+
+    @Test
+    fun snapshotKeyPrefixes_coverEveryConfigWrittenAsASnapshot() {
+        val json = buildMinimalConfigJson()
+        val emitted = json.keys().asSequence()
+            .filter { it.endsWith("Snapshot") }
+            .map { it.removeSuffix("Snapshot") }
+            .toSet()
+        assertEquals(
+            "every <prefix>Snapshot key must have a SNAPSHOT_KEY_PREFIX entry so it can be salvaged",
+            emitted,
+            SubmoduleConfigFiles.SNAPSHOT_KEY_PREFIX.values.toSet()
+        )
+    }
+
     @Test
     fun configJson_sensorVendorKeywords_isArray() {
         val json = buildMinimalConfigJson()

@@ -1,6 +1,7 @@
 package asia.nana7mi.arirang.data.datastore
 
 import android.content.Context
+import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.config.ConfigRegistry
 import asia.nana7mi.arirang.data.config.ConfigIds
@@ -13,6 +14,26 @@ import java.io.FileOutputStream
 import java.util.Date
 
 object SubmoduleConfigFiles {
+    private const val TAG = "SubmoduleConfigFiles"
+
+    /**
+     * Maps a managed config id to the `<prefix>Version` / `<prefix>Snapshot`
+     * key pair it is written under, so a config that fails validation can be
+     * salvaged from the previously written file. Kept in step with the
+     * `.put(...)` calls in [write] by SubmoduleConfigFilesTest.
+     */
+    internal val SNAPSHOT_KEY_PREFIX = mapOf(
+        ConfigIds.GLOBAL to "globalConfig",
+        ConfigIds.UNIQUE_IDENTIFIER to "uniqueIdentifierConfig",
+        ConfigIds.SIM to "simConfig",
+        ConfigIds.HOOK_LOG to "hookLogConfig",
+        ConfigIds.WIFI to "wifiConfig",
+        ConfigIds.BLUETOOTH to "bluetoothConfig",
+        ConfigIds.LOCATION to "locationConfig",
+        ConfigIds.PACKAGE_LIST to "packageListConfig",
+        ConfigIds.SENSOR to "sensorConfig"
+    )
+
     fun configFile(context: Context): File {
         val deContext = context.createDeviceProtectedStorageContext()
         return File(File(deContext.filesDir, BuildConfig.SUBMODULE_CONFIG_DIR), BuildConfig.SUBMODULE_CONFIG_FILE)
@@ -43,7 +64,43 @@ object SubmoduleConfigFiles {
                 lastModified = identifierVersion
             ).toJson()
         )
-        fun managed(id: String) = snapshots.getOrPut(id) { ConfigRegistry.require(id).read(context) }
+        val lastWritten: JSONObject? by lazy { readLastWritten(configFileDe) }
+
+        /**
+         * Snapshot for [id], degrading to the last written value when that
+         * config currently fails validation.
+         *
+         * [ConfigRegistry] reads throw on an invalid config, and this function
+         * is called for nine configs while building one file. Since `write()`
+         * is the last statement of every `*Prefs.saveConfig` -- and runs *after*
+         * the value has already been committed -- letting that throw escape
+         * meant one bad field (say a BSSID a digit short) made every subsequent
+         * save in the app fail, permanently, and crashed the activity that
+         * triggered it.
+         *
+         * Degrading keeps the blast radius at the config that is actually
+         * broken. Reusing the previously written snapshot rather than an empty
+         * one matters for a privacy tool: a feature that was spoofing correctly
+         * keeps its last good settings instead of silently reverting to the
+         * device's real values.
+         */
+        fun managed(id: String): ManagedConfigSnapshot = snapshots.getOrPut(id) {
+            runCatching { ConfigRegistry.require(id).read(context) }.getOrElse { failure ->
+                val salvaged = SNAPSHOT_KEY_PREFIX[id]?.let { prefix ->
+                    lastWritten?.optString("${prefix}Snapshot")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { ManagedConfigSnapshot(lastWritten?.optLong("${prefix}Version") ?: 0L, it) }
+                }
+                Log.e(
+                    TAG,
+                    "config '$id' failed validation; " +
+                        if (salvaged != null) "reusing the last written snapshot"
+                        else "writing an empty snapshot for it",
+                    failure
+                )
+                salvaged ?: ManagedConfigSnapshot(0L, "")
+            }
+        }
         fun configVersion(id: String) = managed(id).version
         fun configSnapshot(id: String) = managed(id).payload
 
@@ -116,6 +173,10 @@ object SubmoduleConfigFiles {
         val configFileCe = ceConfigFile(context)
         writeConfigPair(configFileCe, configFileDe, json)
     }
+
+    private fun readLastWritten(file: File): JSONObject? = runCatching {
+        JSONObject(file.takeIf(File::isFile)?.readText(Charsets.UTF_8) ?: return@runCatching null)
+    }.getOrNull()
 
     private fun writeConfigPair(first: File, second: File, json: String) {
         val firstBefore = first.takeIf(File::isFile)?.readBytes()
