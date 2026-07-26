@@ -105,7 +105,7 @@ object SubmoduleConfigFiles {
         fun configSnapshot(id: String) = managed(id).payload
 
         val simProperties = buildSimProperties(simConfig)
-        val json = JSONObject()
+        val configJson = JSONObject()
             .put("version", Date().time)
             .put("enabled", true)
             .put("globalConfigVersion", configVersion(ConfigIds.GLOBAL))
@@ -168,10 +168,45 @@ object SubmoduleConfigFiles {
             .put("sensorPrecisionRules", buildSensorPrecisionRules(sensorConfig))
             .put("sensorConfigVersion", configVersion(ConfigIds.SENSOR))
             .put("sensorConfigSnapshot", configSnapshot(ConfigIds.SENSOR))
-            .toString()
+        val json = configJson.toString()
+        warnIfOverConsumerLimit(configJson, json)
 
         val configFileCe = ceConfigFile(context)
         writeConfigPair(configFileCe, configFileDe, json)
+    }
+
+    /**
+     * The size ceiling both consumers of config.json enforce.
+     *
+     * `submodule_config.cpp`'s `kMaxConfigSize` makes `apply_json_config` return
+     * false above this, so `ArirangZygisk` keeps its compiled-in defaults — where
+     * `enabled`, `device_info_enabled` and `sensor_config_enabled` are all false.
+     * `module/lib/common.sh` skips the candidate, leaving `ARIRANG_CONFIG_PATH`
+     * empty so `resetprop.sh` sets no properties and DRM ID staging is skipped.
+     *
+     * Exceeding it therefore disables the whole native and shell layer, silently.
+     * The producer has no matching budget of its own: `ManagedConfig` allows
+     * 512 KiB *per config* and `ConfigRegistry` permits 4096 app rules each with
+     * up to 4096 packages, so a large package-visibility config can be many times
+     * over this while the manager reports everything as valid.
+     */
+    private const val CONSUMER_MAX_CONFIG_BYTES = 65_536
+
+    private fun warnIfOverConsumerLimit(configJson: JSONObject, json: String) {
+        val size = json.toByteArray(Charsets.UTF_8).size
+        if (size <= CONSUMER_MAX_CONFIG_BYTES) return
+
+        val biggest = configJson.keys().asSequence()
+            .map { key -> key to configJson.optString(key).length }
+            .sortedByDescending { it.second }
+            .take(3)
+            .joinToString { "${it.first}=${it.second}B" }
+        Log.e(
+            TAG,
+            "config.json is $size bytes, over the $CONSUMER_MAX_CONFIG_BYTES-byte limit both the " +
+                "native module and post-fs-data.sh enforce. Both will ignore the file and fall back " +
+                "to defaults, disabling native spoofing entirely. Largest keys: $biggest"
+        )
     }
 
     private fun readLastWritten(file: File): JSONObject? = runCatching {
