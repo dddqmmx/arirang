@@ -1,10 +1,9 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-
 import android.bluetooth.BluetoothDevice
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -165,23 +164,5 @@ internal class BluetoothAdapterHooks(
         }
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
-    private fun afterHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 }

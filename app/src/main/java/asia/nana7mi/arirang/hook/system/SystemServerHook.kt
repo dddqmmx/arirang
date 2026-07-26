@@ -1,22 +1,23 @@
 package asia.nana7mi.arirang.hook.system
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
+import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
-
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import asia.nana7mi.arirang.BuildConfig
-import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
-import asia.nana7mi.arirang.data.config.ConfigIds
-import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+
 class SystemServerHook : BaseHookModule(matchSystem = true) {
     private data class BluetoothNameConfig(val enabled: Boolean = false, val name: String? = null)
 
@@ -171,27 +172,23 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
 
     private fun hookBluetoothManagerService(bmsClass: Class<*>) {
         // getName() — the leaf the app-facing IBluetoothManager.getName() funnels through.
-        HookBridge.findAndHookMethod(bmsClass, "getName", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (param.hasThrowable()) return
-                val name = readBluetoothNameFromConfig()
-                if (name == null) {
-                    HookLog.d(HookLog.Module.BLUETOOTH, "BluetoothManagerService.getName() config disabled/unavailable")
-                    return
-                }
-                param.result = name
-                HookLog.d(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getName()")
+        HookBridge.findAndHookMethod(bmsClass, "getName", afterHookedMethod {
+            if (hasThrowable()) return@afterHookedMethod
+            val name = readBluetoothNameFromConfig()
+            if (name == null) {
+                HookLog.d(HookLog.Module.BLUETOOTH, "BluetoothManagerService.getName() config disabled/unavailable")
+                return@afterHookedMethod
             }
+            result = name
+            HookLog.d(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getName()")
         })
 
         // getAddress()
-        HookBridge.findAndHookMethod(bmsClass, "getAddress", object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                if (param.hasThrowable()) return
-                if (readBluetoothNameFromConfig() == null) return
-                param.result = "02:00:00:AA:BB:CC"
-                HookLog.d(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getAddress()")
-            }
+        HookBridge.findAndHookMethod(bmsClass, "getAddress", afterHookedMethod {
+            if (hasThrowable()) return@afterHookedMethod
+            if (readBluetoothNameFromConfig() == null) return@afterHookedMethod
+            result = "02:00:00:AA:BB:CC"
+            HookLog.d(HookLog.Module.BLUETOOTH, "spoof BluetoothManagerService.getAddress()")
         })
     }
 
@@ -201,14 +198,12 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
         // __system_property_get, which would require the native property spoofer. The user's
         // configured name is normally served by AdapterProperties.getName() (FuckBluetooth),
         // so this is a best-effort cover for the pre-set-name / early-boot path.
-        val hook = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val key = param.args[0] as? String ?: return
-                if (key != "bluetooth.device.default_name") return
-                val name = readBluetoothNameFromConfig() ?: return
-                param.result = name
-                HookLog.d(HookLog.Module.BLUETOOTH, "spoof SystemProperties bluetooth.device.default_name")
-            }
+        val hook = afterHookedMethod {
+            val key = args[0] as? String ?: return@afterHookedMethod
+            if (key != "bluetooth.device.default_name") return@afterHookedMethod
+            val name = readBluetoothNameFromConfig() ?: return@afterHookedMethod
+            result = name
+            HookLog.d(HookLog.Module.BLUETOOTH, "spoof SystemProperties bluetooth.device.default_name")
         }
 
         HookBridge.findAndHookMethod(spClass, "get", String::class.java, hook)

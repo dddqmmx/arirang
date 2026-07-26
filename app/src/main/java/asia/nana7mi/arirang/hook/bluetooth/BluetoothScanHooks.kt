@@ -1,8 +1,7 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
 import asia.nana7mi.arirang.hook.core.HookBridge
-
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -85,15 +84,6 @@ internal class BluetoothScanHooks(
         return true
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
     private fun advertisingData(name: String): ByteArray {
         val nameBytes = name.toByteArray(Charsets.UTF_8).take(MAX_LOCAL_NAME_BYTES).toByteArray()

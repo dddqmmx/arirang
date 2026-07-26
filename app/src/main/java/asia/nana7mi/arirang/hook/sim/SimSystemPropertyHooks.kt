@@ -1,11 +1,11 @@
 package asia.nana7mi.arirang.hook.sim
 
 import asia.nana7mi.arirang.hook.core.HookBridge
-
 import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
+import asia.nana7mi.arirang.hook.core.hookedMethod
 import asia.nana7mi.arirang.hook.util.asIntOrNull
 import asia.nana7mi.arirang.hook.util.firstIntOrNull
-
 import de.robv.android.xposed.XC_MethodHook
 
 internal class SimSystemPropertyHooks(
@@ -232,30 +232,7 @@ internal class SimSystemPropertyHooks(
             ?: HookBridge.findClassIfExists("android.os.SystemProperties", classLoader)
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
-    private fun hookedMethod(
-        before: (XC_MethodHook.MethodHookParam.() -> Unit)? = null,
-        after: (XC_MethodHook.MethodHookParam.() -> Unit)? = null
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                before?.invoke(param)
-            }
-
-            override fun afterHookedMethod(param: MethodHookParam) {
-                after?.invoke(param)
-            }
-        }
-    }
 
     private companion object {
         private val SYSTEM_PROPERTY_KEYS = setOf(

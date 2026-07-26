@@ -1,9 +1,10 @@
 package asia.nana7mi.arirang.hook.gms
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-
 import android.os.Parcel
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.XC_MethodHook
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -63,25 +64,7 @@ internal class GmsAdvertisingIdHooks(
         HookLog.i(HookLog.Module.GMS, "GAID spoofed from GMS binder")
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
-    private fun afterHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
     companion object {
         const val ADS_IDENTIFIER_DESCRIPTOR =

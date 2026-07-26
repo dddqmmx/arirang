@@ -1,22 +1,23 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.util.asIntOrNull
-import asia.nana7mi.arirang.hook.util.firstIntOrNull
-import asia.nana7mi.arirang.hook.util.getFieldValue
-
 import android.os.Binder
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
+import asia.nana7mi.arirang.hook.core.ArirangClient
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.core.hookedMethod
+import asia.nana7mi.arirang.hook.util.asIntOrNull
+import asia.nana7mi.arirang.hook.util.firstIntOrNull
+import asia.nana7mi.arirang.hook.util.getFieldValue
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.lang.reflect.Array as ReflectArray
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import java.lang.reflect.Array as ReflectArray
 
 private const val CONFIG_REFRESH_DELAY_MS = 600L
 

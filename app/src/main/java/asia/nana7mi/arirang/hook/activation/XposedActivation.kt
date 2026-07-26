@@ -2,7 +2,7 @@ package asia.nana7mi.arirang.hook.activation
 
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
-
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 // 用于检测客户端xposed是否生效

@@ -4,6 +4,8 @@ import android.net.NetworkInfo
 import android.net.wifi.WifiInfo
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.XC_MethodHook
 import java.util.Collections
 import java.util.WeakHashMap
@@ -421,25 +423,7 @@ internal class WifiConnectivityHooks(
         }.getOrNull()
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
-    private fun afterHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
     private companion object {
         private const val TYPE_WIFI = 1

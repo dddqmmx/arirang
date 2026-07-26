@@ -1,12 +1,5 @@
 package asia.nana7mi.arirang.hook.location
 
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookConfigFile
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.util.getFieldValue
-
 import android.app.Application
 import android.content.Context
 import android.location.Location
@@ -18,8 +11,17 @@ import android.os.IInterface
 import android.os.Looper
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
-import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
+import asia.nana7mi.arirang.hook.core.ArirangClient
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.core.HookConfigFile
+import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
+import asia.nana7mi.arirang.hook.core.hookedMethod
+import asia.nana7mi.arirang.hook.util.getFieldValue
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.lang.ref.WeakReference
 import java.lang.reflect.Method
