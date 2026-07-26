@@ -59,7 +59,7 @@ class FuckLocation : BaseHookModule(
 
     // receiverPackages —— 注册时（getCallingUid 仍指向真正请求方）把投递用的 callback/listener
     //   binder 绑定到包名；key 为 GMS 持有的 BinderProxy，使用 WeakHashMap，GMS 注销后自动回收。
-    // activeDeliveryPackage —— 异步投递时按 binder 反查到的包名写入此 thread-local，供 resolveProfile() 消费。
+    // activeDeliveryPackage —— 异步投递时按 binder 反查到的包名写入此 thread-local，供 profiles.forCurrentCaller() 消费。
     private val receiverPackages = Collections.synchronizedMap(WeakHashMap<IBinder, String>())
     private val activeDeliveryPackage = ThreadLocal<String?>()
 
@@ -220,7 +220,7 @@ class FuckLocation : BaseHookModule(
      */
     private fun scheduleProactiveFakeDelivery(holder: Any, callbackProxy: IInterface) {
         val receiverType = runCatching { HookBridge.getIntField(holder, "a") }.getOrNull()
-        val profile = resolveProfile() ?: return
+        val profile = profiles.forCurrentCaller() ?: return
         val binder = callbackProxy.asBinder() ?: return
         val pkg = receiverPackages[binder]
         val cl = holder.javaClass.classLoader
@@ -483,7 +483,7 @@ class FuckLocation : BaseHookModule(
                     // 并就地改写入参，双保险。
                     val pkg = (thisObject as? IInterface)?.asBinder()?.let { receiverPackages[it] }
                     activeDeliveryPackage.set(pkg)
-                    resolveProfile(pkg)?.let { profile ->
+                    profiles.forPackage(pkg)?.let { profile ->
                         args.forEachIndexed { index, arg ->
                             if (arg == null && method.parameterTypes[index] == Location::class.java) {
                                 args[index] = fakeLocation(profile)
@@ -506,97 +506,61 @@ class FuckLocation : BaseHookModule(
         }
     }
 
+    private val profiles = LocationProfileResolver(
+        currentConfig = ::currentConfig,
+        activeDeliveryPackage = { activeDeliveryPackage.get() }
+    )
+
     private fun currentConfig(): LocationHookConfig {
         return configFile.current()
     }
 
-    private fun globalRewriteProfile(): LocationProfile? {
-        val config = currentConfig()
-        if (!config.enabled || !config.defaultProfile.enabled) return null
-        return config.defaultProfile
-    }
-
-    private fun resolveProfile(packageName: String? = null): LocationProfile? {
-        val config = currentConfig()
-        if (!config.enabled) return null
-
-        val callingUid = Binder.getCallingUid()
-        val pkg = packageName ?: activeDeliveryPackage.get() ?: LocationCallerResolver.packageNameForUid(callingUid)
-
-        val profile = if (pkg != null && pkg != "android" && pkg != "com.google.android.gms") {
-            config.perPackage[pkg] ?: config.defaultProfile
-        } else {
-            config.defaultProfile
-        }
-
-        if (profile.enabled) {
-            val source = if (pkg != null && config.perPackage.containsKey(pkg)) "per-package" else "default"
-            HookLog.d(HookLog.Module.LOCATION, "resolved $source location profile for uid=$callingUid")
-            return profile
-        }
-        return null
-    }
-
-    private fun profileForPackage(packageName: String?): LocationProfile? {
-        return resolveProfile(packageName)
-    }
-
-    private fun profileForArgs(args: Array<Any?>): LocationProfile? {
-        return profileForPackage(
-            LocationCallerResolver.callerFromArgs(args)
-                ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
-        )
-    }
-
-    private fun profileForReceiver(receiver: Any?): LocationProfile? {
-        return profileForPackage(LocationCallerResolver.packageNameFromObject(receiver))
-    }
 
     private fun hookLocationAccessors() {
         if (!hookedClasses.add(Location::class.java)) return
 
         HookBridge.hookAllMethods(Location::class.java, "getLatitude", beforeHookedMethod {
-            resolveProfile()?.let { result = it.latitude }
+            profiles.forCurrentCaller()?.let { result = it.latitude }
         })
         HookBridge.hookAllMethods(Location::class.java, "getLongitude", beforeHookedMethod {
-            resolveProfile()?.let { result = it.longitude }
+            profiles.forCurrentCaller()?.let { result = it.longitude }
         })
         HookBridge.hookAllMethods(Location::class.java, "getAltitude", beforeHookedMethod {
-            resolveProfile()?.let { result = it.altitude }
+            profiles.forCurrentCaller()?.let { result = it.altitude }
         })
         HookBridge.hookAllMethods(Location::class.java, "getAccuracy", beforeHookedMethod {
-            resolveProfile()?.let { result = it.accuracy }
+            profiles.forCurrentCaller()?.let { result = it.accuracy }
         })
         HookBridge.hookAllMethods(Location::class.java, "getSpeed", beforeHookedMethod {
-            resolveProfile()?.let { result = it.speed }
+            profiles.forCurrentCaller()?.let { result = it.speed }
         })
         HookBridge.hookAllMethods(Location::class.java, "getBearing", beforeHookedMethod {
-            resolveProfile()?.let { result = it.bearing }
+            profiles.forCurrentCaller()?.let { result = it.bearing }
         })
         HookBridge.hookAllMethods(Location::class.java, "getProvider", beforeHookedMethod {
-            if (resolveProfile() != null) result = LocationManager.GPS_PROVIDER
+            if (profiles.forCurrentCaller() != null) result = LocationManager.GPS_PROVIDER
         })
         HookBridge.hookAllMethods(Location::class.java, "getTime", beforeHookedMethod {
-            if (resolveProfile() != null) result = System.currentTimeMillis()
+            if (profiles.forCurrentCaller() != null) result = System.currentTimeMillis()
         })
         HookBridge.hookAllMethods(Location::class.java, "getElapsedRealtimeNanos", beforeHookedMethod {
-            if (resolveProfile() != null) result = SystemClock.elapsedRealtimeNanos()
+            if (profiles.forCurrentCaller() != null) result = SystemClock.elapsedRealtimeNanos()
         })
 
         runCatching {
             HookBridge.hookAllMethods(Location::class.java, "isFromMockProvider", beforeHookedMethod {
-                if (resolveProfile() != null) result = false
+                if (profiles.forCurrentCaller() != null) result = false
             })
         }
         runCatching {
             HookBridge.hookAllMethods(Location::class.java, "isMock", beforeHookedMethod {
-                if (resolveProfile() != null) result = false
+                if (profiles.forCurrentCaller() != null) result = false
             })
         }
 
         // 关键修复：Hook writeToParcel 确保跨进程传输前数据已被修改
         HookBridge.hookAllMethods(Location::class.java, "writeToParcel", beforeHookedMethod {
-            val profile = resolveProfile() ?: return@beforeHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@beforeHookedMethod
             (thisObject as Location).spoofInPlace(profile)
         })
 
@@ -604,7 +568,7 @@ class FuckLocation : BaseHookModule(
             val creator = HookBridge.getStaticObjectField(Location::class.java, "CREATOR")
             if (creator != null && hookedClasses.add(creator.javaClass)) {
                 HookBridge.hookAllMethods(creator.javaClass, "createFromParcel", afterHookedMethod {
-                    val profile = resolveProfile() ?: return@afterHookedMethod
+                    val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
                     (result as? Location)?.spoofInPlace(profile)
                 })
             }
@@ -622,7 +586,7 @@ class FuckLocation : BaseHookModule(
         hookLocationReceiverDelivery(lmsClass)
 
         HookBridge.hookAllMethods(lmsClass, "getLastLocation", afterHookedMethod {
-            val profile = profileForArgs(args) ?: return@afterHookedMethod
+            val profile = profiles.forArgs(args) ?: return@afterHookedMethod
             val provider = LocationCallerResolver.providerFromArgs(args)
             result = fakeLocation(profile, provider)
             HookLog.d(
@@ -632,7 +596,7 @@ class FuckLocation : BaseHookModule(
         })
 
         HookBridge.hookAllMethods(lmsClass, "getCurrentLocation", beforeHookedMethod {
-            val profile = profileForArgs(args) ?: return@beforeHookedMethod
+            val profile = profiles.forArgs(args) ?: return@beforeHookedMethod
             val callback = args.firstOrNull { it?.javaClass?.hasLocationCallbackMethod() == true } ?: return@beforeHookedMethod
             val location = fakeLocation(profile, LocationCallerResolver.providerFromArgs(args))
             if (callback.dispatchLocation(location)) {
@@ -652,7 +616,7 @@ class FuckLocation : BaseHookModule(
         ).forEach { methodName ->
             HookBridge.hookAllMethods(lmsClass, methodName, hookedMethod(
                 before = {
-                    val profile = profileForArgs(args) ?: return@hookedMethod
+                    val profile = profiles.forArgs(args) ?: return@hookedMethod
                     args.forEachIndexed { index, arg ->
                         if (arg is Location) {
                             args[index] = arg.spoofed(profile)
@@ -660,7 +624,7 @@ class FuckLocation : BaseHookModule(
                     }
                 },
                 after = {
-                    val profile = profileForArgs(args) ?: return@hookedMethod
+                    val profile = profiles.forArgs(args) ?: return@hookedMethod
                     val provider = LocationCallerResolver.providerFromArgs(args)
                     val pkg = LocationCallerResolver.callerFromArgs(args)
                         ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
@@ -681,9 +645,9 @@ class FuckLocation : BaseHookModule(
         receiverClasses.forEach { receiverClass ->
             if (!hookedClasses.add(receiverClass)) return@forEach
             HookBridge.hookAllConstructors(receiverClass, afterHookedMethod {
-                val profile = profileForReceiver(thisObject)
-                    ?: profileForArgs(args)
-                    ?: profileForPackage(LocationCallerResolver.packageNameForUid(Binder.getCallingUid()))
+                val profile = profiles.forReceiver(thisObject)
+                    ?: profiles.forArgs(args)
+                    ?: profiles.forPackage(LocationCallerResolver.packageNameForUid(Binder.getCallingUid()))
                     ?: return@afterHookedMethod
                 val provider = LocationCallerResolver.providerFromArgs(args)
                 val pkg = LocationCallerResolver.packageNameFromObject(thisObject)
@@ -717,7 +681,7 @@ class FuckLocation : BaseHookModule(
                 }
                 .forEach { method ->
                     HookBridge.hookMethod(method, beforeHookedMethod {
-                        val profile = profileForReceiver(thisObject) ?: return@beforeHookedMethod
+                        val profile = profiles.forReceiver(thisObject) ?: return@beforeHookedMethod
                         args.forEachIndexed { index, arg ->
                             when {
                                 arg is Location -> args[index] = arg.spoofed(profile)
@@ -747,7 +711,7 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(providerManagerClass)) return
 
         HookBridge.hookAllMethods(providerManagerClass, "onReportLocation", beforeHookedMethod {
-            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+            val profile = profiles.globalProfileIgnoringPerPackage() ?: return@beforeHookedMethod
             val report = args.firstOrNull() ?: return@beforeHookedMethod
             if (report is Location) {
                 args[0] = report.spoofed(profile)
@@ -763,7 +727,7 @@ class FuckLocation : BaseHookModule(
         // 对 last-location 读路径直接返回“新鲜”假坐标，确保仅订 network 的客户端能立刻收到。
         listOf("getLastLocation", "getLastLocationUnsafe", "getLastLocationLocked").forEach { methodName ->
             HookBridge.hookAllMethods(providerManagerClass, methodName, afterHookedMethod {
-                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                val profile = profiles.globalProfileIgnoringPerPackage() ?: return@afterHookedMethod
                 val provider = providerNameOf(thisObject)
                 when (val current = result) {
                     is Location -> result = current.spoofed(profile).also {
@@ -787,7 +751,7 @@ class FuckLocation : BaseHookModule(
             "setRealRequestLocked"
         ).forEach { methodName ->
             HookBridge.hookAllMethods(providerManagerClass, methodName, afterHookedMethod {
-                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                val profile = profiles.globalProfileIgnoringPerPackage() ?: return@afterHookedMethod
                 val managerRef = WeakReference(thisObject)
                 val provider = providerNameOf(thisObject)
                 mainHandler.postDelayed({
@@ -804,7 +768,7 @@ class FuckLocation : BaseHookModule(
                 if (!hookedClasses.add(registrationClass)) return@forEach
                 listOf("onActive", "onListenerRegister", "deliverLastLocation").forEach { methodName ->
                     HookBridge.hookAllMethods(registrationClass, methodName, afterHookedMethod {
-                        val profile = profileForReceiver(thisObject) ?: globalRewriteProfile()
+                        val profile = profiles.forReceiver(thisObject) ?: profiles.globalProfileIgnoringPerPackage()
                             ?: return@afterHookedMethod
                         val provider = providerNameOf(thisObject)
                         scheduleProactiveUpdateDelivery(
@@ -827,7 +791,7 @@ class FuckLocation : BaseHookModule(
                     }
                     .forEach { method ->
                         HookBridge.hookMethod(method, beforeHookedMethod {
-                            val profile = profileForReceiver(thisObject) ?: globalRewriteProfile()
+                            val profile = profiles.forReceiver(thisObject) ?: profiles.globalProfileIgnoringPerPackage()
                                 ?: return@beforeHookedMethod
                             args.forEachIndexed { index, arg ->
                                 args[index] = rewriteLocationContainer(arg, profile)
@@ -903,14 +867,14 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(fusedProviderClass)) return
 
         HookBridge.hookAllMethods(fusedProviderClass, "chooseBestLocation", afterHookedMethod {
-            val profile = globalRewriteProfile() ?: return@afterHookedMethod
+            val profile = profiles.globalProfileIgnoringPerPackage() ?: return@afterHookedMethod
             if (result is Location) {
                 result = (result as Location).spoofed(profile)
             }
         })
 
         HookBridge.hookAllMethods(fusedProviderClass, "reportBestLocationLocked", beforeHookedMethod {
-            val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+            val profile = profiles.globalProfileIgnoringPerPackage() ?: return@beforeHookedMethod
             args.forEachIndexed { index, arg ->
                 args[index] = rewriteLocationContainer(arg, profile)
             }
@@ -924,7 +888,7 @@ class FuckLocation : BaseHookModule(
             ?: return
         if (hookedClasses.add(locationManagerClass)) {
             HookBridge.hookAllMethods(locationManagerClass, "getLastKnownLocation", afterHookedMethod {
-                val profile = globalRewriteProfile() ?: return@afterHookedMethod
+                val profile = profiles.globalProfileIgnoringPerPackage() ?: return@afterHookedMethod
                 if (result is Location) {
                     result = (result as Location).spoofed(profile)
                 }
@@ -939,7 +903,7 @@ class FuckLocation : BaseHookModule(
             val transportClass = HookBridge.findClassIfExists(className, classLoader) ?: return@forEach
             if (!hookedClasses.add(transportClass)) return@forEach
             HookBridge.hookAllMethods(transportClass, methodName, beforeHookedMethod {
-                val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+                val profile = profiles.globalProfileIgnoringPerPackage() ?: return@beforeHookedMethod
                 args.forEachIndexed { index, arg ->
                     args[index] = rewriteLocationContainer(arg, profile)
                 }
@@ -962,7 +926,7 @@ class FuckLocation : BaseHookModule(
         hookLocationResultClass(resultClass)
 
         HookBridge.hookAllMethods(resultClass, "extractResult", afterHookedMethod {
-            val profile = resolveProfile() ?: return@afterHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
             result = rewriteLocationContainer(result, profile)
         })
     }
@@ -974,7 +938,7 @@ class FuckLocation : BaseHookModule(
         )
         if (callbackClass != null && hookedClasses.add(callbackClass)) {
             HookBridge.hookAllMethods(callbackClass, "onLocationResult", beforeHookedMethod {
-                val profile = profileForReceiver(thisObject) ?: resolveProfile() ?: return@beforeHookedMethod
+                val profile = profiles.forReceiver(thisObject) ?: profiles.forCurrentCaller() ?: return@beforeHookedMethod
                 args[0] = rewriteLocationContainer(args[0], profile)
             })
         }
@@ -985,7 +949,7 @@ class FuckLocation : BaseHookModule(
         )
         if (listenerClass != null && hookedClasses.add(listenerClass)) {
             HookBridge.hookAllMethods(listenerClass, "onLocationChanged", beforeHookedMethod {
-                val profile = profileForReceiver(thisObject) ?: resolveProfile() ?: return@beforeHookedMethod
+                val profile = profiles.forReceiver(thisObject) ?: profiles.forCurrentCaller() ?: return@beforeHookedMethod
                 if (args[0] is Location) {
                     args[0] = (args[0] as Location).spoofed(profile)
                 }
@@ -998,7 +962,7 @@ class FuckLocation : BaseHookModule(
         )
         if (availabilityClass != null && hookedClasses.add(availabilityClass)) {
             HookBridge.hookAllMethods(availabilityClass, "isLocationAvailable", beforeHookedMethod {
-                if (resolveProfile() != null) result = true
+                if (profiles.forCurrentCaller() != null) result = true
             })
         }
     }
@@ -1017,7 +981,7 @@ class FuckLocation : BaseHookModule(
         }
 
         HookBridge.hookAllMethods(clientClass, "requestLocationUpdates", afterHookedMethod {
-            val profile = resolveProfile() ?: return@afterHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
             args.forEach { arg ->
                 if (isLocationDeliveryTarget(arg)) {
                     scheduleProactiveUpdateDelivery(
@@ -1054,7 +1018,7 @@ class FuckLocation : BaseHookModule(
                 // Hook methods that handle LocationResult or Location
                 if (method.parameterTypes.any { it.name.endsWith(".LocationResult") || it == Location::class.java }) {
                     HookBridge.hookMethod(method, beforeHookedMethod {
-                        val profile = profileForReceiver(thisObject) ?: profileForArgs(args) ?: resolveProfile() ?: return@beforeHookedMethod
+                        val profile = profiles.forReceiver(thisObject) ?: profiles.forArgs(args) ?: profiles.forCurrentCaller() ?: return@beforeHookedMethod
                         args.forEachIndexed { index, arg ->
                             val rewritten = rewriteLocationContainer(arg, profile)
                             if (rewritten != null && rewritten !== arg) {
@@ -1068,7 +1032,7 @@ class FuckLocation : BaseHookModule(
 
             if (className.endsWith("LocationRequestInternal")) {
                 HookBridge.hookAllMethods(clazz, "writeToParcel", beforeHookedMethod {
-                    val profile = profileForReceiver(thisObject) ?: resolveProfile() ?: return@beforeHookedMethod
+                    val profile = profiles.forReceiver(thisObject) ?: profiles.forCurrentCaller() ?: return@beforeHookedMethod
                     val locationRequest = getFieldValue(thisObject, "a") as? Location
                     if (locationRequest != null) {
                         locationRequest.spoofInPlace(profile)
@@ -1088,7 +1052,7 @@ class FuckLocation : BaseHookModule(
             if (!hookedClasses.add(clazz)) return@forEach
             
             HookBridge.hookAllMethods(clazz, "getLastLocation", afterHookedMethod {
-                val profile = profileForArgs(args) ?: resolveProfile() ?: return@afterHookedMethod
+                val profile = profiles.forArgs(args) ?: profiles.forCurrentCaller() ?: return@afterHookedMethod
                 result = rewriteLocationContainer(result, profile)
                 if (result != null) {
                     HookLog.d(HookLog.Module.LOCATION, "spoofed ${clazz.name}.getLastLocation result")
@@ -1097,7 +1061,7 @@ class FuckLocation : BaseHookModule(
 
             HookBridge.hookAllMethods(clazz, "requestLocationUpdates", hookedMethod(
                 before = {
-                    val profile = profileForArgs(args) ?: resolveProfile() ?: return@hookedMethod
+                    val profile = profiles.forArgs(args) ?: profiles.forCurrentCaller() ?: return@hookedMethod
                     args.forEachIndexed { index, arg ->
                         val rewritten = rewriteLocationContainer(arg, profile)
                         if (rewritten != null && rewritten !== arg) {
@@ -1107,7 +1071,7 @@ class FuckLocation : BaseHookModule(
                     }
                 },
                 after = {
-                    val profile = profileForArgs(args) ?: resolveProfile() ?: return@hookedMethod
+                    val profile = profiles.forArgs(args) ?: profiles.forCurrentCaller() ?: return@hookedMethod
                     val pkg = LocationCallerResolver.callerFromArgs(args)
                         ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
                     args.forEach { arg ->
@@ -1130,20 +1094,20 @@ class FuckLocation : BaseHookModule(
 
         listOf("asList", "getLocations").forEach { methodName ->
             HookBridge.hookAllMethods(resultClass, methodName, afterHookedMethod {
-                val profile = resolveProfile() ?: return@afterHookedMethod
+                val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
                 result = rewriteLocationContainer(result, profile)
             })
         }
 
         HookBridge.hookAllMethods(resultClass, "getLastLocation", afterHookedMethod {
-            val profile = resolveProfile() ?: return@afterHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
             if (result is Location) {
                 result = (result as Location).spoofed(profile)
             }
         })
 
         HookBridge.hookAllMethods(resultClass, "writeToParcel", beforeHookedMethod {
-            val profile = resolveProfile() ?: return@beforeHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@beforeHookedMethod
             rewriteLocationResult(thisObject, profile)
         })
 
@@ -1151,7 +1115,7 @@ class FuckLocation : BaseHookModule(
             val creator = HookBridge.getStaticObjectField(resultClass, "CREATOR")
             if (creator != null && hookedClasses.add(creator.javaClass)) {
                 HookBridge.hookAllMethods(creator.javaClass, "createFromParcel", afterHookedMethod {
-                    val profile = resolveProfile() ?: return@afterHookedMethod
+                    val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
                     rewriteLocationContainer(result, profile)
                 })
             }
@@ -1166,20 +1130,20 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(taskClass)) return
 
         HookBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
-            val profile = resolveProfile() ?: return@afterHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
             result = rewriteLocationContainer(result, profile)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
             HookBridge.hookAllMethods(taskClass, methodName, hookedMethod(
                 before = {
-                    if (resolveProfile() == null) return@hookedMethod
+                    if (profiles.forCurrentCaller() == null) return@hookedMethod
                     args.forEach { arg ->
                         hookGoogleTaskListener(arg)
                     }
                 },
                 after = {
-                    if (resolveProfile() == null) return@hookedMethod
+                    if (profiles.forCurrentCaller() == null) return@hookedMethod
                     hookConcreteGoogleTask(thisObject)
                     hookConcreteGoogleTask(result)
                 }
@@ -1196,13 +1160,13 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(taskClass)) return
 
         HookBridge.hookAllMethods(taskClass, "getResult", afterHookedMethod {
-            val profile = resolveProfile() ?: return@afterHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@afterHookedMethod
             result = rewriteLocationContainer(result, profile)
         })
 
         listOf("addOnSuccessListener", "addOnCompleteListener").forEach { methodName ->
             HookBridge.hookAllMethods(taskClass, methodName, beforeHookedMethod {
-                if (resolveProfile() == null) return@beforeHookedMethod
+                if (profiles.forCurrentCaller() == null) return@beforeHookedMethod
                 args.forEach { arg ->
                     hookGoogleTaskListener(arg)
                 }
@@ -1223,14 +1187,14 @@ class FuckLocation : BaseHookModule(
         if (!hookedClasses.add(listenerClass)) return
 
         HookBridge.hookAllMethods(listenerClass, "onSuccess", beforeHookedMethod {
-            val profile = resolveProfile() ?: return@beforeHookedMethod
+            val profile = profiles.forCurrentCaller() ?: return@beforeHookedMethod
             args.forEachIndexed { index, arg ->
                 args[index] = rewriteLocationContainer(arg, profile)
             }
         })
 
         HookBridge.hookAllMethods(listenerClass, "onComplete", beforeHookedMethod {
-            if (resolveProfile() == null) return@beforeHookedMethod
+            if (profiles.forCurrentCaller() == null) return@beforeHookedMethod
             args.forEach { arg ->
                 hookConcreteGoogleTask(arg)
             }
@@ -1247,7 +1211,7 @@ class FuckLocation : BaseHookModule(
 
                 listOf("reportLocation", "reportLocationBatch").forEach { methodName ->
                     HookBridge.hookAllMethods(targetClass, methodName, beforeHookedMethod {
-                        val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+                        val profile = profiles.globalProfileIgnoringPerPackage() ?: return@beforeHookedMethod
                         args.forEachIndexed { index, arg ->
                             args[index] = rewriteLocationContainer(arg, profile)
                         }
@@ -1255,7 +1219,7 @@ class FuckLocation : BaseHookModule(
                 }
 
                 HookBridge.hookAllMethods(targetClass, "reportNmea", beforeHookedMethod {
-                    val profile = globalRewriteProfile() ?: return@beforeHookedMethod
+                    val profile = profiles.globalProfileIgnoringPerPackage() ?: return@beforeHookedMethod
                     args.forEachIndexed { index, arg ->
                         if (arg is String) {
                             args[index] = spoofNmea(arg, profile)
@@ -1269,7 +1233,7 @@ class FuckLocation : BaseHookModule(
                     "reportNavigationMessage"
                 ).forEach { methodName ->
                     HookBridge.hookAllMethods(targetClass, methodName, beforeHookedMethod {
-                        if (globalRewriteProfile() == null) return@beforeHookedMethod
+                        if (profiles.globalProfileIgnoringPerPackage() == null) return@beforeHookedMethod
                         result = null
                     })
                 }

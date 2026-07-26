@@ -885,11 +885,12 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     private fun phoneNumberForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
         val firstInt = param.args.firstIntOrNull()
+        // Unlike IMEI/TAC, every int-keyed phone-number overload keys by subId,
+        // never by slot, so there is no slot derivation here.
+        val bySubId = method.name.contains("ForSubscriber", ignoreCase = true) ||
+            method.name.contains("ForDisplay", ignoreCase = true)
         val profile = when {
-            method.name.contains("ForSubscriber", ignoreCase = true) ->
-                profileForSubId(firstInt, allowFallback = firstInt == null)
-            method.name.contains("ForDisplay", ignoreCase = true) ->
-                profileForSubId(firstInt, allowFallback = firstInt == null)
+            bySubId -> profileForSubId(firstInt, allowFallback = firstInt == null)
             method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
                 profileForSubId(firstInt, allowFallback = false)
             else -> profileForTelephonyManager(param)
@@ -897,43 +898,46 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         return profile?.phoneNumber
     }
 
-    private fun imeiForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+    /**
+     * Which SIM a hooked call refers to, plus the slot to key per-slot
+     * identifiers (IMEI, TAC) by.
+     *
+     * How the target is derived depends on how the hooked method names its
+     * subject: `*ForSubscriber` takes a subId, `*ForPhone` and the bare
+     * `int`-arg overloads take a slot, and everything else falls back to the
+     * TelephonyManager instance's own mSubId/mPhoneId.
+     */
+    private data class SimCallTarget(val profile: SimProfile?, val slotIndex: Int?)
+
+    private fun slotTargetForCall(
+        param: XC_MethodHook.MethodHookParam,
+        method: Method
+    ): SimCallTarget {
         val firstInt = param.args.firstIntOrNull()
+        val bySubscriber = method.name.contains("ForSubscriber", ignoreCase = true)
+        val bySlot = method.name.contains("ForPhone", ignoreCase = true) ||
+            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType
+
         val profile = when {
-            method.name.contains("ForSubscriber", ignoreCase = true) ->
-                profileForSubId(firstInt, allowFallback = firstInt == null)
-            method.name.contains("ForPhone", ignoreCase = true) ->
-                profileForSlot(firstInt, allowFallback = false)
-            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
-                profileForSlot(firstInt, allowFallback = false)
+            bySubscriber -> profileForSubId(firstInt, allowFallback = firstInt == null)
+            bySlot -> profileForSlot(firstInt, allowFallback = false)
             else -> profileForTelephonyManager(param)
         }
-        val slotIndex = when {
-            method.name.contains("ForSubscriber", ignoreCase = true) -> profile?.slotIndex
-            method.name.contains("ForPhone", ignoreCase = true) -> firstInt
-            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType -> firstInt
-            else -> profile?.slotIndex
-        }
+        // Only a slot-keyed call carries a usable slot in its arguments. Note
+        // bySubscriber wins over bySlot here: `getImeiForSubscriber(int subId)`
+        // matches both, and its int is a subId, not a slot.
+        val slotIndex = if (bySlot && !bySubscriber) firstInt else profile?.slotIndex
+        return SimCallTarget(profile, slotIndex)
+    }
+
+    private fun imeiForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+        val (profile, slotIndex) = slotTargetForCall(param, method)
         return hookConfig.uniqueIdentifiers.imeiForSlot(slotIndex, profile?.imei)
     }
 
     private fun typeAllocationCodeForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+        val (profile, slotIndex) = slotTargetForCall(param, method)
         val firstInt = param.args.firstIntOrNull()
-        val profile = when {
-            method.name.contains("ForSubscriber", ignoreCase = true) ->
-                profileForSubId(firstInt, allowFallback = firstInt == null)
-            method.name.contains("ForPhone", ignoreCase = true) ->
-                profileForSlot(firstInt, allowFallback = false)
-            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType ->
-                profileForSlot(firstInt, allowFallback = false)
-            else -> profileForTelephonyManager(param)
-        }
-        val slotIndex = when {
-            method.name.contains("ForSubscriber", ignoreCase = true) -> profile?.slotIndex
-            method.name.contains("ForPhone", ignoreCase = true) -> firstInt
-            method.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType -> firstInt
-            else -> profile?.slotIndex
-        }
         val config = hookConfig
         val result = config.uniqueIdentifiers.typeAllocationCodeForSlot(slotIndex, profile?.typeAllocationCode)
         HookLog.d(
