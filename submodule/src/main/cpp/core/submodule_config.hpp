@@ -42,21 +42,29 @@ struct SensorPrecisionRule {
 struct SubmoduleConfig {
     bool enabled = false;
     bool device_info_enabled = false;
+    // These are the fallback used when config.json is missing or rejected, so
+    // they must describe the SAME device as DevicePresetCatalog.defaultPreset in
+    // the manager app. They had drifted to a Pixel 9 Pro (caiman) while the app
+    // defaults to a Pixel 8 Pro (husky), which meant that whenever the fallback
+    // engaged the native layer and the Java layer described two different
+    // phones -- and the fallback engages precisely when something is already
+    // wrong, e.g. config.json over the 64 KiB ceiling. Note build_display below
+    // also lacked the "husky-user 14 ..." prefix the app's format uses.
     std::string build_brand = "google";
     std::string build_manufacturer = "Google";
-    std::string build_model = "Pixel 9 Pro";
-    std::string build_device = "caiman";
-    std::string build_product = "caiman";
-    std::string build_board = "caiman";
-    std::string build_hardware = "caiman";
-    std::string build_display = "BP4A.251205.006 release-keys";
+    std::string build_model = "Pixel 8 Pro";
+    std::string build_device = "husky";
+    std::string build_product = "husky";
+    std::string build_board = "husky";
+    std::string build_hardware = "husky";
+    std::string build_display = "husky-user 14 AP2A.240805.005 12025142 release-keys";
     std::string build_host = "android-build";
-    std::string build_id = "BP4A.251205.006";
+    std::string build_id = "AP2A.240805.005";
     std::string build_tags = "release-keys";
     std::string build_type = "user";
     std::string build_user = "android-build";
-    std::string build_fingerprint = "google/caiman/caiman:15/BP4A.251205.006/1234567:user/release-keys";
-    jlong build_time = 1764892800000L;
+    std::string build_fingerprint = "google/husky/husky:14/AP2A.240805.005/12025142:user/release-keys";
+    jlong build_time = 1724191800000L;
     std::string gsm_sim_operator_iso_country = "kp,";
     std::string gsm_operator_iso_country = "kp,";
     std::string gsm_sim_operator_numeric = "46705,";

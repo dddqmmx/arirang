@@ -18,7 +18,9 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class ClipboardController(private val context: Context) {
 
@@ -50,11 +52,16 @@ class ClipboardController(private val context: Context) {
         loadPolicy()
     }
 
-    private data class PendingRequest(
-        val latch: CountDownLatch = CountDownLatch(1),
-        @Volatile var decision: Int? = null,
-        @Volatile var timedOut: Boolean = false
-    )
+    private class PendingRequest(
+        /** Invoked exactly once, from whichever of user choice or timeout wins. */
+        val onDecision: (ClipboardAccessDecision) -> Unit
+    ) {
+        val answered = AtomicBoolean(false)
+
+        fun resolve(decision: ClipboardAccessDecision) {
+            if (answered.compareAndSet(false, true)) onDecision(decision)
+        }
+    }
 
     private fun loadPolicy() {
         scope.launch {
@@ -76,47 +83,73 @@ class ClipboardController(private val context: Context) {
         }
     }
 
-    fun handleClipboardRequest(userId: Int, pkgName: String): ClipboardAccessDecision {
-        if (!isFeatureEnabled) return ClipboardAccessDecision.ALLOW
+    /**
+     * Resolves a clipboard read, calling [onDecision] exactly once.
+     *
+     * Does not block. Cases decidable from policy answer inline; a prompt
+     * registers the request and returns, and the decision arrives later from
+     * either the user's choice or the timeout, whichever is first.
+     *
+     * This exists because the binder side is `oneway`: previously the handler
+     * still blocked on a latch for the full 10 s, occupying one of the manager
+     * app's binder threads per request and up to eight at once, so config
+     * refreshes arriving from system_server, com.android.phone and GMS queued
+     * behind them and served stale data for the duration.
+     */
+    fun requestClipboardDecision(
+        userId: Int,
+        pkgName: String,
+        onDecision: (ClipboardAccessDecision) -> Unit
+    ) {
+        if (!isFeatureEnabled) return onDecision(ClipboardAccessDecision.ALLOW)
 
         val policyKey = ClipboardPromptPrefs.scopedPolicyId(userId, pkgName)
-        val policy = synchronized(policyLock) { appPolicies[policyKey] } ?: defaultPolicy
-
-        if (policy == ClipboardPromptPrefs.Policy.ALLOW) return ClipboardAccessDecision.ALLOW
-        if (policy == ClipboardPromptPrefs.Policy.DENY) return ClipboardAccessDecision.DENY
-
-        if (keyguardManager?.isKeyguardLocked == true) {
-            return ClipboardAccessDecision.DENY
+        when (synchronized(policyLock) { appPolicies[policyKey] } ?: defaultPolicy) {
+            ClipboardPromptPrefs.Policy.ALLOW -> return onDecision(ClipboardAccessDecision.ALLOW)
+            ClipboardPromptPrefs.Policy.DENY -> return onDecision(ClipboardAccessDecision.DENY)
+            ClipboardPromptPrefs.Policy.ASK -> Unit
         }
 
-        if (pendingRequests.size >= MAX_PENDING_REQUESTS) return ClipboardAccessDecision.DENY
+        if (keyguardManager?.isKeyguardLocked == true) {
+            return onDecision(ClipboardAccessDecision.DENY)
+        }
+        if (pendingRequests.size >= MAX_PENDING_REQUESTS) {
+            return onDecision(ClipboardAccessDecision.DENY)
+        }
 
         val requestId = requestIdGenerator.getAndIncrement()
-        val pending = PendingRequest()
+        val pending = PendingRequest { decision ->
+            pendingRequests.remove(requestId)
+            onDecision(decision)
+        }
         pendingRequests[requestId] = pending
 
         val receiver = buildDecisionReceiver(requestId, userId, pkgName)
+        mainHandler.post { launchDialog(pkgName, receiver, DEFAULT_TIMEOUT_MS) }
+        mainHandler.postDelayed({ pending.resolve(ClipboardAccessDecision.DENY) }, DEFAULT_TIMEOUT_MS)
+    }
 
-        mainHandler.post {
-            launchDialog(pkgName, receiver, DEFAULT_TIMEOUT_MS)
+    /**
+     * Blocking form, for the legacy synchronous binder method. Prefer
+     * [requestClipboardDecision]; this one parks the calling thread.
+     */
+    fun handleClipboardRequest(userId: Int, pkgName: String): ClipboardAccessDecision {
+        val latch = CountDownLatch(1)
+        val decision = AtomicReference(ClipboardAccessDecision.DENY)
+        requestClipboardDecision(userId, pkgName) {
+            decision.set(it)
+            latch.countDown()
         }
-
         return try {
-            val completed = pending.latch.await(
-                DEFAULT_TIMEOUT_MS,
-                TimeUnit.MILLISECONDS
-            )
-            if (!completed) {
-                pending.timedOut = true
-                scheduleCleanup(requestId)
-                ClipboardAccessDecision.DENY
+            // The prompt's own timeout resolves the request, so this bound only
+            // covers the handoff and is deliberately a little longer.
+            if (latch.await(DEFAULT_TIMEOUT_MS + LATE_DECISION_GRACE_MS, TimeUnit.MILLISECONDS)) {
+                decision.get()
             } else {
-                pendingRequests.remove(requestId)
-                pending.decision?.let { ClipboardAccessDecision.fromInt(it) } ?: ClipboardAccessDecision.DENY
+                ClipboardAccessDecision.DENY
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
-            pendingRequests.remove(requestId)
             ClipboardAccessDecision.DENY
         }
     }
@@ -156,17 +189,14 @@ class ClipboardController(private val context: Context) {
                 }
 
                 val resolvedDecision = when (resultCode) {
-                    ConfirmDialogActivity.RESULT_ALLOW_ONCE, ConfirmDialogActivity.RESULT_ALLOW_ALWAYS -> ClipboardAccessDecision.ALLOW.value
-                    else -> ClipboardAccessDecision.DENY.value
+                    ConfirmDialogActivity.RESULT_ALLOW_ONCE, ConfirmDialogActivity.RESULT_ALLOW_ALWAYS ->
+                        ClipboardAccessDecision.ALLOW
+                    else -> ClipboardAccessDecision.DENY
                 }
 
-                val pending = pendingRequests.remove(requestId)
-                if (pending == null || pending.timedOut) {
-                    return
-                }
-
-                pending.decision = resolvedDecision
-                pending.latch.countDown()
+                // resolve() is idempotent, so a decision arriving after the
+                // timeout already answered is simply dropped.
+                pendingRequests[requestId]?.resolve(resolvedDecision)
             }
         }
     }

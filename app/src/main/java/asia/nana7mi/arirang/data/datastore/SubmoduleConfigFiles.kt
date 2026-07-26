@@ -5,8 +5,6 @@ import android.util.Log
 import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.data.config.ConfigRegistry
 import asia.nana7mi.arirang.data.config.ConfigIds
-import asia.nana7mi.arirang.data.config.ManagedConfigSnapshot
-import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -17,12 +15,12 @@ object SubmoduleConfigFiles {
     private const val TAG = "SubmoduleConfigFiles"
 
     /**
-     * Maps a managed config id to the `<prefix>Version` / `<prefix>Snapshot`
-     * key pair it is written under, so a config that fails validation can be
-     * salvaged from the previously written file. Kept in step with the
-     * `.put(...)` calls in [write] by SubmoduleConfigFilesTest.
+     * Maps a managed config id to the `<prefix>Version` key it is written
+     * under, so a config that fails validation can keep its last written
+     * version instead of regressing to 0. Kept in step with the `.put(...)`
+     * calls in [write] by SubmoduleConfigFilesTest.
      */
-    internal val SNAPSHOT_KEY_PREFIX = mapOf(
+    internal val CONFIG_KEY_PREFIX = mapOf(
         ConfigIds.GLOBAL to "globalConfig",
         ConfigIds.UNIQUE_IDENTIFIER to "uniqueIdentifierConfig",
         ConfigIds.SIM to "simConfig",
@@ -48,68 +46,45 @@ object SubmoduleConfigFiles {
         sensorConfig: SensorConfigPrefs.Config = SensorConfigPrefs.loadConfig(context)
     ) {
         val configFileDe = configFile(context)
-        val snapshots = HashMap<String, ManagedConfigSnapshot>()
-        val identifierVersion = UniqueIdentifierPrefs.lastModified(context)
-        snapshots[ConfigIds.UNIQUE_IDENTIFIER] = ManagedConfigSnapshot(
-            identifierVersion,
-            IdentifierConfigSchema(
-                enabled = uniqueIdentifierConfig.enabled,
-                androidId = uniqueIdentifierConfig.androidId,
-                gaid = uniqueIdentifierConfig.gaid,
-                widevineDrmId = uniqueIdentifierConfig.widevineDrmId,
-                appSetId = uniqueIdentifierConfig.appSetId,
-                serial = uniqueIdentifierConfig.serial,
-                imeiBySlot = uniqueIdentifierConfig.imeiBySlot,
-                tacBySlot = uniqueIdentifierConfig.tacBySlot,
-                lastModified = identifierVersion
-            ).toJson()
-        )
+        val versions = HashMap<String, Long>()
+        versions[ConfigIds.UNIQUE_IDENTIFIER] = UniqueIdentifierPrefs.lastModified(context)
         val lastWritten: JSONObject? by lazy { readLastWritten(configFileDe) }
 
         /**
-         * Snapshot for [id], degrading to the last written value when that
-         * config currently fails validation.
+         * Last-modified version for [id], degrading to the last written value
+         * when that config currently fails validation.
          *
-         * [ConfigRegistry] reads throw on an invalid config, and this function
-         * is called for nine configs while building one file. Since `write()`
-         * is the last statement of every `*Prefs.saveConfig` -- and runs *after*
-         * the value has already been committed -- letting that throw escape
-         * meant one bad field (say a BSSID a digit short) made every subsequent
-         * save in the app fail, permanently, and crashed the activity that
-         * triggered it.
+         * [ConfigRegistry] reads throw on an invalid config, and this runs for
+         * nine configs while building one file. Since `write()` is the last
+         * statement of every `*Prefs.saveConfig` -- and runs *after* the value
+         * has already been committed -- letting that throw escape meant one bad
+         * field (say a BSSID a digit short) made every subsequent save in the
+         * app fail, permanently, and crashed the activity that triggered it.
          *
          * Degrading keeps the blast radius at the config that is actually
-         * broken. Reusing the previously written snapshot rather than an empty
-         * one matters for a privacy tool: a feature that was spoofing correctly
-         * keeps its last good settings instead of silently reverting to the
-         * device's real values.
+         * broken: the other eight still reach the native layer.
          */
-        fun managed(id: String): ManagedConfigSnapshot = snapshots.getOrPut(id) {
-            runCatching { ConfigRegistry.require(id).read(context) }.getOrElse { failure ->
-                val salvaged = SNAPSHOT_KEY_PREFIX[id]?.let { prefix ->
-                    lastWritten?.optString("${prefix}Snapshot")
-                        ?.takeIf { it.isNotBlank() }
-                        ?.let { ManagedConfigSnapshot(lastWritten?.optLong("${prefix}Version") ?: 0L, it) }
-                }
+        fun configVersion(id: String): Long = versions.getOrPut(id) {
+            runCatching { ConfigRegistry.require(id).read(context).version }.getOrElse { failure ->
+                val salvaged = CONFIG_KEY_PREFIX[id]
+                    ?.let { prefix -> lastWritten?.optLong("${prefix}Version") }
+                    ?.takeIf { it > 0L }
                 Log.e(
                     TAG,
                     "config '$id' failed validation; " +
-                        if (salvaged != null) "reusing the last written snapshot"
-                        else "writing an empty snapshot for it",
+                        if (salvaged != null) "reusing its last written version"
+                        else "reporting version 0 for it",
                     failure
                 )
-                salvaged ?: ManagedConfigSnapshot(0L, "")
+                salvaged ?: 0L
             }
         }
-        fun configVersion(id: String) = managed(id).version
-        fun configSnapshot(id: String) = managed(id).payload
 
         val simProperties = buildSimProperties(simConfig)
         val configJson = JSONObject()
             .put("version", Date().time)
             .put("enabled", true)
             .put("globalConfigVersion", configVersion(ConfigIds.GLOBAL))
-            .put("globalConfigSnapshot", configSnapshot(ConfigIds.GLOBAL))
             .put("deviceInfoEnabled", deviceConfig.enabled)
             .put("devicePresetId", deviceConfig.presetId)
             .put("buildBrand", deviceConfig.brand)
@@ -136,7 +111,6 @@ object SubmoduleConfigFiles {
             .put("imeiBySlot", JSONObject(uniqueIdentifierConfig.imeiBySlot.mapKeys { it.key.toString() }))
             .put("tacBySlot", JSONObject(uniqueIdentifierConfig.tacBySlot.mapKeys { it.key.toString() }))
             .put("uniqueIdentifierConfigVersion", configVersion(ConfigIds.UNIQUE_IDENTIFIER))
-            .put("uniqueIdentifierConfigSnapshot", configSnapshot(ConfigIds.UNIQUE_IDENTIFIER))
             .put("gsmSimOperatorIsoCountry", simProperties.countryIso)
             .put("gsmOperatorIsoCountry", simProperties.countryIso)
             .put("gsmSimOperatorNumeric", simProperties.operatorNumeric)
@@ -144,17 +118,11 @@ object SubmoduleConfigFiles {
             .put("gsmSimOperatorAlpha", simProperties.alpha)
             .put("gsmOperatorAlpha", simProperties.alpha)
             .put("simConfigVersion", configVersion(ConfigIds.SIM))
-            .put("simConfigSnapshot", configSnapshot(ConfigIds.SIM))
             .put("hookLogConfigVersion", configVersion(ConfigIds.HOOK_LOG))
-            .put("hookLogConfigSnapshot", configSnapshot(ConfigIds.HOOK_LOG))
             .put("wifiConfigVersion", configVersion(ConfigIds.WIFI))
-            .put("wifiConfigSnapshot", configSnapshot(ConfigIds.WIFI))
             .put("bluetoothConfigVersion", configVersion(ConfigIds.BLUETOOTH))
-            .put("bluetoothConfigSnapshot", configSnapshot(ConfigIds.BLUETOOTH))
             .put("locationConfigVersion", configVersion(ConfigIds.LOCATION))
-            .put("locationConfigSnapshot", configSnapshot(ConfigIds.LOCATION))
             .put("packageListConfigVersion", configVersion(ConfigIds.PACKAGE_LIST))
-            .put("packageListConfigSnapshot", configSnapshot(ConfigIds.PACKAGE_LIST))
             .put("sensorConfigEnabled", sensorConfig.enabled)
             .put("sensorHideAll", sensorConfig.hideAll)
             .put("sensorGlobalVendorReplacement", sensorConfig.vendorReplacement)
@@ -167,7 +135,6 @@ object SubmoduleConfigFiles {
             .put("sensorInjections", buildSensorInjections(sensorConfig))
             .put("sensorPrecisionRules", buildSensorPrecisionRules(sensorConfig))
             .put("sensorConfigVersion", configVersion(ConfigIds.SENSOR))
-            .put("sensorConfigSnapshot", configSnapshot(ConfigIds.SENSOR))
         val json = configJson.toString()
         warnIfOverConsumerLimit(configJson, json)
 

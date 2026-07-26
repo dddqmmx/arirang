@@ -21,7 +21,7 @@ class SubmoduleConfigFilesTest {
     fun configJson_allKnownKeys_present() {
         val requiredKeys = setOf(
             "version", "enabled",
-            "globalConfigVersion", "globalConfigSnapshot",
+            "globalConfigVersion",
             "deviceInfoEnabled", "devicePresetId",
             "buildBrand", "buildManufacturer", "buildModel", "buildDevice",
             "buildProduct", "buildBoard", "buildHardware", "buildDisplay",
@@ -30,21 +30,21 @@ class SubmoduleConfigFilesTest {
             "uniqueIdentifierEnabled",
             "androidId", "gaid", "widevineDrmId", "appSetId", "serial",
             "imeiBySlot", "tacBySlot",
-            "uniqueIdentifierConfigVersion", "uniqueIdentifierConfigSnapshot",
+            "uniqueIdentifierConfigVersion",
             "gsmSimOperatorIsoCountry", "gsmOperatorIsoCountry",
             "gsmSimOperatorNumeric", "gsmOperatorNumeric",
             "gsmSimOperatorAlpha", "gsmOperatorAlpha",
-            "simConfigVersion", "simConfigSnapshot",
-            "hookLogConfigVersion", "hookLogConfigSnapshot",
-            "wifiConfigVersion", "wifiConfigSnapshot",
-            "bluetoothConfigVersion", "bluetoothConfigSnapshot",
-            "locationConfigVersion", "locationConfigSnapshot",
-            "packageListConfigVersion", "packageListConfigSnapshot",
+            "simConfigVersion",
+            "hookLogConfigVersion",
+            "wifiConfigVersion",
+            "bluetoothConfigVersion",
+            "locationConfigVersion",
+            "packageListConfigVersion",
             "sensorConfigEnabled", "sensorHideAll",
             "sensorGlobalVendorReplacement", "sensorVendorKeywords",
             "sensorBlacklist", "sensorOverrides", "sensorInjections",
             "sensorPrecisionRules",
-            "sensorConfigVersion", "sensorConfigSnapshot"
+            "sensorConfigVersion"
         )
         val json = buildMinimalConfigJson()
         for (key in requiredKeys) {
@@ -59,37 +59,45 @@ class SubmoduleConfigFilesTest {
         assertEquals("46705,25001", json.getString("gsmSimOperatorNumeric"))
     }
 
-    // SubmoduleConfigFiles.write salvages a config that fails validation from the
-    // previously written file, looking it up via SNAPSHOT_KEY_PREFIX. If that map
-    // drifts from the keys write() actually emits, the salvage silently stops
-    // working and a broken config reverts to unspoofed defaults instead.
+    // write() keeps a config's last written version when that config currently
+    // fails validation, looking the key up via CONFIG_KEY_PREFIX. If the map
+    // drifts from the keys write() emits, that salvage silently stops working.
     @Test
-    fun snapshotKeyPrefixes_matchTheKeysWriteEmits() {
+    fun configKeyPrefixes_matchTheKeysWriteEmits() {
         val json = buildMinimalConfigJson()
-        for ((configId, prefix) in SubmoduleConfigFiles.SNAPSHOT_KEY_PREFIX) {
+        for ((configId, prefix) in SubmoduleConfigFiles.CONFIG_KEY_PREFIX) {
             assertTrue(
-                "SNAPSHOT_KEY_PREFIX['$configId'] = '$prefix' but ${prefix}Snapshot is not written",
-                json.has("${prefix}Snapshot")
-            )
-            assertTrue(
-                "SNAPSHOT_KEY_PREFIX['$configId'] = '$prefix' but ${prefix}Version is not written",
+                "CONFIG_KEY_PREFIX['$configId'] = '$prefix' but ${prefix}Version is not written",
                 json.has("${prefix}Version")
             )
         }
     }
 
     @Test
-    fun snapshotKeyPrefixes_coverEveryConfigWrittenAsASnapshot() {
+    fun configKeyPrefixes_coverEveryVersionKeyWritten() {
         val json = buildMinimalConfigJson()
         val emitted = json.keys().asSequence()
-            .filter { it.endsWith("Snapshot") }
-            .map { it.removeSuffix("Snapshot") }
+            .filter { it.endsWith("ConfigVersion") }
+            .map { it.removeSuffix("Version") }
             .toSet()
         assertEquals(
-            "every <prefix>Snapshot key must have a SNAPSHOT_KEY_PREFIX entry so it can be salvaged",
+            "every <prefix>Version key must have a CONFIG_KEY_PREFIX entry so it can be salvaged",
             emitted,
-            SubmoduleConfigFiles.SNAPSHOT_KEY_PREFIX.values.toSet()
+            SubmoduleConfigFiles.CONFIG_KEY_PREFIX.values.toSet()
         )
+    }
+
+    // The nine embedded config snapshots were removed: no consumer read them.
+    // Each *_config_snapshot field in submodule_config.cpp had exactly one
+    // reference, the read_string() that filled it, and the shell layer reads
+    // only scalar keys. They were also the dominant contributor to the 64 KiB
+    // size ceiling both consumers enforce, above which they ignore the file
+    // entirely and fall back to defaults that disable spoofing.
+    @Test
+    fun configJson_carriesNoEmbeddedSnapshotPayloads() {
+        val json = buildMinimalConfigJson()
+        val snapshotKeys = json.keys().asSequence().filter { it.endsWith("Snapshot") }.toList()
+        assertEquals("no consumer reads these; they only consume the size budget", emptyList<String>(), snapshotKeys)
     }
 
     @Test
@@ -171,21 +179,6 @@ class SubmoduleConfigFilesTest {
     }
 
     @Test
-    fun configJson_configSnapshotsAreStrings() {
-        val json = buildMinimalConfigJson()
-        val snapshotKeys = listOf(
-            "simConfigSnapshot", "uniqueIdentifierConfigSnapshot",
-            "hookLogConfigSnapshot", "wifiConfigSnapshot",
-            "bluetoothConfigSnapshot", "locationConfigSnapshot",
-            "packageListConfigSnapshot", "sensorConfigSnapshot",
-            "globalConfigSnapshot"
-        )
-        for (key in snapshotKeys) {
-            assertTrue("$key should be a string", json.optString(key) != null || !json.has(key))
-        }
-    }
-
-    @Test
     fun configJson_imeiAndTacBySlot_areObjects() {
         val json = buildMinimalConfigJson()
         val imei = json.getJSONObject("imeiBySlot")
@@ -261,7 +254,6 @@ class SubmoduleConfigFilesTest {
             .put("version", 1L)
             .put("enabled", true)
             .put("globalConfigVersion", 1L)
-            .put("globalConfigSnapshot", "{}")
             .put("deviceInfoEnabled", deviceEnabled)
             .put("devicePresetId", "")
             .put("buildBrand", "google")
@@ -288,7 +280,6 @@ class SubmoduleConfigFilesTest {
             .put("imeiBySlot", JSONObject(simConfig.uniqueIdentifiers.imeiBySlot.mapKeys { it.key.toString() }))
             .put("tacBySlot", JSONObject(simConfig.uniqueIdentifiers.tacBySlot.mapKeys { it.key.toString() }))
             .put("uniqueIdentifierConfigVersion", 1L)
-            .put("uniqueIdentifierConfigSnapshot", "{}")
             .put("gsmSimOperatorIsoCountry", simConfig.countryIsoList.joinToString(","))
             .put("gsmOperatorIsoCountry", simConfig.countryIsoList.joinToString(","))
             .put("gsmSimOperatorNumeric", simConfig.operatorNumericList.joinToString(","))
@@ -296,17 +287,11 @@ class SubmoduleConfigFilesTest {
             .put("gsmSimOperatorAlpha", simConfig.profilesBySlot.toSortedMap().values.joinToString(",") { it.alphaLong })
             .put("gsmOperatorAlpha", simConfig.profilesBySlot.toSortedMap().values.joinToString(",") { it.alphaLong })
             .put("simConfigVersion", 1L)
-            .put("simConfigSnapshot", "{}")
             .put("hookLogConfigVersion", 1L)
-            .put("hookLogConfigSnapshot", "{}")
             .put("wifiConfigVersion", 1L)
-            .put("wifiConfigSnapshot", "{}")
             .put("bluetoothConfigVersion", 1L)
-            .put("bluetoothConfigSnapshot", "{}")
             .put("locationConfigVersion", 1L)
-            .put("locationConfigSnapshot", "{}")
             .put("packageListConfigVersion", 1L)
-            .put("packageListConfigSnapshot", "{}")
             .put("sensorConfigEnabled", sensorEnabled)
             .put("sensorHideAll", false)
             .put("sensorGlobalVendorReplacement", "")
@@ -316,6 +301,5 @@ class SubmoduleConfigFilesTest {
             .put("sensorInjections", org.json.JSONArray())
             .put("sensorPrecisionRules", org.json.JSONArray())
             .put("sensorConfigVersion", 1L)
-            .put("sensorConfigSnapshot", "{}")
     }
 }

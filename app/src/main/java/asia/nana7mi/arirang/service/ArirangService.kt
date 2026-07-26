@@ -62,9 +62,33 @@ class ArirangService : Service() {
             userId: Int,
             callback: IClipboardDecisionCallback
         ) {
-            val decision = requestClipboardRead(pkgName, uid, userId)
-            runCatching { callback.onDecision(decision) }
-                .onFailure { Log.w(TAG, "Failed to deliver clipboard decision", it) }
+            // Genuinely async: this returns as soon as the request is registered.
+            // It previously delegated to the blocking form, so despite being
+            // `oneway` it held one of this app's ~15 binder threads for up to 10 s
+            // per request, eight at once, and config refreshes from system_server,
+            // com.android.phone and GMS queued behind them.
+            fun deliver(decision: Int) {
+                runCatching { callback.onDecision(decision) }
+                    .onFailure { Log.w(TAG, "Failed to deliver clipboard decision", it) }
+            }
+
+            val normalizedPkgName = pkgName.trim()
+            val callingUid = getCallingUid()
+            if (!callerValidator.isTrustedCaller(callingUid) ||
+                !callerValidator.isAuthorizedPackageForCaller(callingUid, normalizedPkgName) ||
+                !callerValidator.isPackageOwnedByUid(uid, normalizedPkgName)
+            ) {
+                Log.w(TAG, "Rejected clipboard decision request from uid=$callingUid for pkg=$pkgName")
+                return deliver(ClipboardAccessDecision.ALLOW.value)
+            }
+            if (userId != serviceUserId) {
+                Log.w(TAG, "Rejected cross-user clipboard request for pkg=$normalizedPkgName callerUser=$userId serviceUser=$serviceUserId")
+                return deliver(ClipboardAccessDecision.DENY.value)
+            }
+
+            clipboardController.requestClipboardDecision(userId, normalizedPkgName) { decision ->
+                deliver(decision.value)
+            }
         }
 
         override fun onPermissionUsed(pkgName: String, uid: Int, userId: Int, opName: String) {
