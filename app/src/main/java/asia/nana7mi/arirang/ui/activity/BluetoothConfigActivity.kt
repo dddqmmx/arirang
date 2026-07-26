@@ -9,7 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
 import asia.nana7mi.arirang.ui.screen.bluetooth.BluetoothConfigScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class BluetoothConfigActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)

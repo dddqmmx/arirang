@@ -9,7 +9,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.DeviceInfoPrefs
 import asia.nana7mi.arirang.ui.screen.device.DeviceInfoConfigScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class DeviceInfoConfigActivity : ComponentActivity() {
 

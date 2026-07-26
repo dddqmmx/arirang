@@ -11,7 +11,7 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs.SensorEntry
 import asia.nana7mi.arirang.ui.screen.sensor.SensorConfigScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class SensorConfigActivity : ComponentActivity() {
 

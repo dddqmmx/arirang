@@ -1,7 +1,5 @@
 package asia.nana7mi.arirang.ui.screen.location
 
-import asia.nana7mi.arirang.ui.component.location.*
-import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -51,8 +49,13 @@ import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Profile
 import asia.nana7mi.arirang.ui.activity.LocationAppConfigActivity
+import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
 import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
 import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.location.*
+import asia.nana7mi.arirang.ui.component.location.parseDouble
+import asia.nana7mi.arirang.ui.component.location.parseFloat
+import asia.nana7mi.arirang.ui.component.location.parseInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -440,36 +443,6 @@ internal fun LocationConfigScreen(
     }
 }
 
-private fun parseDouble(text: String, label: String, min: Double, max: Double, errorFormat: String): ParsedValue {
-    val value = text.trim().toDoubleOrNull()
-    return if (value == null || value !in min..max) {
-        ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        ParsedValue(doubleValue = value)
-    }
-}
 
-private fun parseFloat(text: String, label: String, min: Float, max: Float, errorFormat: String): ParsedValue {
-    val value = text.trim().toFloatOrNull()
-    return if (value == null || value < min || value > max) {
-        ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        ParsedValue(floatValue = value)
-    }
-}
 
-private fun parseInt(text: String, label: String, min: Int, max: Int, errorFormat: String): ParsedValue {
-    val value = text.trim().toIntOrNull()
-    return if (value == null || value !in min..max) {
-        ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        ParsedValue(intValue = value)
-    }
-}
 
-private data class ParsedValue(
-    val doubleValue: Double? = null,
-    val floatValue: Float? = null,
-    val intValue: Int? = null,
-    val error: String? = null
-)

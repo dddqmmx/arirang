@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.ui.ui.theme
+package asia.nana7mi.arirang.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

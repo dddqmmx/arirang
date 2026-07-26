@@ -365,39 +365,9 @@ internal fun EditProfileDialog(
     )
 }
 
-private fun parseDouble(text: String, label: String, min: Double, max: Double, errorFormat: String): AppLocationParsedValue {
-    val value = text.trim().toDoubleOrNull()
-    return if (value == null || value !in min..max) {
-        AppLocationParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        AppLocationParsedValue(doubleValue = value)
-    }
-}
 
-private fun parseFloat(text: String, label: String, min: Float, max: Float, errorFormat: String): AppLocationParsedValue {
-    val value = text.trim().toFloatOrNull()
-    return if (value == null || value !in min..max) {
-        AppLocationParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        AppLocationParsedValue(floatValue = value)
-    }
-}
 
-private fun parseInt(text: String, label: String, min: Int, max: Int, errorFormat: String): AppLocationParsedValue {
-    val value = text.trim().toIntOrNull()
-    return if (value == null || value !in min..max) {
-        AppLocationParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        AppLocationParsedValue(intValue = value)
-    }
-}
 
-private data class AppLocationParsedValue(
-    val doubleValue: Double? = null,
-    val floatValue: Float? = null,
-    val intValue: Int? = null,
-    val error: String? = null
-)
 
 internal data class AppEntry(
     val label: String,

@@ -16,7 +16,7 @@ import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
 import asia.nana7mi.arirang.model.SimInfo
 import asia.nana7mi.arirang.ui.screen.sim.SimConfigScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 import java.security.SecureRandom
 
 class SimConfigActivity : ComponentActivity() {
