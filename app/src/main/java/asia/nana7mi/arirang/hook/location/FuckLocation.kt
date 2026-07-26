@@ -727,7 +727,15 @@ class FuckLocation : BaseHookModule(
         // 对 last-location 读路径直接返回“新鲜”假坐标，确保仅订 network 的客户端能立刻收到。
         listOf("getLastLocation", "getLastLocationUnsafe", "getLastLocationLocked").forEach { methodName ->
             HookBridge.hookAllMethods(providerManagerClass, methodName, afterHookedMethod {
-                val profile = profiles.globalProfileIgnoringPerPackage() ?: return@afterHookedMethod
+                // Per-caller, not global. LocationManagerService.getLastLocation
+                // delegates here inside the caller's own Binder transaction, so
+                // this after-hook runs *before* the LMS-level one. Resolving
+                // globally overwrote the result with the default profile, and the
+                // LMS hook -- which correctly resolves null for an opted-out
+                // package and returns early -- then had nothing left to undo. A
+                // user's explicit "don't spoof this app" had no effect on the
+                // most common location API on the platform.
+                val profile = profiles.forArgs(args) ?: return@afterHookedMethod
                 val provider = providerNameOf(thisObject)
                 when (val current = result) {
                     is Location -> result = current.spoofed(profile).also {
@@ -751,7 +759,13 @@ class FuckLocation : BaseHookModule(
             "setRealRequestLocked"
         ).forEach { methodName ->
             HookBridge.hookAllMethods(providerManagerClass, methodName, afterHookedMethod {
-                val profile = profiles.globalProfileIgnoringPerPackage() ?: return@afterHookedMethod
+                // Resolved here, inside the registering caller's transaction, so
+                // an opted-out app registering no longer triggers an injection.
+                // Note the residual limitation: injectProviderLocation reports to
+                // the shared provider, so a fix injected on behalf of one client
+                // still reaches every other client of that provider. Fully
+                // honouring per-package here needs per-registration delivery.
+                val profile = profiles.forArgs(args) ?: return@afterHookedMethod
                 val managerRef = WeakReference(thisObject)
                 val provider = providerNameOf(thisObject)
                 mainHandler.postDelayed({

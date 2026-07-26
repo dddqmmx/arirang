@@ -34,7 +34,21 @@ internal class PackageListHookConfig(private val prefsName: String) {
         HookConfigFile.xSharedPreferences(prefsName)
     }
 
-    @Synchronized
+    /**
+     * The snapshot string [state] was last built from.
+     *
+     * Held so an unchanged config can be recognised without parsing it. The
+     * unchanged check used to live inside [loadFromSnapshot], *after*
+     * `JSONObject(snapshot)` had already parsed every template and per-app rule
+     * — potentially thousands of strings. This runs from all ten PackageManager
+     * hooks, i.e. on every getPackageInfo / getPackagesForUid / getNameForUid /
+     * queryIntent* call made by any process on the device, and did so while
+     * holding this object's monitor, so PMS binder threads serialised on a
+     * repeated parse of a config that had not changed.
+     */
+    @Volatile
+    private var lastSnapshot: String? = null
+
     fun loadIfUpdated() {
         val snapshot = ArirangClient.readConfigSnapshot(
             configName = ConfigIds.PACKAGE_LIST,
@@ -43,8 +57,19 @@ internal class PackageListHookConfig(private val prefsName: String) {
             logName = "Package List"
         )
 
+        // Fast path: no lock, no parse. ArirangClient hands back its cached
+        // snapshot instance, so this is normally a reference-equal hit.
+        if (!snapshot.isNullOrBlank() && snapshot == lastSnapshot) return
+
+        reload(snapshot)
+    }
+
+    @Synchronized
+    private fun reload(snapshot: String?) {
         if (!snapshot.isNullOrBlank()) {
+            if (snapshot == lastSnapshot) return
             loadFromSnapshot(snapshot)
+            lastSnapshot = snapshot
         } else {
             loadFromPrefs()
         }
