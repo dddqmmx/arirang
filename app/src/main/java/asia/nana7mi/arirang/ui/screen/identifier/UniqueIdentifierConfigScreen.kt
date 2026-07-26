@@ -1,8 +1,8 @@
 package asia.nana7mi.arirang.ui.screen.identifier
 
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.identifier.*
 import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,21 +18,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -45,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -54,8 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +60,6 @@ internal fun UniqueIdentifierConfigScreen(
 ) {
     var config by remember { mutableStateOf(initialConfig) }
     var savedConfig by remember { mutableStateOf(initialConfig) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
     var revision by remember { mutableLongStateOf(0L) }
     val imeiRows = remember {
         mutableStateListOf<ImeiRowState>().apply {
@@ -89,7 +81,6 @@ internal fun UniqueIdentifierConfigScreen(
             )
         }
     }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val lazyListState = rememberLazyListState()
     var draggedItemIndex by remember { mutableStateOf<Int?>(null) }
     var draggingOffset by remember { mutableFloatStateOf(0f) }
@@ -105,60 +96,43 @@ internal fun UniqueIdentifierConfigScreen(
         config = currentConfig()
     }
 
-    fun saveCurrent() {
+    fun saveCurrent(): Boolean {
         val current = currentConfig()
         config = current
         onSave(current)
         savedConfig = current
+        return true
     }
 
     val hasChanges = currentConfig() != savedConfig
 
-    fun requestBack() {
-        if (hasChanges) {
-            showUnsavedDialog = true
-        } else {
-            onBack()
-        }
-    }
 
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.unique_identifier_config_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        config = config.copy(
-                            androidId = UniqueIdentifierPrefs.randomAndroidId(),
-                            gaid = UniqueIdentifierPrefs.randomGaid(),
-                            widevineDrmId = UniqueIdentifierPrefs.randomWidevineDrmId(),
-                            appSetId = UniqueIdentifierPrefs.randomAppSetId(),
-                            serial = UniqueIdentifierPrefs.randomSerial()
-                        )
-                        imeiRows.forEachIndexed { index, row ->
-                            val tac = UniqueIdentifierPrefs.randomTac()
-                            imeiRows[index] = row.copy(
-                                tac = tac,
-                                imei = UniqueIdentifierPrefs.randomImeiForSlot(row.slot, tac)
-                            )
-                        }
-                        updateImeis()
-                        revision++
-                    }) {
-                        Icon(Icons.Default.Shuffle, contentDescription = stringResource(R.string.unique_randomize_all))
-                    }
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
+    ConfigScreenScaffold(
+        title = stringResource(R.string.unique_identifier_config_title),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = {
+                config = config.copy(
+                    androidId = UniqueIdentifierPrefs.randomAndroidId(),
+                    gaid = UniqueIdentifierPrefs.randomGaid(),
+                    widevineDrmId = UniqueIdentifierPrefs.randomWidevineDrmId(),
+                    appSetId = UniqueIdentifierPrefs.randomAppSetId(),
+                    serial = UniqueIdentifierPrefs.randomSerial()
+                )
+                imeiRows.forEachIndexed { index, row ->
+                    val tac = UniqueIdentifierPrefs.randomTac()
+                    imeiRows[index] = row.copy(
+                        tac = tac,
+                        imei = UniqueIdentifierPrefs.randomImeiForSlot(row.slot, tac)
+                    )
+                }
+                updateImeis()
+                revision++
+            }) {
+                Icon(Icons.Default.Shuffle, contentDescription = stringResource(R.string.unique_randomize_all))
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -178,7 +152,7 @@ internal fun UniqueIdentifierConfigScreen(
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = { Text(stringResource(R.string.unique_add_imei_slot)) }
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
             state = lazyListState,
@@ -399,18 +373,4 @@ internal fun UniqueIdentifierConfigScreen(
         }
     }
 
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = {
-                showUnsavedDialog = false
-                onBack()
-            },
-            onSave = {
-                showUnsavedDialog = false
-                saveCurrent()
-                onBack()
-            }
-        )
-    }
 }

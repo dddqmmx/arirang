@@ -1,20 +1,18 @@
 package asia.nana7mi.arirang.ui.screen.sim
 
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.sim.*
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -22,9 +20,7 @@ import androidx.core.app.ActivityCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.SimInfo
 import asia.nana7mi.arirang.ui.component.dialog.InfoDialog
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
 import asia.nana7mi.arirang.ui.component.sim.SimSlotItem
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,63 +42,43 @@ internal fun SimConfigScreen(
     var savedEnabled by remember { mutableStateOf(initialEnabled) }
     var savedHideSim by remember { mutableStateOf(initialHideSim) }
     var savedSimList by remember { mutableStateOf(initialSimList.take(maxSlots)) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
     var showSlotLimitDialog by remember { mutableStateOf(false) }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val context = LocalContext.current
     val noActiveSimMessage = stringResource(R.string.sim_import_no_active)
     val hasChanges = enabled != savedEnabled || hideSim != savedHideSim || simList.toList() != savedSimList
 
-    fun saveCurrent() {
+    fun saveCurrent(): Boolean {
         val currentList = simList.toList()
         onSave(enabled, hideSim, currentList)
         savedEnabled = enabled
         savedHideSim = hideSim
         savedSimList = currentList
+        return true
     }
 
-    fun requestBack() {
-        if (hasChanges) {
-            showUnsavedDialog = true
-        } else {
-            onBack()
-        }
-    }
-
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.sim_config_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    if (!hideSim) {
-                        IconButton(onClick = {
-                            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-                                val systemSims = onImportSystemSims()
-                                if (systemSims.isNotEmpty()) {
-                                    simList.clear()
-                                    simList.addAll(systemSims.take(maxSlots))
-                                } else {
-                                    Toast.makeText(context, noActiveSimMessage, Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                onRequestPhoneStatePermission()
-                            }
-                        }) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.sim_import_desc))
+    ConfigScreenScaffold(
+        title = stringResource(R.string.sim_config_title),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack,
+        actions = {
+            if (!hideSim) {
+                IconButton(onClick = {
+                    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                        val systemSims = onImportSystemSims()
+                        if (systemSims.isNotEmpty()) {
+                            simList.clear()
+                            simList.addAll(systemSims.take(maxSlots))
+                        } else {
+                            Toast.makeText(context, noActiveSimMessage, Toast.LENGTH_SHORT).show()
                         }
+                    } else {
+                        onRequestPhoneStatePermission()
                     }
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
+                }) {
+                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.sim_import_desc))
+                }
+            }
         },
         floatingActionButton = {
             if (!hideSim) {
@@ -168,21 +144,6 @@ internal fun SimConfigScreen(
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
-    }
-
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = {
-                showUnsavedDialog = false
-                onBack()
-            },
-            onSave = {
-                showUnsavedDialog = false
-                saveCurrent()
-                onBack()
-            }
-        )
     }
 
     if (showSlotLimitDialog) {

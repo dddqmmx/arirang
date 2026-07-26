@@ -1,9 +1,5 @@
 package asia.nana7mi.arirang.ui.screen.wifi
 
-import asia.nana7mi.arirang.ui.component.wifi.*
-import asia.nana7mi.arirang.ui.component.common.ToggleSettingRow
-import asia.nana7mi.arirang.ui.component.common.ExpandableSectionCard
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,23 +11,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiFind
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -41,15 +33,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
+import asia.nana7mi.arirang.ui.component.common.ExpandableSectionCard
+import asia.nana7mi.arirang.ui.component.common.ToggleSettingRow
+import asia.nana7mi.arirang.ui.component.wifi.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,68 +53,48 @@ internal fun WifiConfigScreen(
 ) {
     var config by remember { mutableStateOf(initialConfig) }
     var savedConfig by remember { mutableStateOf(initialConfig) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
     var currentExpanded by remember { mutableStateOf(true) }
     var nearbyExpanded by remember { mutableStateOf(true) }
     val scanNetworkExpanded = remember { mutableStateMapOf<Int, Boolean>() }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val hasChanges = config != savedConfig
 
-    fun saveCurrent() {
+    fun saveCurrent(): Boolean {
         onSave(config)
         savedConfig = config
+        return true
     }
 
-    fun requestBack() {
-        if (hasChanges) {
-            showUnsavedDialog = true
-        } else {
-            onBack()
-        }
-    }
-
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.wifi_config_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        val lan = randomLanAddresses()
-                        config = config.copy(
-                            currentBssid = randomBssid(),
-                            ipAddress = lan.ipAddress,
-                            gateway = lan.gateway,
-                            dns1 = lan.dns1,
-                            dns2 = lan.dns2,
-                            scanResults = config.scanResults.map { network ->
-                                network.copy(bssid = randomBssid())
-                            }.ifEmpty {
-                                listOf(
-                                    WifiConfigPrefs.ScanNetwork(
-                                        ssid = WifiConfigPrefs.DEFAULT_SCAN_SSID,
-                                        bssid = randomBssid()
-                                    )
-                                )
-                            }
-                        )
-                    }) {
-                        Icon(
-                            Icons.Default.Shuffle,
-                            contentDescription = stringResource(R.string.unique_randomize_all)
+    ConfigScreenScaffold(
+        title = stringResource(R.string.wifi_config_title),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = {
+                val lan = randomLanAddresses()
+                config = config.copy(
+                    currentBssid = randomBssid(),
+                    ipAddress = lan.ipAddress,
+                    gateway = lan.gateway,
+                    dns1 = lan.dns1,
+                    dns2 = lan.dns2,
+                    scanResults = config.scanResults.map { network ->
+                        network.copy(bssid = randomBssid())
+                    }.ifEmpty {
+                        listOf(
+                            WifiConfigPrefs.ScanNetwork(
+                                ssid = WifiConfigPrefs.DEFAULT_SCAN_SSID,
+                                bssid = randomBssid()
+                            )
                         )
                     }
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
+                )
+            }) {
+                Icon(
+                    Icons.Default.Shuffle,
+                    contentDescription = stringResource(R.string.unique_randomize_all)
+                )
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -296,18 +269,4 @@ internal fun WifiConfigScreen(
         }
     }
 
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = {
-                showUnsavedDialog = false
-                onBack()
-            },
-            onSave = {
-                showUnsavedDialog = false
-                saveCurrent()
-                onBack()
-            }
-        )
-    }
 }

@@ -1,8 +1,8 @@
 package asia.nana7mi.arirang.ui.screen.device
 
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.device.*
 import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,13 +23,10 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -40,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -48,8 +42,6 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.DeviceInfoPrefs
 import asia.nana7mi.arirang.model.DevicePresetCatalog
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,9 +54,7 @@ internal fun DeviceInfoConfigScreen(
     var savedConfig by remember { mutableStateOf(initialConfig) }
     var expanded by remember { mutableStateOf(false) }
     var buildTimeText by remember { mutableStateOf(initialConfig.time.toString()) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
     var revision by remember { mutableLongStateOf(0L) }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val selectedPreset = DevicePresetCatalog.ALL.firstOrNull { it.id == config.presetId }?.label
         ?: stringResource(R.string.device_preset_custom)
 
@@ -78,41 +68,22 @@ internal fun DeviceInfoConfigScreen(
         return config.copy(time = buildTimeText.toLongOrNull() ?: config.time)
     }
 
-    fun saveCurrent() {
+    fun saveCurrent(): Boolean {
         val current = currentConfig()
         config = current
         onSave(current)
         savedConfig = current
+        return true
     }
 
     val hasChanges = currentConfig() != savedConfig
 
-    fun requestBack() {
-        if (hasChanges) {
-            showUnsavedDialog = true
-        } else {
-            onBack()
-        }
-    }
 
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.device_info_config_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
+    ConfigScreenScaffold(
+        title = stringResource(R.string.device_info_config_title),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack,
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -279,18 +250,4 @@ internal fun DeviceInfoConfigScreen(
         }
     }
 
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = {
-                showUnsavedDialog = false
-                onBack()
-            },
-            onSave = {
-                showUnsavedDialog = false
-                saveCurrent()
-                onBack()
-            }
-        )
-    }
 }
