@@ -26,6 +26,7 @@
     <string name="category_permission">Permissions</string>
     <string name="category_anonymization">Anonymization</string>
     <string name="category_control">Control</string>
+    <string name="category_system_status">System Status</string>
 
     <string name="feature_clipboard">Clipboard</string>
     <string name="feature_sensor">Sensors</string>
@@ -39,8 +40,8 @@
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">Bluetooth</string>
 
-    <string name="feature_background_network">Background Network</string>
-    <string name="feature_force_proxy">Force Proxy</string>
+    <string name="feature_vpn_status">VPN Status</string>
+    <string name="feature_system_setting">System Setting</string>
 
     <string name="clipboard_permission_title">Clipboard Access Permission</string>
     <string name="clipboard_overlay_permission_title">Overlay Permission Required</string>

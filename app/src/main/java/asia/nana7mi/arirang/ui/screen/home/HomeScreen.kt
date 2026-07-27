@@ -12,8 +12,10 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.VpnLock
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,7 @@ import asia.nana7mi.arirang.ui.activity.PackageListConfigActivity
 import asia.nana7mi.arirang.ui.activity.SensorConfigActivity
 import asia.nana7mi.arirang.ui.activity.SimConfigActivity
 import asia.nana7mi.arirang.ui.activity.UniqueIdentifierConfigActivity
+import asia.nana7mi.arirang.ui.activity.VpnStatusConfigActivity
 import asia.nana7mi.arirang.ui.activity.WifiConfigActivity
 
 @Composable
@@ -87,6 +90,18 @@ fun HomeScreen(
                     FeatureItem(R.string.feature_location, Icons.Default.MyLocation, LocationConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_device_info, Icons.Default.Smartphone, DeviceInfoConfigActivity::class.java, true),
                     FeatureItem(R.string.feature_unique_identifier, Icons.Default.Fingerprint, UniqueIdentifierConfigActivity::class.java, true)
+                ),
+                onUnavailable = { showUnavailableDialog = true },
+                onFeatureClick = onFeatureClick
+            )
+        }
+
+        item {
+            FeatureSection(
+                title = stringResource(R.string.category_system_status),
+                items = listOf(
+                    FeatureItem(R.string.feature_vpn_status, Icons.Default.VpnLock, VpnStatusConfigActivity::class.java, true),
+                    FeatureItem(R.string.feature_system_setting, Icons.Default.Settings, VpnStatusConfigActivity::class.java, true),
                 ),
                 onUnavailable = { showUnavailableDialog = true },
                 onFeatureClick = onFeatureClick
