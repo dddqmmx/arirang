@@ -1,10 +1,10 @@
 package asia.nana7mi.arirang.ui.screen.sensor
 
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.sensor.*
 import asia.nana7mi.arirang.ui.component.common.SensorSwitchRow
 import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
 import android.hardware.Sensor
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.hardware.SensorManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -31,7 +30,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
@@ -40,11 +38,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Card
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,7 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,8 +58,6 @@ import androidx.compose.ui.platform.LocalContext
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs.SensorEntry
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,49 +69,34 @@ internal fun SensorListScreen(
     val context = LocalContext.current
     var config by remember { mutableStateOf(initialConfig) }
     var savedConfig by remember { mutableStateOf(initialConfig) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
     var editingIndex by remember { mutableIntStateOf(-1) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
-    fun saveCurrent() { onSave(config); savedConfig = config }
+    fun saveCurrent(): Boolean { onSave(config); savedConfig = config; return true }
     val hasChanges = config != savedConfig
-    fun requestBack() { if (hasChanges) showUnsavedDialog = true else onBack() }
 
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.sensor_section_list)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            val sm = context.getSystemService(SensorManager::class.java)
-                            val deviceEntries = sm?.getSensorList(Sensor.TYPE_ALL).orEmpty()
-                                .map { SensorEntry(name = it.name, vendor = it.vendor, type = it.type) }
-                                .distinctBy { it.type }
-                                .sortedBy { it.type }
-                            config = config.copy(
-                                sensorEntries = deviceEntries,
-                                vendorKeywords = "",
-                                vendorReplacement = ""
-                            )
-                        }
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.reset))
-                    }
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
+    ConfigScreenScaffold(
+        title = stringResource(R.string.sensor_section_list),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack,
+        actions = {
+            IconButton(
+                onClick = {
+                    val sm = context.getSystemService(SensorManager::class.java)
+                    val deviceEntries = sm?.getSensorList(Sensor.TYPE_ALL).orEmpty()
+                        .map { SensorEntry(name = it.name, vendor = it.vendor, type = it.type) }
+                        .distinctBy { it.type }
+                        .sortedBy { it.type }
+                    config = config.copy(
+                        sensorEntries = deviceEntries,
+                        vendorKeywords = "",
+                        vendorReplacement = ""
+                    )
+                }
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.reset))
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
@@ -338,13 +316,6 @@ internal fun SensorListScreen(
     }
 
     // ── Unsaved dialog ──
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = { showUnsavedDialog = false; onBack() },
-            onSave = { showUnsavedDialog = false; saveCurrent(); onBack() }
-        )
-    }
 
     // ── Edit sensor dialog ──
     if (editingIndex >= 0 && editingIndex < config.sensorEntries.size) {

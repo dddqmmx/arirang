@@ -13,9 +13,6 @@ object PackageVisibilityPrefs {
     const val PREFS_NAME = "clipboard_visibility_prefs"
 
     private const val KEY_ENABLED = "enabled"
-    private const val KEY_MODE = "mode"
-    private const val KEY_VISIBLE_LIST = "visible_list"
-    private const val KEY_INVISIBLE_LIST = "invisible_list"
     private const val KEY_LAST_MODIFIED = "last_modified"
 
     private const val KEY_DEFAULT_MODE = "default_display_mode"
@@ -183,19 +180,58 @@ object PackageVisibilityPrefs {
         SubmoduleConfigFiles.write(context)
     }
 
-    fun setDefaultSelection(context: Context, mode: DisplayMode, templateId: String?) {
-        val templates = loadTemplates(context)
-        val resolvedMode = if (mode == DisplayMode.TEMPLATE && templateId == null) {
-            DisplayMode.ALL_VISIBLE
-        } else {
-            mode
+    /**
+     * Collects related changes so they are committed together.
+     *
+     * Templates, app rules and the default selection reference each other, and
+     * ConfigRegistry validates those cross-references when the submodule
+     * config is rebuilt. Committing them one at a time publishes intermediate
+     * states that do not satisfy those constraints — deleting a template used
+     * by a rule, for instance, briefly leaves the rule pointing at a template
+     * that no longer exists.
+     */
+    class Edit internal constructor() {
+        internal var templates: List<Template>? = null
+        internal var appRules: List<AppRule>? = null
+        internal var defaultSelection: Pair<DisplayMode, String?>? = null
+
+        fun templates(value: List<Template>) { templates = value }
+
+        fun appRules(value: List<AppRule>) { appRules = value }
+
+        fun defaultSelection(mode: DisplayMode, templateId: String?) {
+            defaultSelection = mode to templateId
         }
+    }
+
+    /** Applies [block]'s changes in one commit followed by one submodule write. */
+    fun edit(context: Context, block: Edit.() -> Unit) {
+        val pending = Edit().apply(block)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
-            putString(KEY_DEFAULT_MODE, resolvedMode.name)
-            putString(KEY_DEFAULT_TEMPLATE_ID, templateId)
+            pending.templates?.let { putString(KEY_TEMPLATES, gson.toJson(withoutSelfParents(it))) }
+            pending.appRules?.let { putString(KEY_APP_RULES, gson.toJson(it)) }
+            pending.defaultSelection?.let { (mode, templateId) ->
+                // A TEMPLATE selection with no template is not a state the
+                // validator accepts, so fall back to showing everything.
+                val resolvedMode = if (mode == DisplayMode.TEMPLATE && templateId == null) {
+                    DisplayMode.ALL_VISIBLE
+                } else {
+                    mode
+                }
+                putString(KEY_DEFAULT_MODE, resolvedMode.name)
+                putString(KEY_DEFAULT_TEMPLATE_ID, templateId)
+            }
             putLong(KEY_LAST_MODIFIED, Date().time)
         }
         SubmoduleConfigFiles.write(context)
+    }
+
+    private fun withoutSelfParents(templates: List<Template>): List<Template> = templates.map {
+        if (it.parentId == it.id) it.copy(parentId = null) else it
+    }
+
+    fun setDefaultSelection(context: Context, mode: DisplayMode, templateId: String?) {
+        edit(context) { defaultSelection(mode, templateId) }
     }
 
     fun loadTemplates(context: Context): List<Template> {
@@ -207,14 +243,7 @@ object PackageVisibilityPrefs {
     }
 
     fun saveTemplates(context: Context, templates: List<Template>) {
-        val cleaned = templates.map { template ->
-            if (template.parentId == template.id) template.copy(parentId = null) else template
-        }
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
-            putString(KEY_TEMPLATES, gson.toJson(cleaned))
-            putLong(KEY_LAST_MODIFIED, Date().time)
-        }
-        SubmoduleConfigFiles.write(context)
+        edit(context) { templates(templates) }
     }
 
     fun loadAppRules(context: Context): List<AppRule> {
@@ -226,11 +255,7 @@ object PackageVisibilityPrefs {
     }
 
     fun saveAppRules(context: Context, rules: List<AppRule>) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
-            putString(KEY_APP_RULES, gson.toJson(rules))
-            putLong(KEY_LAST_MODIFIED, Date().time)
-        }
-        SubmoduleConfigFiles.write(context)
+        edit(context) { appRules(rules) }
     }
 
     fun createTemplate(

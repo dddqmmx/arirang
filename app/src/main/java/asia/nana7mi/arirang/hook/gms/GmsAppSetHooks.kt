@@ -1,12 +1,12 @@
 package asia.nana7mi.arirang.hook.gms
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-
 import android.os.IBinder
 import android.os.IInterface
 import android.os.Parcel
 import android.os.Parcelable
+import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import com.google.android.gms.appset.zzc as AppSetIdResult
 import com.google.android.gms.common.api.Status
 import de.robv.android.xposed.XC_MethodHook
@@ -175,15 +175,6 @@ internal class GmsAppSetHooks(
         }
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
     companion object {
         const val APP_SET_SERVICE_DESCRIPTOR =

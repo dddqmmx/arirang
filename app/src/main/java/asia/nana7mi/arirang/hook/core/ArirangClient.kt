@@ -80,12 +80,27 @@ object ArirangClient {
     private const val RESULT_ALLOW = 1
 
     /**
-     * 服务不可用时是否默认放行（fail-open）
+     * What to return when the manager app cannot be reached at all.
      *
-     * true  = 服务异常时不阻断系统流程
-     * false = 服务异常时默认拒绝（更安全但更激进）
+     * Open, deliberately. The clipboard feature's enabled flag lives only in the
+     * manager app (ClipboardController returns ALLOW when it is off) and
+     * FuckClipboard has no local config read, so an unreachable service means we
+     * cannot tell whether the user even switched clipboard protection on. Denying
+     * in that state returned a null clip to *every* app on the device — including
+     * for users who never enabled the feature — from boot until a successful
+     * bind, or permanently if the manager app is force-stopped, frozen by an OEM
+     * battery policy, or the request came from a secondary user.
      */
-    private const val FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE = false
+    private const val FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE = true
+
+    /**
+     * What to return when the manager app was reached but did not answer.
+     *
+     * Closed. Here the feature demonstrably is governing the read and the user
+     * was asked, so an unanswered prompt is a denial rather than an absence of
+     * policy.
+     */
+    private const val FAIL_OPEN_ON_TIMEOUT = false
 
     /**
      * 当前已连接的远程 Binder 接口
@@ -313,17 +328,17 @@ object ArirangClient {
             }
             if (!latch.await(CLIPBOARD_CALL_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                 HookLog.w(HookLog.Module.NOTIFY, "clipboard request timed out")
-                FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
+                FAIL_OPEN_ON_TIMEOUT
             } else {
                 decision.get() == RESULT_ALLOW
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
-            FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
+            FAIL_OPEN_ON_TIMEOUT
         } catch (t: Throwable) {
             if (t is DeadObjectException) clearDeadService(service)
             HookLog.w(HookLog.Module.NOTIFY, "requestClipboardReadAccess failed: ${t.message}")
-            FAIL_OPEN_WHEN_SERVICE_UNAVAILABLE
+            FAIL_OPEN_ON_TIMEOUT
         }
     }
 

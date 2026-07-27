@@ -3,7 +3,7 @@ package asia.nana7mi.arirang.hook.process
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
-
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.io.ByteArrayInputStream
 import java.io.InputStream

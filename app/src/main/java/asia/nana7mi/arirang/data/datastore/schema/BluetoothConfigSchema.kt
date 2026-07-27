@@ -18,12 +18,20 @@ data class BluetoothConfigSchema(
     companion object {
         const val SCHEMA_VERSION = 1
 
+        /**
+         * Declared defaults, used as the decode fallback for absent fields so
+         * the two cannot drift apart (deviceName decoded to "" while its
+         * default is "Arirang"). schemaVersion/lastModified are excluded
+         * deliberately: an absent schemaVersion must stay 0 ("unversioned").
+         */
+        private val DEFAULTS = BluetoothConfigSchema()
+
         fun fromJson(json: String): BluetoothConfigSchema {
             val root = JSON_PARSER.parse(json).asJsonObject
             val gson = Gson()
             return BluetoothConfigSchema(
-                enabled = root.get("enabled")?.asBoolean ?: false,
-                deviceName = root.get("deviceName")?.asString ?: "",
+                enabled = root.get("enabled")?.asBoolean ?: DEFAULTS.enabled,
+                deviceName = root.get("deviceName")?.asString ?: DEFAULTS.deviceName,
                 connectedDevices = root.get("connectedDevices")?.let {
                     gson.fromJson(it, object : TypeToken<List<BluetoothDeviceSchema>>() {}.type)
                 } ?: emptyList(),

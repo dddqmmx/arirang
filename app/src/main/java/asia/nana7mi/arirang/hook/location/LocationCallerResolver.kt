@@ -8,6 +8,8 @@ import asia.nana7mi.arirang.hook.util.getFieldValue
 
 import android.location.LocationManager
 import java.util.Collections
+import java.util.Optional
+import java.util.concurrent.ConcurrentHashMap
 import java.util.IdentityHashMap
 
 internal object LocationCallerResolver {
@@ -35,9 +37,27 @@ internal object LocationCallerResolver {
             .firstOrNull()
     }
 
+    /**
+     * uid -> package cache.
+     *
+     * The lookup below is a real Binder round-trip to PackageManagerService, and
+     * it sits behind every hooked Location getter (getLatitude, getLongitude,
+     * getAccuracy, getTime, …). GMS reading a batch of fixes therefore produced
+     * hundreds of synchronous PMS calls, on GMS's own Binder threads, for a
+     * result that is constant for a process lifetime — and for GMS's shared UID
+     * the answer is always null, so the work was discarded every time.
+     *
+     * Nulls are cached too, since "this uid has no single owning package" is the
+     * common case for shared UIDs and is exactly what we do not want to re-derive
+     * on every call. A uid's package set only changes across install/uninstall,
+     * which gives the uid a new mapping rather than mutating this one.
+     */
+    private val packageNameByUid = ConcurrentHashMap<Int, Optional<String>>()
+
     fun packageNameForUid(uid: Int): String? {
         if (uid <= 0) return null
-        return runCatching {
+        packageNameByUid[uid]?.let { return it.orElse(null) }
+        val resolved = runCatching {
             ArirangClient.getSystemContext()
                 ?.packageManager
                 ?.getPackagesForUid(uid)
@@ -48,6 +68,12 @@ internal object LocationCallerResolver {
                 ?.toList()
                 ?.singleOrNull()
         }.getOrNull()
+        // Only cache once a system context exists; before that a null means "too
+        // early to ask", not "no package", and must not be memoised.
+        if (ArirangClient.getSystemContext() != null) {
+            packageNameByUid[uid] = Optional.ofNullable(resolved)
+        }
+        return resolved
     }
 
     fun packageNameFromObject(value: Any?): String? {

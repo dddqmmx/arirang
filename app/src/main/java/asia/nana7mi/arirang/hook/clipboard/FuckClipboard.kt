@@ -1,15 +1,15 @@
 package asia.nana7mi.arirang.hook.clipboard
 
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-
 import android.os.Binder
 import android.os.Build
 import android.os.Process
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
+import asia.nana7mi.arirang.hook.core.ArirangClient
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -97,20 +97,18 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
     //为了防止android弹出未响应弹窗为当前阻塞应用授予临时特权
     private fun hookAnrExemption(classLoader: ClassLoader) {
-        val hookCallback = object : de.robv.android.xposed.XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                val uid = runCatching {
-                    if (param.thisObject.javaClass.simpleName == "ProcessRecord") {
-                        HookBridge.getIntField(param.thisObject, "uid")
-                    } else {
-                        HookBridge.getIntField(param.thisObject, "mUid")
-                    }
-                }.getOrNull()
-
-                if (uid != null && pendingUids[uid]?.get()?.let { it > 0 } == true) {
-                    HookLog.i(HookLog.Module.CLIPBOARD, "Bypassing ANR for uid $uid via isDebugging spoof")
-                    param.result = true
+        val hookCallback = beforeHookedMethod {
+            val uid = runCatching {
+                if (thisObject.javaClass.simpleName == "ProcessRecord") {
+                    HookBridge.getIntField(thisObject, "uid")
+                } else {
+                    HookBridge.getIntField(thisObject, "mUid")
                 }
+            }.getOrNull()
+
+            if (uid != null && pendingUids[uid]?.get()?.let { it > 0 } == true) {
+                HookLog.i(HookLog.Module.CLIPBOARD, "Bypassing ANR for uid $uid via isDebugging spoof")
+                result = true
             }
         }
 

@@ -1,9 +1,7 @@
 package asia.nana7mi.arirang.ui.component.clipboard
 
-import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,29 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import asia.nana7mi.arirang.R
-
-@Composable
-internal fun DynamicArirangTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
-    val context = LocalContext.current
-    val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else if (darkTheme) {
-        darkColorScheme()
-    } else {
-        lightColorScheme()
-    }
-    MaterialTheme(colorScheme = colorScheme, typography = Typography(), content = content)
-}
 
 @Composable
 internal fun ConfirmDialogContent(

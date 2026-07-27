@@ -34,8 +34,11 @@ jobs:
           fi
           "$SDKMANAGER" --install "ndk;23.1.7779620"
 
+      - name: Run unit tests
+        run: ./gradlew :app:testDebugUnitTest
+
       - name: Build with Gradle
-        run: ./gradlew :app:assembleDebug :app:assembleRelease :arirang-selfcheck:assembleDebug :arirang-selfcheck:assembleRelease :arirang-submodule:packageModule
+        run: ./gradlew :app:assembleDebug :app:assembleRelease :selfcheck:assembleDebug :selfcheck:assembleRelease :submodule:packageModule
 
       - name: Get Build Tools Version
         run: |
@@ -57,7 +60,7 @@ jobs:
         uses: r0adkll/sign-android-release@v1
         id: sign_selfcheck
         with:
-          releaseDirectory: arirang-selfcheck/build/outputs/apk/release
+          releaseDirectory: selfcheck/build/outputs/apk/release
           signingKeyBase64: ${{ secrets.SIGNING_KEY }}
           alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -71,13 +74,13 @@ jobs:
 
       - name: Rename Signed Self-Check APK
         run: |
-          mv ${{ steps.sign_selfcheck.outputs.signedReleaseFile }} arirang-selfcheck/build/outputs/apk/release/arirang-selfcheck-${{ github.ref_name }}-release.apk
-          echo "SELFCHECK_RELEASE_APK_PATH=arirang-selfcheck/build/outputs/apk/release/arirang-selfcheck-${{ github.ref_name }}-release.apk" >> $GITHUB_ENV
+          mv ${{ steps.sign_selfcheck.outputs.signedReleaseFile }} selfcheck/build/outputs/apk/release/arirang-selfcheck-${{ github.ref_name }}-release.apk
+          echo "SELFCHECK_RELEASE_APK_PATH=selfcheck/build/outputs/apk/release/arirang-selfcheck-${{ github.ref_name }}-release.apk" >> $GITHUB_ENV
 
       - name: Rename Submodule Zip
         run: |
-          mv arirang-submodule/build/outputs/arirang-submodule.zip arirang-submodule/build/outputs/arirang-submodule-${{ github.ref_name }}.zip
-          echo "SUBMODULE_ZIP_PATH=arirang-submodule/build/outputs/arirang-submodule-${{ github.ref_name }}.zip" >> $GITHUB_ENV
+          mv submodule/build/outputs/arirang-submodule.zip submodule/build/outputs/arirang-submodule-${{ github.ref_name }}.zip
+          echo "SUBMODULE_ZIP_PATH=submodule/build/outputs/arirang-submodule-${{ github.ref_name }}.zip" >> $GITHUB_ENV
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -89,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: arirang-selfcheck-debug
-          path: arirang-selfcheck/build/outputs/apk/debug/*.apk
+          path: selfcheck/build/outputs/apk/debug/*.apk
 
       - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
@@ -118,7 +121,7 @@ jobs:
           prerelease: false
           files: |
             app/build/outputs/apk/debug/*.apk
-            arirang-selfcheck/build/outputs/apk/debug/*.apk
+            selfcheck/build/outputs/apk/debug/*.apk
             ${{ env.RELEASE_APK_PATH }}
             ${{ env.SELFCHECK_RELEASE_APK_PATH }}
             ${{ env.SUBMODULE_ZIP_PATH }}

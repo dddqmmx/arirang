@@ -9,8 +9,8 @@ Three Gradle modules in `settings.gradle.kts`:
 - `:app` — Xposed/LSPosed module **and** manager UI (`asia.nana7mi.arirang`).
   - Hook entrypoints live under `app/src/main/java/asia/nana7mi/arirang/hook/`.
   - Writes the native submodule config to app files at runtime (`arirang-submodule/config.json`).
-- `:arirang-selfcheck` — standalone companion APK (`asia.nana7mi.arirang.selfcheck`), launcher activity is `SelfCheckActivity`.
-- `:arirang-submodule` — native Zygisk/DRM fallback layer. Builds with CMake + NDK, produces a Magisk/KernelSU/APatch flashable zip.
+- `:selfcheck` — standalone companion APK (`asia.nana7mi.arirang.selfcheck`), launcher activity is `SelfCheckActivity`.
+- `:submodule` — native Zygisk/DRM fallback layer. Builds with CMake + NDK, produces a Magisk/KernelSU/APatch flashable zip.
   - No Android application plugin; uses the `base` plugin and custom tasks.
 
 ## Exact commands
@@ -18,22 +18,22 @@ Three Gradle modules in `settings.gradle.kts`:
 | Goal | Command |
 |------|---------|
 | Build main app debug APK | `./gradlew :app:assembleDebug` |
-| Build self-check debug APK | `./gradlew :arirang-selfcheck:assembleDebug` |
-| Build submodule zip | `./gradlew :arirang-submodule:packageModule` → `arirang-submodule/build/outputs/arirang-submodule.zip` |
-| Build just native artifacts | `./gradlew :arirang-submodule:buildNative` |
-| Install submodule and reboot (Magisk/KSU/APatch auto) | `./gradlew :arirang-submodule:installModuleAndReboot` |
-| Install submodule with KernelSU Next | `./gradlew :arirang-submodule:installKernelSuNextAndReboot` |
-| Install without reboot | `./gradlew :arirang-submodule:installModule` |
+| Build self-check debug APK | `./gradlew :selfcheck:assembleDebug` |
+| Build submodule zip | `./gradlew :submodule:packageModule` → `submodule/build/outputs/arirang-submodule.zip` |
+| Build just native artifacts | `./gradlew :submodule:buildNative` |
+| Install submodule and reboot (Magisk/KSU/APatch auto) | `./gradlew :submodule:installModuleAndReboot` |
+| Install submodule with KernelSU Next | `./gradlew :submodule:installKernelSuNextAndReboot` |
+| Install without reboot | `./gradlew :submodule:installModule` |
 | Install main app debug onto device | `./gradlew :app:installDebug` |
-| Run AGP lint | `./gradlew :app:lintDebug :arirang-selfcheck:lintDebug` |
+| Run AGP lint | `./gradlew :app:lintDebug :selfcheck:lintDebug` |
 
-There are currently **no unit or instrumentation tests**; `app:testDebugUnitTest` exists but has nothing to run.
+There are **67 JVM unit tests** in `app/src/test/` (`ConfigImportExportTest`, `ConfigSchemaTest`, `SubmoduleConfigFilesTest`, `ExampleUnitTest`); run them with `./gradlew :app:testDebugUnitTest`. CI runs them on every build. There are no instrumentation tests.
 
 ## Toolchain / environment
 
 - Dependencies managed via `gradle/libs.versions.toml` version catalog.
-- Gradle wrapper uses **Gradle 9.4.1**.
-- AGP 9.2.1, Kotlin 2.3.20, Compose BOM 2026.03.01.
+- Gradle wrapper uses **Gradle 9.5.0**.
+- AGP 9.3.1, Kotlin 2.4.10, Compose BOM 2026.06.01.
 - `compileSdk = 37`, `targetSdk = 36`, `minSdk = 34`.
 - Java / Kotlin target: **JVM 17**.
 - Native build: **NDK 23.1.7779620**, arm64-v8a, Android API 31.
@@ -51,7 +51,7 @@ There are currently **no unit or instrumentation tests**; `app:testDebugUnitTest
   - `libarirang_drm_hook.so` → staged as `lib/libarirang_drm_hook.so`
   - `arirang_injector` → staged as `bin/arirang_injector`
 - Runtime staging: `post-fs-data.sh` copies the DRM hook `.so` to a tmpfs landing dir at `/dev/.arirang`, bind-mounts it over an unused vendor `.so`, and stages the spoofed `widevineDrmId` from the app config. `service.sh` later ptrace-dlopens it into the Widevine HAL daemon.
-- `arirang-submodule/package.sh` is **not maintained for the current build**; it does not pass the required CMake application/config defines and only packages the Zygisk `.so`. Use the Gradle task for normal builds.
+- `submodule/package.sh` is **not maintained for the current build**; it does not pass the required CMake application/config defines and only packages the Zygisk `.so`. Use the Gradle task for normal builds.
 - Device install tasks use `adb`; you can target a specific device or root method with:
   - `./gradlew ... -Parirang.device=<serial>` or env `ARIRANG_DEVICE`
   - `./gradlew ... -Parirang.root=magisk|ksu|kernelsu|ap|apatch` or env `ARIRANG_ROOT`
@@ -74,7 +74,7 @@ There are currently **no unit or instrumentation tests**; `app:testDebugUnitTest
 
 - Native submodule runtime tags: `ArirangZygisk`, `arirang_service`, `arirang_post_fs_data`, `ArirangDrmHook`.
 - To verify the Widevine `deviceUniqueId` path is spoofed, open the self-check app and trigger `MediaDrm.getPropertyByteArray(PROPERTY_DEVICE_UNIQUE_ID)`; confirm logcat reports `spoofed deviceUniqueId byte[]`.
-- See `arirang-submodule/doc/drm_hook_research.md` for the current vtable-based DRM hook design and reference-device notes.
+- See `submodule/doc/drm_hook_research.md` for the current vtable-based DRM hook design and reference-device notes.
 
 ## CI
 

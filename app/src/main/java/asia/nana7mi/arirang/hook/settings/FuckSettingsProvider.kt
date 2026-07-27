@@ -1,19 +1,19 @@
 package asia.nana7mi.arirang.hook.settings
 
+import android.os.Bundle
+import android.provider.Settings
+import asia.nana7mi.arirang.data.config.ConfigIds
+import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
+import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
+import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
-
-import android.os.Bundle
-import android.provider.Settings
-import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
-import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
-import asia.nana7mi.arirang.data.config.ConfigIds
-import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
-import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value

@@ -1,9 +1,6 @@
 package asia.nana7mi.arirang.ui.screen.location
 
-import asia.nana7mi.arirang.ui.component.location.*
-import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
 import android.content.Intent
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,20 +13,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -39,20 +32,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Profile
 import asia.nana7mi.arirang.ui.activity.LocationAppConfigActivity
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
+import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
+import asia.nana7mi.arirang.ui.component.location.*
+import asia.nana7mi.arirang.ui.component.location.parseDouble
+import asia.nana7mi.arirang.ui.component.location.parseFloat
+import asia.nana7mi.arirang.ui.component.location.parseInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,8 +75,6 @@ internal fun LocationConfigScreen(
     var savedSatellitesText by remember { mutableStateOf(satellitesText) }
     var revision by remember { mutableLongStateOf(0L) }
     var validationError by remember { mutableStateOf<String?>(null) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val context = LocalContext.current
     val latitudeLabel = stringResource(R.string.location_field_latitude)
     val longitudeLabel = stringResource(R.string.location_field_longitude)
@@ -237,34 +231,15 @@ internal fun LocationConfigScreen(
         bearingText != savedBearingText ||
         satellitesText != savedSatellitesText
 
-    fun requestBack() {
-        if (hasChanges) {
-            showUnsavedDialog = true
-        } else {
-            onBack()
-        }
-    }
-
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.location_config_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { applyConfig(Config(enabled = true)) }) {
-                        Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_default_pyongyang))
-                    }
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
+    ConfigScreenScaffold(
+        title = stringResource(R.string.location_config_title),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = { applyConfig(Config(enabled = true)) }) {
+                Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_default_pyongyang))
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -423,53 +398,8 @@ internal fun LocationConfigScreen(
         }
     }
 
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = {
-                showUnsavedDialog = false
-                onBack()
-            },
-            onSave = {
-                if (saveCurrent()) {
-                    showUnsavedDialog = false
-                    onBack()
-                }
-            }
-        )
-    }
 }
 
-private fun parseDouble(text: String, label: String, min: Double, max: Double, errorFormat: String): ParsedValue {
-    val value = text.trim().toDoubleOrNull()
-    return if (value == null || value !in min..max) {
-        ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        ParsedValue(doubleValue = value)
-    }
-}
 
-private fun parseFloat(text: String, label: String, min: Float, max: Float, errorFormat: String): ParsedValue {
-    val value = text.trim().toFloatOrNull()
-    return if (value == null || value < min || value > max) {
-        ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        ParsedValue(floatValue = value)
-    }
-}
 
-private fun parseInt(text: String, label: String, min: Int, max: Int, errorFormat: String): ParsedValue {
-    val value = text.trim().toIntOrNull()
-    return if (value == null || value !in min..max) {
-        ParsedValue(error = errorFormat.format(label, min.toString(), max.toString()))
-    } else {
-        ParsedValue(intValue = value)
-    }
-}
 
-private data class ParsedValue(
-    val doubleValue: Double? = null,
-    val floatValue: Float? = null,
-    val intValue: Int? = null,
-    val error: String? = null
-)

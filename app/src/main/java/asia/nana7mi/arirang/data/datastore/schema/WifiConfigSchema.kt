@@ -21,18 +21,31 @@ data class WifiConfigSchema(
     companion object {
         const val SCHEMA_VERSION = 2
 
+        /**
+         * Declared defaults, used as the decode fallback for absent fields.
+         *
+         * Referencing this rather than repeating literals keeps the two in step:
+         * they had drifted for all six string fields, so a snapshot missing e.g.
+         * `dns2` decoded to "" and then failed ConfigRegistry's IPV4 check.
+         *
+         * schemaVersion and lastModified are deliberately excluded — an absent
+         * schemaVersion must stay 0 ("unversioned") so ManagedConfig's version
+         * check still rejects legacy payloads instead of silently accepting them.
+         */
+        private val DEFAULTS = WifiConfigSchema()
+
         fun fromJson(json: String): WifiConfigSchema {
             val root = JSON_PARSER.parse(json).asJsonObject
             val gson = Gson()
             return WifiConfigSchema(
-                enabled = root.get("enabled")?.asBoolean ?: false,
-                currentSsid = root.get("currentSsid")?.asString ?: "",
-                currentBssid = root.get("currentBssid")?.asString ?: "",
-                ipAddress = root.get("ipAddress")?.asString ?: "",
-                gateway = root.get("gateway")?.asString ?: "",
-                dns1 = root.get("dns1")?.asString ?: "",
-                dns2 = root.get("dns2")?.asString ?: "",
-                hideScanResults = root.get("hideScanResults")?.asBoolean ?: false,
+                enabled = root.get("enabled")?.asBoolean ?: DEFAULTS.enabled,
+                currentSsid = root.get("currentSsid")?.asString ?: DEFAULTS.currentSsid,
+                currentBssid = root.get("currentBssid")?.asString ?: DEFAULTS.currentBssid,
+                ipAddress = root.get("ipAddress")?.asString ?: DEFAULTS.ipAddress,
+                gateway = root.get("gateway")?.asString ?: DEFAULTS.gateway,
+                dns1 = root.get("dns1")?.asString ?: DEFAULTS.dns1,
+                dns2 = root.get("dns2")?.asString ?: DEFAULTS.dns2,
+                hideScanResults = root.get("hideScanResults")?.asBoolean ?: DEFAULTS.hideScanResults,
                 scanResults = root.get("scanResults")?.let {
                     gson.fromJson(it, object : TypeToken<List<WifiScanNetworkSchema>>() {}.type)
                 } ?: emptyList(),

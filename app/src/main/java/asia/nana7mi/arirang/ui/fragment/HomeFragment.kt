@@ -9,7 +9,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import asia.nana7mi.arirang.ui.screen.home.HomeScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class HomeFragment : Fragment() {
     override fun onCreateView(

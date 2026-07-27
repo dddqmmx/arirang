@@ -55,6 +55,16 @@ object AppPreferences {
         ) { "Unable to persist app preferences" }
     }
 
-    private val SUPPORTED_LANGUAGES = setOf("system", "en", "zh-CN", "ja", "ko")
+    /**
+     * Language tags accepted by config import and validation. Single source of
+     * truth: ConfigRegistry.validateApp reads this rather than keeping a copy.
+     *
+     * Must stay in step with the `language_codes` string-array that the settings
+     * picker renders. NOTE: "ko" is offered and accepted here, but
+     * `localeFilters` in app/build.gradle.kts ships only en/zh-rCN/ja and there
+     * is no values-ko/, so selecting Korean currently falls back to the default
+     * strings. Either add the translations or drop it from all three lists.
+     */
+    val SUPPORTED_LANGUAGES = setOf("system", "en", "zh-CN", "ja", "ko")
 
 }

@@ -231,10 +231,15 @@ class PackageTemplateManagerActivity : BaseActivity() {
         val updatedRules = PackageVisibilityPrefs.loadAppRules(this).filterNot { it.templateId == template.id }
         val config = PackageVisibilityPrefs.loadConfig(this)
 
-        PackageVisibilityPrefs.saveTemplates(this, updatedTemplates)
-        PackageVisibilityPrefs.saveAppRules(this, updatedRules)
-        if (config.defaultTemplateId == template.id) {
-            PackageVisibilityPrefs.setDefaultSelection(this, DisplayMode.ALL_VISIBLE, null)
+        // One commit: templates, the rules that referenced the deleted template,
+        // and the default selection all have to move together, or the config is
+        // briefly left with rules pointing at a template that no longer exists.
+        PackageVisibilityPrefs.edit(this) {
+            templates(updatedTemplates)
+            appRules(updatedRules)
+            if (config.defaultTemplateId == template.id) {
+                defaultSelection(DisplayMode.ALL_VISIBLE, null)
+            }
         }
         refreshTemplates()
     }

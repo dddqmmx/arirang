@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import asia.nana7mi.arirang.ui.screen.location.LocationAppConfigScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class LocationAppConfigActivity : ComponentActivity() {
 

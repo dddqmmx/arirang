@@ -8,6 +8,7 @@ import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 private const val GMS_PACKAGE = "com.google.android.gms"

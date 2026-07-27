@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import asia.nana7mi.arirang.ui.screen.advanced.AdvancedSettingsScreen
-import asia.nana7mi.arirang.ui.ui.theme.ArirangTheme
+import asia.nana7mi.arirang.ui.theme.ArirangTheme
 
 class AdvancedSettingsActivity : BaseActivity() {
 

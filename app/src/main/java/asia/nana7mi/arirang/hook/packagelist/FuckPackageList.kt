@@ -1,15 +1,16 @@
 package asia.nana7mi.arirang.hook.packagelist
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
-import android.content.pm.ResolveInfo
 import android.content.pm.ProviderInfo
+import android.content.pm.ResolveInfo
 import android.os.Binder
+import asia.nana7mi.arirang.hook.core.BaseHookModule
+import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.util.concurrent.atomic.AtomicBoolean

@@ -197,7 +197,7 @@ object ConfigRegistry {
 
     private fun validateApp(schema: AppConfigSchema): List<String> = buildList {
         addAll(validateBase(schema))
-        if (schema.language !in SUPPORTED_LANGUAGES) {
+        if (schema.language !in AppPreferences.SUPPORTED_LANGUAGES) {
             add("unsupported language: ${schema.language}")
         }
     }
@@ -433,7 +433,6 @@ object ConfigRegistry {
     fun versions(context: Context): Map<String, Long> =
         all.associate { it.id to it.version(context) }
 
-    private val SUPPORTED_LANGUAGES = setOf("system", "en", "zh-CN", "ja", "ko")
     private val VALID_SLOT_RANGE = 0..31
     private const val MAX_SLOT_COUNT = 32
     private const val MAX_SSID_LENGTH = 32

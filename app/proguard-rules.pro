@@ -5,8 +5,10 @@
 -keep class de.robv.android.xposed.** { *; }
 -keepnames class de.robv.android.xposed.** { *; }
 
-# Keep specific UI classes that might be hooked
--keep class asia.nana7mi.arirang.ui.** { *; }
+# XposedActivation resolves this class and its isXposedActivation method by name
+# (hook/activation/XposedActivation.kt), so it must survive shrinking. Every other
+# ui.** class is reached normally and is kept by AGP's manifest-component rules.
+-keep class asia.nana7mi.arirang.ui.fragment.HomeFragment { *; }
 
 # Keep Gson-backed preference models. Hook code reads these JSON keys by name.
 -keepattributes Signature

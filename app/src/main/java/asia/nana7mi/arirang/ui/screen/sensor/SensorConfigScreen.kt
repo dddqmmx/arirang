@@ -1,11 +1,11 @@
 package asia.nana7mi.arirang.ui.screen.sensor
 
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.sensor.*
 import asia.nana7mi.arirang.ui.component.common.SensorSwitchRow
 import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
 import android.content.Intent
 import android.hardware.Sensor
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -20,18 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,8 +41,6 @@ import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs
 import asia.nana7mi.arirang.ui.activity.SensorListActivity
-import asia.nana7mi.arirang.ui.component.dialog.SaveConfigIconButton
-import asia.nana7mi.arirang.ui.component.dialog.UnsavedChangesDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +52,6 @@ internal fun SensorConfigScreen(
     val context = LocalContext.current
     var config by remember { mutableStateOf(initialConfig) }
     var savedConfig by remember { mutableStateOf(initialConfig) }
-    var showUnsavedDialog by remember { mutableStateOf(false) }
 
     val listLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         // Reload config when returning from the list activity to sync any changes made there
@@ -69,30 +60,14 @@ internal fun SensorConfigScreen(
         savedConfig = newConfig
     }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
-    fun saveCurrent() { onSave(config); savedConfig = config }
+    fun saveCurrent(): Boolean { onSave(config); savedConfig = config; return true }
     val hasChanges = config != savedConfig
-    fun requestBack() { if (hasChanges) showUnsavedDialog = true else onBack() }
 
-    BackHandler { requestBack() }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.sensor_config_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { requestBack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                actions = {
-                    SaveConfigIconButton(hasChanges = hasChanges, onClick = { saveCurrent() })
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
+    ConfigScreenScaffold(
+        title = stringResource(R.string.sensor_config_title),
+        hasChanges = hasChanges,
+        onSave = { saveCurrent() },
+        onBack = onBack
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -187,14 +162,6 @@ internal fun SensorConfigScreen(
         }
     }
 
-    // ── Unsaved dialog ──
-    if (showUnsavedDialog) {
-        UnsavedChangesDialog(
-            onDismiss = { showUnsavedDialog = false },
-            onDiscard = { showUnsavedDialog = false; onBack() },
-            onSave = { showUnsavedDialog = false; saveCurrent(); onBack() }
-        )
-    }
 }
 
 // ──────────────────────────────────────────────

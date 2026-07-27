@@ -1,9 +1,8 @@
 package asia.nana7mi.arirang.hook.wifi
 
 import asia.nana7mi.arirang.hook.core.HookBridge
-
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -146,7 +145,7 @@ internal class WifiServiceHooks(
                         if (isRedactedWifiInfo(result)) return@afterHookedMethod
                         val config = currentConfig()
                         if (!config.enabled) return@afterHookedMethod
-                        spoofedWifiInfo(config)?.let { result = it }
+                        spoofedWifiInfo(config, result)?.let { result = it }
                         HookLog.d(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
                     })
                     hookedConnectionInfo++
@@ -183,25 +182,7 @@ internal class WifiServiceHooks(
         )
     }
 
-    private fun beforeHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun beforeHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
-    private fun afterHookedMethod(
-        block: XC_MethodHook.MethodHookParam.() -> Unit
-    ): XC_MethodHook {
-        return object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                param.block()
-            }
-        }
-    }
 
     private fun isRedactedWifiInfo(value: Any?): Boolean {
         value ?: return true

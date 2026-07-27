@@ -26,17 +26,36 @@ public:
             arirang::log_warn("onLoad: Zygisk API or JNIEnv unavailable; module disabled for this process");
             return;
         }
-        // Prefer direct disk config because it is available even if the Zygisk
-        // companion socket is unavailable in this implementation. Fall back to
-        // the companion for environments where the module process cannot read
-        // the app-owned config paths.
+        // Deliberately does no work here.
+        //
+        // onLoad runs in every forked process, which is why preAppSpecialize has
+        // to DLCLOSE the module out of ordinary apps below. Reading the config
+        // and JNI-writing android.os.Build here therefore did both in every
+        // third-party app's VM before that unload decision was made: a disk read
+        // and ~15 static field writes on every cold start, plus per-process
+        // identity spoofing in apps this module is explicitly not allowed to
+        // touch. See the MANDATORY DESIGN COMPLIANCE note in preAppSpecialize --
+        // global Build/property identity is resetprop.sh's job, and it already
+        // spoofs ro.product.* and ro.build.fingerprint at boot.
+        //
+        // Config loading and Build spoofing now happen only in the two processes
+        // the module actually stays resident in: com.android.phone and
+        // system_server.
+    }
+
+    /**
+     * Loads the submodule config once per process.
+     *
+     * Prefers direct disk config because it is available even if the Zygisk
+     * companion socket is unavailable in this implementation, falling back to
+     * the companion where the module process cannot read the app-owned paths.
+     */
+    void ensure_config_loaded() {
+        if (config_loaded_) return;
+        config_loaded_ = true;
         if (!arirang::load_config_from_disk(config_)) {
             arirang::load_config_from_companion(api_, config_);
         }
-        // Build.* static fields are initialized in zygote and inherited by app
-        // forks, so spoof them at module load before specialization decisions.
-        arirang::spoof_build_fields(env_, config_);
-        arirang::log_info("installed zygote inherited Build field spoofing");
     }
 
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
@@ -74,10 +93,15 @@ public:
             // Unload from ordinary app processes immediately after specialization
             // so no native hooks, globals, or background work remain mapped there.
             if (api_ != nullptr) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            return;
         }
+        // Only the phone process gets this far, so the config read happens there
+        // rather than in every app.
+        ensure_config_loaded();
     }
 
     void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
+        ensure_config_loaded();
         // Some Zygisk implementations used by KernelSU Next keep the module
         // mapped in system_server but do not reliably call postServerSpecialize.
         // Install the SensorService vtable hooks before specialization instead.
@@ -92,13 +116,17 @@ public:
         // The phone process owns several telephony property write/read paths.
         // Keep hooks here source-level so third-party apps observe spoofed data
         // through normal framework IPC rather than by being injected.
+        ensure_config_loaded();
+        arirang::spoof_build_fields(env_, config_);
         arirang::install_system_property_spoofer(api_, env_, config_, true);
         arirang::log_info(std::string("installed phone process native hooks"));
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *) override {
+        ensure_config_loaded();
         arirang::log_info(std::string("postServerSpecialize: enter sensor_enabled=") +
                           (config_.sensor_config_enabled ? "true" : "false"));
+        arirang::spoof_build_fields(env_, config_);
         arirang::install_system_property_spoofer(api_, env_, config_, true);
         if (config_.sensor_config_enabled) {
             // SensorService lives in system_server on current target builds.
@@ -117,6 +145,7 @@ private:
     arirang::SubmoduleConfig config_;
     std::string current_app_process_;
     bool keep_module_loaded_in_app_ = false;
+    bool config_loaded_ = false;
 };
 
 REGISTER_ZYGISK_MODULE(ArirangZygisk)
