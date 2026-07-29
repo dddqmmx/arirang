@@ -136,9 +136,6 @@
     <string name="location_app_config_entry">应用位置</string>
     <string name="location_app_config_entry_summary">为单个应用设置独立坐标</string>
     <string name="location_search_apps">搜索应用</string>
-    <string name="location_filter_user_apps">用户应用</string>
-    <string name="location_filter_system_apps">系统应用</string>
-    <string name="location_filter_all_apps">所有应用</string>
     <string name="location_app_configured">%1$s, %2$s</string>
     <string name="location_app_not_configured">未配置</string>
     <string name="location_edit_app_location">应用位置</string>
@@ -250,6 +247,11 @@
     <string name="select_all">全选</string>
     <string name="clear_all">全部取消</string>
     <string name="invert_selection">反选</string>
+    <string name="package_list_enable">启用应用列表过滤</string>
+    <string name="package_list_enable_summary">控制每个应用能看到哪些已安装应用</string>
+    <string name="app_list_empty">没有匹配的应用</string>
+    <string name="template_empty_hint">创建模板后，可在多个应用之间复用同一份显示列表</string>
+    <string name="template_delete_confirm">删除「%1$s」？使用该模板的应用将回退为全部显示。</string>
 
     
     <string name="clipboard_access_warning">剪贴板访问警告</string>

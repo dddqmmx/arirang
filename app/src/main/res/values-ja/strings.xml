@@ -134,9 +134,6 @@
     <string name="location_app_config_entry">アプリ位置情報</string>
     <string name="location_app_config_entry_summary">アプリごとに個別の座標を設定します</string>
     <string name="location_search_apps">アプリを検索</string>
-    <string name="location_filter_user_apps">ユーザーアプリ</string>
-    <string name="location_filter_system_apps">システムアプリ</string>
-    <string name="location_filter_all_apps">すべてのアプリ</string>
     <string name="location_app_configured">%1$s, %2$s</string>
     <string name="location_app_not_configured">未設定</string>
     <string name="location_edit_app_location">アプリ位置情報</string>
@@ -248,6 +245,11 @@
     <string name="select_all">すべて選択</string>
     <string name="clear_all">すべて解除</string>
     <string name="invert_selection">選択を反転</string>
+    <string name="package_list_enable">アプリ一覧フィルターを有効にする</string>
+    <string name="package_list_enable_summary">各アプリが認識できるインストール済みアプリを制御します</string>
+    <string name="app_list_empty">一致するアプリがありません</string>
+    <string name="template_empty_hint">テンプレートを作成すると、複数のアプリで同じ表示リストを再利用できます</string>
+    <string name="template_delete_confirm">「%1$s」を削除しますか？このテンプレートを使用しているアプリは「すべて表示」に戻ります。</string>
 
     
     <string name="clipboard_access_warning">クリップボードアクセスの警告</string>

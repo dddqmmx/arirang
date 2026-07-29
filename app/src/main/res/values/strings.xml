@@ -154,9 +154,6 @@
     <string name="location_app_config_entry">App locations</string>
     <string name="location_app_config_entry_summary">Set coordinates for individual applications</string>
     <string name="location_search_apps">Search apps</string>
-    <string name="location_filter_user_apps">User apps</string>
-    <string name="location_filter_system_apps">System apps</string>
-    <string name="location_filter_all_apps">All apps</string>
     <string name="location_app_configured">%1$s, %2$s</string>
     <string name="location_app_not_configured">Not configured</string>
     <string name="location_edit_app_location">App location</string>
@@ -268,6 +265,11 @@
     <string name="select_all">Select All</string>
     <string name="clear_all">Clear All</string>
     <string name="invert_selection">Invert Selection</string>
+    <string name="package_list_enable">Enable app list filtering</string>
+    <string name="package_list_enable_summary">Control which installed apps each application can see</string>
+    <string name="app_list_empty">No matching apps</string>
+    <string name="template_empty_hint">Create a template to reuse one display list across several apps</string>
+    <string name="template_delete_confirm">Delete “%1$s”? Apps using this template will fall back to Show All.</string>
 
     
     <string name="clipboard_access_warning">Clipboard Access Warning</string>

@@ -1,6 +1,5 @@
 package asia.nana7mi.arirang.ui.component.location
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -35,15 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Profile
+import asia.nana7mi.arirang.ui.component.common.AppEntry
+import asia.nana7mi.arirang.ui.component.common.AppIcon
 
 @Composable
 internal fun AppLocationRow(
@@ -66,16 +64,8 @@ internal fun AppLocationRow(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            app.icon?.let { icon ->
-                Image(
-                    bitmap = remember(app.packageName) { icon.toBitmap().asImageBitmap() },
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                )
-                Spacer(modifier = Modifier.width(16.dp))
-            }
+            AppIcon(app)
+            Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -239,16 +229,8 @@ internal fun EditProfileDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                app.icon?.let { icon ->
-                    Image(
-                        bitmap = remember(app.packageName) { icon.toBitmap().asImageBitmap() },
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
+                AppIcon(app)
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(stringResource(R.string.location_edit_app_location))
                     Text(
@@ -369,15 +351,4 @@ internal fun EditProfileDialog(
 
 
 
-internal data class AppEntry(
-    val label: String,
-    val packageName: String,
-    val isSystemApp: Boolean,
-    val icon: android.graphics.drawable.Drawable? = null
-)
 
-internal enum class AppTypeFilter {
-    USER,
-    SYSTEM,
-    ALL
-}

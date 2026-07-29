@@ -1,28 +1,18 @@
 package asia.nana7mi.arirang.ui.screen.location
 
 import asia.nana7mi.arirang.ui.component.location.*
-import android.content.Context
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -39,8 +29,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import asia.nana7mi.arirang.ui.component.common.AppEntry
+import asia.nana7mi.arirang.ui.component.common.AppSearchField
+import asia.nana7mi.arirang.ui.component.common.AppTypeFilter
+import asia.nana7mi.arirang.ui.component.common.AppTypeFilterChips
+import asia.nana7mi.arirang.ui.component.common.loadInstalledApps
+import asia.nana7mi.arirang.ui.component.common.matching
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,19 +52,7 @@ internal fun LocationAppConfigScreen(onBack: () -> Unit) {
     }
 
     val filteredApps = apps
-        .filter { app ->
-            when (filter) {
-                AppTypeFilter.USER -> !app.isSystemApp
-                AppTypeFilter.SYSTEM -> app.isSystemApp
-                AppTypeFilter.ALL -> true
-            }
-        }
-        .filter { app ->
-            val normalizedQuery = query.trim().lowercase()
-            normalizedQuery.isEmpty() ||
-                app.label.lowercase().contains(normalizedQuery) ||
-                app.packageName.lowercase().contains(normalizedQuery)
-        }
+        .matching(filter, query)
         .sortedWith(
             compareByDescending<AppEntry> { config.perPackage.containsKey(it.packageName) }
                 .thenBy { it.label.lowercase() }
@@ -90,7 +72,7 @@ internal fun LocationAppConfigScreen(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        androidx.compose.foundation.lazy.LazyColumn(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -99,43 +81,14 @@ internal fun LocationAppConfigScreen(onBack: () -> Unit) {
             contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp)
         ) {
             item {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text(stringResource(R.string.location_search_apps)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
+                AppSearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    placeholder = stringResource(R.string.location_search_apps)
                 )
             }
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = filter == AppTypeFilter.USER,
-                        onClick = { filter = AppTypeFilter.USER },
-                        label = { Text(stringResource(R.string.location_filter_user_apps)) }
-                    )
-                    FilterChip(
-                        selected = filter == AppTypeFilter.SYSTEM,
-                        onClick = { filter = AppTypeFilter.SYSTEM },
-                        label = { Text(stringResource(R.string.location_filter_system_apps)) }
-                    )
-                    FilterChip(
-                        selected = filter == AppTypeFilter.ALL,
-                        onClick = { filter = AppTypeFilter.ALL },
-                        label = { Text(stringResource(R.string.location_filter_all_apps)) }
-                    )
-                }
+                AppTypeFilterChips(selected = filter, onSelect = { filter = it })
             }
             items(
                 count = filteredApps.size,
@@ -182,20 +135,5 @@ internal fun LocationAppConfigScreen(onBack: () -> Unit) {
                 }
             }
         )
-    }
-}
-
-private suspend fun loadInstalledApps(context: Context): List<AppEntry> {
-    return withContext(Dispatchers.IO) {
-        val pm = context.packageManager
-        pm.getInstalledApplications(PackageManager.GET_META_DATA)
-            .map { app ->
-                AppEntry(
-                    label = pm.getApplicationLabel(app).toString(),
-                    packageName = app.packageName,
-                    isSystemApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
-                    icon = pm.getApplicationIcon(app)
-                )
-            }
     }
 }
