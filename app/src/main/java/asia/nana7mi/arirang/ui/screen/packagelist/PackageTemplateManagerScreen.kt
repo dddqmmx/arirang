@@ -42,6 +42,7 @@ import asia.nana7mi.arirang.ui.component.packagelist.CreateTemplateDialog
 import asia.nana7mi.arirang.ui.component.packagelist.RenameTemplateDialog
 import asia.nana7mi.arirang.ui.component.packagelist.SingleChoiceDialog
 import asia.nana7mi.arirang.ui.component.packagelist.TemplateCard
+import asia.nana7mi.arirang.ui.component.packagelist.TemplateParentDialog
 import asia.nana7mi.arirang.ui.component.packagelist.labelRes
 
 /** What a newly created template will be used for once it exists. */
@@ -153,8 +154,10 @@ internal fun PackageTemplateManagerScreen(onBack: () -> Unit) {
                 TemplateCard(
                     name = template.name,
                     listMode = template.listMode,
-                    parentName = templates.firstOrNull { it.id == template.parentId }?.name,
-                    packageCount = PackageVisibilityPrefs
+                    ancestorNames = PackageVisibilityPrefs.ancestorChain(template, templates)
+                        .map { it.name },
+                    ownCount = template.visiblePackages.size,
+                    totalCount = PackageVisibilityPrefs
                         .resolvedTemplatePackages(template, templates).size,
                     onClick = { actionTarget = template }
                 )
@@ -213,25 +216,20 @@ internal fun PackageTemplateManagerScreen(onBack: () -> Unit) {
     }
 
     settingParent?.let { template ->
-        val candidates = templates.filter { it.id != template.id }
-        val options = buildList {
-            add(stringResource(R.string.template_none))
-            add(stringResource(R.string.template_new))
-            addAll(candidates.map { it.name })
-        }
-        ChoiceListDialog(
-            title = stringResource(R.string.template_parent),
-            options = options,
+        // eligibleParents drops the template itself and anything already
+        // inheriting from it, so a loop cannot be selected in the first place.
+        TemplateParentDialog(
+            currentParentId = template.parentId,
+            candidates = PackageVisibilityPrefs.eligibleParents(template, templates),
+            packageCountOf = { PackageVisibilityPrefs.resolvedTemplatePackages(it, templates).size },
             onDismiss = { settingParent = null },
-            onSelect = { index ->
+            onSelect = { parent ->
                 settingParent = null
-                when (index) {
-                    0 -> updateTemplate(template.copy(parentId = null))
-                    1 -> creatingFor = NewTemplateUse.AsParentOf(template.id)
-                    else -> candidates.getOrNull(index - 2)?.let { parent ->
-                        updateTemplate(template.copy(parentId = parent.id))
-                    }
-                }
+                updateTemplate(template.copy(parentId = parent?.id))
+            },
+            onCreateNew = {
+                settingParent = null
+                creatingFor = NewTemplateUse.AsParentOf(template.id)
             }
         )
     }

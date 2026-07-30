@@ -1,5 +1,6 @@
 package asia.nana7mi.arirang.hook.settings
 
+import android.os.Binder
 import android.os.Bundle
 import android.provider.Settings
 import asia.nana7mi.arirang.data.config.ConfigIds
@@ -14,6 +15,8 @@ import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.network.VpnHookConfigFile
+import asia.nana7mi.arirang.hook.util.CallerPackages
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
@@ -24,6 +27,8 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         private const val KEY_ENABLED = "enabled"
         private const val KEY_ANDROID_ID = "android_id"
         private const val REFRESH_INTERVAL_MS = 1_000L
+        private val ALWAYS_ON_VPN_KEYS = setOf("always_on_vpn_app", "always_on_vpn_lockdown")
+        private val ALWAYS_ON_VPN_BYPASS = setOf("com.android.settings", "com.android.systemui")
     }
 
     private data class StringSetting(val enabled: Boolean = false, val value: String? = null)
@@ -70,10 +75,12 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         }
     )
 
+    /** Shares the VPN config with FuckVpnStatus; each host process caches its own copy. */
+    private val vpnConfig = VpnHookConfigFile.create()
+
     override fun isEnabled(): Boolean {
         return true
     }
-
     override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
         val classLoader = lpparam.classLoader
 
@@ -123,6 +130,17 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
                     return@afterHookedMethod
                 }
 
+                // Always-on VPN. Reported as unset so an app cannot infer a VPN
+                // from the configuration even when the transport is hidden.
+                if (method == callMethodGetSecure && request in ALWAYS_ON_VPN_KEYS) {
+                    if (!shouldHideAlwaysOnVpn()) return@afterHookedMethod
+                    val bundle = Bundle()
+                    bundle.putString(Settings.NameValueTable.VALUE, null)
+                    result = bundle
+                    HookLog.d(HookLog.Module.SETTINGS, "spoof Settings.Secure.$request")
+                    return@afterHookedMethod
+                }
+
                 // Handle Bluetooth Name (Global)
                 val callMethodGetGlobal = runCatching {
                     HookBridge.getStaticObjectField(Settings::class.java, "CALL_METHOD_GET_GLOBAL") as String
@@ -146,6 +164,25 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
 
     private fun readBluetoothNameFromConfig(): String? {
         return bluetoothNameConfig.current().takeIf { it.enabled }?.value
+    }
+
+    /**
+     * Whether the always-on VPN keys should read as unset for the current caller.
+     *
+     * [ALWAYS_ON_VPN_BYPASS] is not user configurable on purpose: these are the
+     * surfaces through which the always-on VPN is *configured*, and blanking the
+     * value for them would show the user their own VPN setting had vanished.
+     * Hiding it from them protects nothing, since they are not what an app uses
+     * to detect a VPN.
+     */
+    private fun shouldHideAlwaysOnVpn(): Boolean {
+        val callingUid = Binder.getCallingUid()
+        if (CallerPackages.isPlatformCaller(callingUid)) return false
+        val current = vpnConfig.current()
+        if (!current.enabled || !current.hideAlwaysOnVpn) return false
+        val callerPackages = CallerPackages.forUid(callingUid)
+        if (callerPackages.any { it in ALWAYS_ON_VPN_BYPASS }) return false
+        return current.appliesTo(callerPackages)
     }
 
     private fun parseStoredSetting(prefsName: String, valueKey: String): StringSetting {

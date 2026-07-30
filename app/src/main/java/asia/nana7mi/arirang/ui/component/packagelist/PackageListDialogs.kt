@@ -10,7 +10,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -27,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
+import asia.nana7mi.arirang.data.datastore.PackageVisibilityPrefs.Template
 import asia.nana7mi.arirang.data.datastore.PackageVisibilityPrefs.TemplateListMode
 
 /**
@@ -36,10 +45,6 @@ import asia.nana7mi.arirang.data.datastore.PackageVisibilityPrefs.TemplateListMo
  * the create-template case, a hand-assembled `LinearLayout` + `RadioGroup` —
  * which existed verbatim twice, once in `PackageListConfigActivity` and once in
  * `PackageTemplateManagerActivity`. [CreateTemplateDialog] is the single copy.
- *
- * [ChoiceListDialog] and [SingleChoiceDialog] stand in for `setItems` and
- * `setSingleChoiceItems`; the callers still build their own option lists, so
- * what each dialog means stays next to the code that acts on the choice.
  */
 
 /** Replaces `MaterialAlertDialogBuilder.setItems` — a titled list, dismissed on pick. */
@@ -122,11 +127,12 @@ internal fun SingleChoiceDialog(
 }
 
 /**
- * Name plus whitelist/blacklist choice.
+ * Name plus whitelist/blacklist, with the mode's meaning spelled out.
  *
- * A blank name falls back to the "New Template" label, matching what the View
- * implementation did — a template with an empty name is indistinguishable from
- * the others in every picker that lists it.
+ * Confirm stays disabled until the trimmed name is non-empty. The View version
+ * silently substituted "New Template" for a blank name, which produced several
+ * identically named templates that were then impossible to tell apart in the
+ * pickers that list them.
  */
 @Composable
 internal fun CreateTemplateDialog(
@@ -135,28 +141,27 @@ internal fun CreateTemplateDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var listMode by remember { mutableStateOf(TemplateListMode.WHITELIST) }
-    val fallbackName = stringResource(R.string.template_new)
+    val trimmedName = name.trim()
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Layers, contentDescription = null) },
         title = { Text(stringResource(R.string.template_new)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                TemplateNameField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.template_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    showRequiredHint = trimmedName.isEmpty()
                 )
-                TemplateListModeRadioGroup(
-                    selected = listMode,
-                    onSelect = { listMode = it }
-                )
+                TemplateModeSelector(selected = listMode, onSelect = { listMode = it })
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(name.trim().ifBlank { fallbackName }, listMode) }) {
+            TextButton(
+                enabled = trimmedName.isNotEmpty(),
+                onClick = { onConfirm(trimmedName, listMode) }
+            ) {
                 Text(stringResource(android.R.string.ok))
             }
         },
@@ -175,25 +180,114 @@ internal fun RenameTemplateDialog(
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
+    val trimmedName = name.trim()
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
         title = { Text(stringResource(R.string.template_rename)) },
         text = {
-            OutlinedTextField(
+            TemplateNameField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text(stringResource(R.string.template_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                showRequiredHint = trimmedName.isEmpty()
             )
         },
         confirmButton = {
-            // Blank keeps the current name rather than clearing it.
-            TextButton(onClick = { onConfirm(name.trim().ifBlank { initialName }) }) {
+            TextButton(
+                enabled = trimmedName.isNotEmpty(),
+                onClick = { onConfirm(trimmedName) }
+            ) {
                 Text(stringResource(android.R.string.ok))
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Inheritance picker.
+ *
+ * Leads with what inheritance actually does, because neither half of it is
+ * guessable: the parent's packages are merged in, and the *child's* list mode
+ * decides how the merged set is read — the parent's own whitelist/blacklist
+ * setting is discarded (`PackageListHookConfig.resolveTemplate`).
+ *
+ * [candidates] is expected to already exclude anything that would form a loop;
+ * see `PackageVisibilityPrefs.eligibleParents`.
+ */
+@Composable
+internal fun TemplateParentDialog(
+    currentParentId: String?,
+    candidates: List<Template>,
+    packageCountOf: (Template) -> Int,
+    onSelect: (Template?) -> Unit,
+    onCreateNew: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.AccountTree, contentDescription = null) },
+        title = { Text(stringResource(R.string.template_parent)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = stringResource(R.string.template_inheritance_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+                ParentOptionRow(
+                    title = stringResource(R.string.template_none),
+                    subtitle = null,
+                    selected = currentParentId == null,
+                    onClick = { onSelect(null) }
+                )
+                candidates.forEach { candidate ->
+                    ParentOptionRow(
+                        title = candidate.name,
+                        subtitle = stringResource(R.string.visible_count, packageCountOf(candidate)),
+                        selected = candidate.id == currentParentId,
+                        onClick = { onSelect(candidate) }
+                    )
+                }
+                if (candidates.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.template_no_eligible_parents),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onCreateNew)
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = stringResource(R.string.template_new),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(android.R.string.cancel))
@@ -212,6 +306,7 @@ internal fun ConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
@@ -227,29 +322,56 @@ internal fun ConfirmDialog(
     )
 }
 
+/**
+ * Shared name input.
+ *
+ * `trimStart` runs on every keystroke so a leading space can never be entered;
+ * the trailing one is removed when the caller trims on confirm, which is why it
+ * is not stripped here — doing so would make it impossible to type a space
+ * between two words.
+ */
 @Composable
-private fun TemplateListModeRadioGroup(
-    selected: TemplateListMode,
-    onSelect: (TemplateListMode) -> Unit
+private fun TemplateNameField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    showRequiredHint: Boolean
 ) {
-    Column {
-        TemplateListMode.entries.forEach { mode ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(
-                        selected = mode == selected,
-                        onClick = { onSelect(mode) },
-                        role = Role.RadioButton
-                    )
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(selected = mode == selected, onClick = null)
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onValueChange(it.trimStart()) },
+        label = { Text(stringResource(R.string.template_name)) },
+        singleLine = true,
+        supportingText = if (showRequiredHint) {
+            { Text(stringResource(R.string.template_name_required)) }
+        } else {
+            null
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun ParentOptionRow(
+    title: String,
+    subtitle: String?,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
                 Text(
-                    text = stringResource(mode.labelRes()),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(start = 12.dp)
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -260,4 +382,10 @@ private fun TemplateListModeRadioGroup(
 internal fun TemplateListMode.labelRes(): Int = when (this) {
     TemplateListMode.WHITELIST -> R.string.template_mode_whitelist
     TemplateListMode.BLACKLIST -> R.string.template_mode_blacklist
+}
+
+@StringRes
+internal fun TemplateListMode.hintRes(): Int = when (this) {
+    TemplateListMode.WHITELIST -> R.string.template_mode_whitelist_hint
+    TemplateListMode.BLACKLIST -> R.string.template_mode_blacklist_hint
 }

@@ -270,6 +270,57 @@
     <string name="app_list_empty">No matching apps</string>
     <string name="template_empty_hint">Create a template to reuse one display list across several apps</string>
     <string name="template_delete_confirm">Delete “%1$s”? Apps using this template will fall back to Show All.</string>
+    <string name="template_mode_whitelist_hint">Only the apps in this list stay visible.</string>
+    <string name="template_mode_blacklist_hint">The apps in this list are hidden; everything else stays visible.</string>
+    <string name="template_name_required">Enter a template name</string>
+    <string name="template_inheritance_hint">The parent template\'s apps are merged into this one. Whitelist/blacklist is decided by this template — the parent\'s mode is ignored.</string>
+    <string name="template_inherited_extra">+%1$d inherited</string>
+    <string name="template_no_eligible_parents">No other template can be inherited without creating a loop.</string>
+
+    <string name="picker_no_results">No matches</string>
+
+    <string name="vpn_section_enable">VPN spoofing</string>
+    <string name="vpn_enable">Enable VPN spoofing</string>
+    <string name="vpn_enable_summary">Change what apps can learn about VPN and proxy state</string>
+    <string name="vpn_section_visibility">VPN visibility</string>
+    <string name="vpn_hide_transport">Hide the VPN transport</string>
+    <string name="vpn_hide_transport_summary">Apps querying the active network no longer see it as a VPN</string>
+    <string name="vpn_spoofed_transport">Report instead as</string>
+    <string name="vpn_transport_unchanged">Leave unchanged</string>
+    <string name="vpn_transport_wifi">Wi-Fi</string>
+    <string name="vpn_transport_cellular">Cellular</string>
+    <string name="vpn_transport_ethernet">Ethernet</string>
+    <string name="vpn_section_network">Interfaces and proxy</string>
+    <string name="vpn_hide_interfaces">Hide tunnel interfaces</string>
+    <string name="vpn_hide_interfaces_summary">Omit tun, ppp and wg devices when apps enumerate network interfaces</string>
+    <string name="vpn_hide_always_on">Hide always-on VPN</string>
+    <string name="vpn_hide_always_on_summary">Report that no always-on VPN app is configured</string>
+    <string name="vpn_hide_proxy">Hide proxy settings</string>
+    <string name="vpn_hide_proxy_summary">Report no HTTP proxy, even when one is configured</string>
+    <string name="vpn_section_exempt">Exempt apps</string>
+    <string name="vpn_exempt_summary">These apps keep seeing the real VPN and proxy state.</string>
+    <string name="vpn_exempt_empty">No exempt apps</string>
+    <string name="vpn_add_app">Add app</string>
+    <string name="vpn_remove_app">Remove</string>
+
+    <string name="system_setting_section_enable">System values</string>
+    <string name="system_setting_enable">Enable time zone and language spoofing</string>
+    <string name="system_setting_enable_summary">Report a different time zone or language to apps</string>
+    <string name="system_setting_section_default">Defaults</string>
+    <string name="system_setting_section_default_summary">Applied to every app that has no override of its own.</string>
+    <string name="system_setting_time_zone">Time zone</string>
+    <string name="system_setting_language">Language</string>
+    <string name="system_setting_unchanged">Leave unchanged</string>
+    <string name="system_setting_follow_default">Follow default</string>
+    <string name="system_setting_search_time_zone">Search time zones</string>
+    <string name="system_setting_search_language">Search languages</string>
+    <string name="system_setting_override_title">Per-app override</string>
+    <string name="system_setting_override_enabled">Apply to this app</string>
+    <string name="system_setting_clear_override">Remove override</string>
+    <string name="system_setting_disabled">Spoofing is off</string>
+    <string name="system_setting_override_off">Exempt — sees the real values</string>
+    <string name="system_setting_row_summary">%1$s · %2$s</string>
+    <string name="system_setting_row_default">Default: %1$s</string>
 
     
     <string name="clipboard_access_warning">Clipboard Access Warning</string>

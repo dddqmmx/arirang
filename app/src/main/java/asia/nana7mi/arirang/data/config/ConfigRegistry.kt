@@ -11,7 +11,9 @@ import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.PackageVisibilityPrefs
 import asia.nana7mi.arirang.data.datastore.SensorConfigPrefs
 import asia.nana7mi.arirang.data.datastore.SimConfigPrefs
+import asia.nana7mi.arirang.data.datastore.SystemSettingPrefs
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
+import asia.nana7mi.arirang.data.datastore.VpnStatusPrefs
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
 import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.AppConfigSchema
@@ -25,6 +27,8 @@ import asia.nana7mi.arirang.data.datastore.schema.LocationConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.PackageListConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.SensorConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.SimConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.SystemSettingConfigSchema
+import asia.nana7mi.arirang.data.datastore.schema.VpnStatusConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.WifiConfigSchema
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -185,6 +189,31 @@ object ConfigRegistry {
                 runBlocking(Dispatchers.IO) { ClipboardPromptPrefs.importSchema(context, schema) }
             },
             validator = { schema -> validateBase(schema) + ClipboardPromptPrefs.validateSchema(schema) }
+        ),
+        ManagedConfig(
+            id = ConfigIds.VPN_STATUS,
+            currentSchemaVersion = VpnStatusConfigSchema.SCHEMA_VERSION,
+            realtimeAvailable = true,
+            requiredFields = requiredFields(
+                "enabled", "hideVpnTransport", "spoofedTransport", "hideVpnInterfaces",
+                "hideAlwaysOnVpn", "hideProxy", "exemptPackages"
+            ),
+            versionReader = VpnStatusPrefs::lastModified,
+            snapshotReader = VpnStatusPrefs::buildHookSnapshot,
+            decoder = VpnStatusConfigSchema::fromJson,
+            importer = VpnStatusPrefs::importSchema,
+            validator = ::validateVpnStatus
+        ),
+        ManagedConfig(
+            id = ConfigIds.SYSTEM_SETTING,
+            currentSchemaVersion = SystemSettingConfigSchema.SCHEMA_VERSION,
+            realtimeAvailable = true,
+            requiredFields = requiredFields("enabled", "timeZoneId", "languageTag", "perPackage"),
+            versionReader = SystemSettingPrefs::lastModified,
+            snapshotReader = SystemSettingPrefs::buildHookSnapshot,
+            decoder = SystemSettingConfigSchema::fromJson,
+            importer = SystemSettingPrefs::importSchema,
+            validator = ::validateSystemSetting
         )
     )
 
@@ -408,8 +437,61 @@ object ConfigRegistry {
         }
     }
 
-    private fun MutableList<String>.validateSlotMap(name: String, values: Map<Int, String>, digits: Int) {
-        if (values.size > MAX_SLOT_COUNT) add("$name exceeds $MAX_SLOT_COUNT entries")
+    private fun validateVpnStatus(schema: VpnStatusConfigSchema): List<String> = buildList {
+        addAll(validateBase(schema))
+        if (schema.spoofedTransport !in SPOOFED_TRANSPORTS) add("spoofedTransport is invalid")
+        validatePackageSet("exemptPackages", schema.exemptPackages, VpnStatusPrefs.MAX_EXEMPT_PACKAGES)
+    }
+
+    private fun validateSystemSetting(schema: SystemSettingConfigSchema): List<String> = buildList {
+        addAll(validateBase(schema))
+        validateTimeZoneId("timeZoneId", schema.timeZoneId)
+        validateLanguageTag("languageTag", schema.languageTag)
+        if (schema.perPackage.size > SystemSettingPrefs.MAX_PACKAGE_OVERRIDES) {
+            add("perPackage exceeds ${SystemSettingPrefs.MAX_PACKAGE_OVERRIDES} entries")
+        }
+        schema.perPackage.forEach { (packageName, override) ->
+            if (!PACKAGE_NAME.matches(packageName)) add("perPackage contains invalid packageName")
+            validateTimeZoneId("perPackage[$packageName].timeZoneId", override.timeZoneId)
+            validateLanguageTag("perPackage[$packageName].languageTag", override.languageTag)
+        }
+    }
+
+    private fun MutableList<String>.validatePackageSet(
+        name: String,
+        packages: List<String>,
+        maximum: Int
+    ) {
+        if (packages.size > maximum) add("$name exceeds $maximum entries")
+        if (packages.any { !PACKAGE_NAME.matches(it) }) add("$name contains an invalid packageName")
+        if (packages.size != packages.toSet().size) add("$name contains duplicates")
+    }
+
+    /**
+     * Shape-only check. Deliberately not membership in `TimeZone.getAvailableIDs()`:
+     * a backup taken on one device can legitimately name a zone the importing
+     * device does not know, and rejecting it here would fail the entire import
+     * rather than that one field.
+     */
+    private fun MutableList<String>.validateTimeZoneId(name: String, value: String) {
+        if (value.isEmpty()) return
+        if (value.length > SystemSettingPrefs.MAX_TIME_ZONE_LENGTH) {
+            add("$name exceeds ${SystemSettingPrefs.MAX_TIME_ZONE_LENGTH} characters")
+        } else if (!SystemSettingPrefs.TIME_ZONE_ID.matches(value)) {
+            add("$name is invalid")
+        }
+    }
+
+    private fun MutableList<String>.validateLanguageTag(name: String, value: String) {
+        if (value.isEmpty()) return
+        if (value.length > SystemSettingPrefs.MAX_LANGUAGE_TAG_LENGTH) {
+            add("$name exceeds ${SystemSettingPrefs.MAX_LANGUAGE_TAG_LENGTH} characters")
+        } else if (!SystemSettingPrefs.LANGUAGE_TAG.matches(value)) {
+            add("$name is invalid")
+        }
+    }
+
+    private fun MutableList<String>.validateSlotMap(name: String, values: Map<Int, String>, digits: Int) {        if (values.size > MAX_SLOT_COUNT) add("$name exceeds $MAX_SLOT_COUNT entries")
         values.forEach { (slot, value) ->
             if (slot !in VALID_SLOT_RANGE) add("$name contains invalid slot $slot")
             if (value.length != digits || !value.all(Char::isDigit)) add("$name[$slot] is invalid")
@@ -462,4 +544,6 @@ object ConfigRegistry {
     private val DISPLAY_MODES = PackageVisibilityPrefs.DisplayMode.entries.mapTo(HashSet()) { it.name }
     private val TEMPLATE_LIST_MODES =
         PackageVisibilityPrefs.TemplateListMode.entries.mapTo(HashSet()) { it.name }
+    private val SPOOFED_TRANSPORTS =
+        VpnStatusPrefs.SpoofedTransport.entries.mapTo(HashSet()) { it.name }
 }

@@ -250,6 +250,57 @@
     <string name="app_list_empty">一致するアプリがありません</string>
     <string name="template_empty_hint">テンプレートを作成すると、複数のアプリで同じ表示リストを再利用できます</string>
     <string name="template_delete_confirm">「%1$s」を削除しますか？このテンプレートを使用しているアプリは「すべて表示」に戻ります。</string>
+    <string name="template_mode_whitelist_hint">リスト内のアプリだけが表示されます。</string>
+    <string name="template_mode_blacklist_hint">リスト内のアプリが非表示になり、それ以外は表示されます。</string>
+    <string name="template_name_required">テンプレート名を入力してください</string>
+    <string name="template_inheritance_hint">親テンプレートのアプリがこのテンプレートに統合されます。ホワイト/ブラックリストの判定はこのテンプレートに従い、親のモードは無視されます。</string>
+    <string name="template_inherited_extra">継承 +%1$d</string>
+    <string name="template_no_eligible_parents">継承できるテンプレートがありません（循環参照になります）。</string>
+
+    <string name="picker_no_results">一致する項目がありません</string>
+
+    <string name="vpn_section_enable">VPN 偽装</string>
+    <string name="vpn_enable">VPN 偽装を有効にする</string>
+    <string name="vpn_enable_summary">アプリが取得できる VPN とプロキシの状態を変更します</string>
+    <string name="vpn_section_visibility">VPN の可視性</string>
+    <string name="vpn_hide_transport">VPN トランスポートを隠す</string>
+    <string name="vpn_hide_transport_summary">アプリが現在のネットワークを問い合わせても VPN として見えなくなります</string>
+    <string name="vpn_spoofed_transport">代わりに報告する種類</string>
+    <string name="vpn_transport_unchanged">変更しない</string>
+    <string name="vpn_transport_wifi">Wi-Fi</string>
+    <string name="vpn_transport_cellular">モバイル通信</string>
+    <string name="vpn_transport_ethernet">イーサネット</string>
+    <string name="vpn_section_network">ネットワークインターフェースとプロキシ</string>
+    <string name="vpn_hide_interfaces">トンネルインターフェースを隠す</string>
+    <string name="vpn_hide_interfaces_summary">アプリがインターフェースを列挙する際に tun・ppp・wg を除外します</string>
+    <string name="vpn_hide_always_on">常時接続 VPN を隠す</string>
+    <string name="vpn_hide_always_on_summary">常時接続 VPN アプリは未設定として報告します</string>
+    <string name="vpn_hide_proxy">プロキシ設定を隠す</string>
+    <string name="vpn_hide_proxy_summary">設定済みでも HTTP プロキシなしとして報告します</string>
+    <string name="vpn_section_exempt">除外アプリ</string>
+    <string name="vpn_exempt_summary">これらのアプリには実際の VPN とプロキシの状態が見えます。</string>
+    <string name="vpn_exempt_empty">除外アプリはありません</string>
+    <string name="vpn_add_app">アプリを追加</string>
+    <string name="vpn_remove_app">削除</string>
+
+    <string name="system_setting_section_enable">システム値</string>
+    <string name="system_setting_enable">タイムゾーンと言語の偽装を有効にする</string>
+    <string name="system_setting_enable_summary">アプリに異なるタイムゾーンや言語を報告します</string>
+    <string name="system_setting_section_default">既定値</string>
+    <string name="system_setting_section_default_summary">個別設定のないすべてのアプリに適用されます。</string>
+    <string name="system_setting_time_zone">タイムゾーン</string>
+    <string name="system_setting_language">言語</string>
+    <string name="system_setting_unchanged">変更しない</string>
+    <string name="system_setting_follow_default">既定に従う</string>
+    <string name="system_setting_search_time_zone">タイムゾーンを検索</string>
+    <string name="system_setting_search_language">言語を検索</string>
+    <string name="system_setting_override_title">アプリ個別設定</string>
+    <string name="system_setting_override_enabled">このアプリに適用</string>
+    <string name="system_setting_clear_override">個別設定を削除</string>
+    <string name="system_setting_disabled">偽装は無効です</string>
+    <string name="system_setting_override_off">除外中 — 実際の値が見えます</string>
+    <string name="system_setting_row_summary">%1$s · %2$s</string>
+    <string name="system_setting_row_default">既定: %1$s</string>
 
     
     <string name="clipboard_access_warning">クリップボードアクセスの警告</string>

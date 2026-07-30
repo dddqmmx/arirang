@@ -252,6 +252,57 @@
     <string name="app_list_empty">没有匹配的应用</string>
     <string name="template_empty_hint">创建模板后，可在多个应用之间复用同一份显示列表</string>
     <string name="template_delete_confirm">删除「%1$s」？使用该模板的应用将回退为全部显示。</string>
+    <string name="template_mode_whitelist_hint">只有列表中的应用保持可见。</string>
+    <string name="template_mode_blacklist_hint">列表中的应用会被隐藏，其余应用保持可见。</string>
+    <string name="template_name_required">请输入模板名称</string>
+    <string name="template_inheritance_hint">父模板的应用会并入本模板。黑/白名单由本模板决定，父模板的模式不生效。</string>
+    <string name="template_inherited_extra">继承 +%1$d</string>
+    <string name="template_no_eligible_parents">没有可继承的模板，否则会造成循环继承。</string>
+
+    <string name="picker_no_results">没有匹配项</string>
+
+    <string name="vpn_section_enable">VPN 伪装</string>
+    <string name="vpn_enable">启用 VPN 伪装</string>
+    <string name="vpn_enable_summary">改变应用能获知的 VPN 与代理状态</string>
+    <string name="vpn_section_visibility">VPN 可见性</string>
+    <string name="vpn_hide_transport">隐藏 VPN 传输类型</string>
+    <string name="vpn_hide_transport_summary">应用查询当前网络时不再看到 VPN</string>
+    <string name="vpn_spoofed_transport">改为上报</string>
+    <string name="vpn_transport_unchanged">不修改</string>
+    <string name="vpn_transport_wifi">Wi-Fi</string>
+    <string name="vpn_transport_cellular">移动网络</string>
+    <string name="vpn_transport_ethernet">以太网</string>
+    <string name="vpn_section_network">网络接口与代理</string>
+    <string name="vpn_hide_interfaces">隐藏隧道接口</string>
+    <string name="vpn_hide_interfaces_summary">应用枚举网络接口时略去 tun、ppp、wg 设备</string>
+    <string name="vpn_hide_always_on">隐藏始终开启的 VPN</string>
+    <string name="vpn_hide_always_on_summary">上报未配置任何 always-on VPN 应用</string>
+    <string name="vpn_hide_proxy">隐藏代理设置</string>
+    <string name="vpn_hide_proxy_summary">即使已配置代理，也上报为无 HTTP 代理</string>
+    <string name="vpn_section_exempt">例外应用</string>
+    <string name="vpn_exempt_summary">这些应用仍会看到真实的 VPN 与代理状态。</string>
+    <string name="vpn_exempt_empty">暂无例外应用</string>
+    <string name="vpn_add_app">添加应用</string>
+    <string name="vpn_remove_app">移除</string>
+
+    <string name="system_setting_section_enable">系统值</string>
+    <string name="system_setting_enable">启用时区与语言伪装</string>
+    <string name="system_setting_enable_summary">向应用上报不同的时区或语言</string>
+    <string name="system_setting_section_default">默认值</string>
+    <string name="system_setting_section_default_summary">应用于所有没有单独设定的应用。</string>
+    <string name="system_setting_time_zone">时区</string>
+    <string name="system_setting_language">语言</string>
+    <string name="system_setting_unchanged">不修改</string>
+    <string name="system_setting_follow_default">跟随默认</string>
+    <string name="system_setting_search_time_zone">搜索时区</string>
+    <string name="system_setting_search_language">搜索语言</string>
+    <string name="system_setting_override_title">单独设定</string>
+    <string name="system_setting_override_enabled">对此应用生效</string>
+    <string name="system_setting_clear_override">移除单独设定</string>
+    <string name="system_setting_disabled">伪装未启用</string>
+    <string name="system_setting_override_off">已排除，看到真实值</string>
+    <string name="system_setting_row_summary">%1$s · %2$s</string>
+    <string name="system_setting_row_default">默认：%1$s</string>
 
     
     <string name="clipboard_access_warning">剪贴板访问警告</string>

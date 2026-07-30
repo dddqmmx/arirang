@@ -13,4 +13,6 @@ object ConfigIds {
     const val LOCATION = "location"
     const val PACKAGE_LIST = "package_list"
     const val SENSOR = "sensor"
+    const val VPN_STATUS = "vpn_status"
+    const val SYSTEM_SETTING = "system_setting"
 }

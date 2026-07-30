@@ -2,7 +2,6 @@ package asia.nana7mi.arirang.ui.component.packagelist
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,22 +10,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -91,13 +88,23 @@ internal fun AppRuleRow(
     }
 }
 
-/** One template, with its list mode, inheritance and resolved package count. */
+/**
+ * One template.
+ *
+ * [ancestorNames] is the parent chain nearest-first; showing the whole chain
+ * rather than just the immediate parent is the point — with only "Inherits X"
+ * on screen there was no way to tell how deep a template's package list
+ * actually reached. [ownCount] versus [totalCount] makes the same thing
+ * concrete: how many apps this template contributes itself, and how many it
+ * picks up from above.
+ */
 @Composable
 internal fun TemplateCard(
     name: String,
     listMode: TemplateListMode,
-    parentName: String?,
-    packageCount: Int,
+    ancestorNames: List<String>,
+    ownCount: Int,
+    totalCount: Int,
     onClick: () -> Unit
 ) {
     ElevatedCard(
@@ -128,21 +135,44 @@ internal fun TemplateCard(
                 )
                 ListModeTag(listMode)
             }
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.visible_count, packageCount),
+                    text = stringResource(R.string.visible_count, totalCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (parentName != null) {
+                if (totalCount > ownCount) {
                     Text(
-                        text = stringResource(R.string.inherits_from, parentName),
+                        text = stringResource(R.string.template_inherited_extra, totalCount - ownCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (ancestorNames.isNotEmpty()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountTree,
+                        contentDescription = null,
+                        modifier = Modifier.width(16.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.inherits_from,
+                            ancestorNames.joinToString(" → ")
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -167,6 +197,43 @@ private fun ListModeTag(listMode: TemplateListMode) {
             style = MaterialTheme.typography.labelSmall,
             color = content,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+/**
+ * Whitelist/blacklist picker with the sentence that says what the choice does.
+ *
+ * The two words alone do not tell you which way round the list is read, and the
+ * answer is not guessable — see `PackageListHookConfig.keepByTemplate`, which is
+ * what actually decides visibility.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TemplateModeSelector(
+    selected: TemplateListMode,
+    onSelect: (TemplateListMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val modes = TemplateListMode.entries
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            modes.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = mode == selected,
+                    onClick = { onSelect(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
+                    label = { Text(stringResource(mode.labelRes())) }
+                )
+            }
+        }
+        Text(
+            text = stringResource(selected.hintRes()),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -224,63 +291,6 @@ internal fun SelectablePackageRow(
                     MaterialTheme.colorScheme.outlineVariant
                 }
             )
-        }
-    }
-}
-
-/**
- * Label-and-value row that opens a menu, standing in for the `AppCompatSpinner`
- * the View layout used. Mirrors the shape of `PrecisionDropdown` in the sensor
- * screen so the two read the same.
- */
-@Composable
-internal fun LabelledDropdown(
-    label: String,
-    selectedLabel: String,
-    options: List<String>,
-    onSelect: (Int) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = true }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium
-        )
-        Box {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = selectedLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEachIndexed { index, option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            expanded = false
-                            onSelect(index)
-                        }
-                    )
-                }
-            }
         }
     }
 }

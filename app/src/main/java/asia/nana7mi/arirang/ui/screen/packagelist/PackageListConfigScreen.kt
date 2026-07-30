@@ -49,13 +49,13 @@ import asia.nana7mi.arirang.ui.component.common.AppSearchField
 import asia.nana7mi.arirang.ui.component.common.AppTypeFilter
 import asia.nana7mi.arirang.ui.component.common.AppTypeFilterChips
 import asia.nana7mi.arirang.ui.component.common.EmptyState
+import asia.nana7mi.arirang.ui.component.common.LabelledDropdown
 import asia.nana7mi.arirang.ui.component.common.ToggleSettingRow
 import asia.nana7mi.arirang.ui.component.common.loadInstalledApps
 import asia.nana7mi.arirang.ui.component.common.matching
 import asia.nana7mi.arirang.ui.component.packagelist.AppRuleRow
 import asia.nana7mi.arirang.ui.component.packagelist.ChoiceListDialog
 import asia.nana7mi.arirang.ui.component.packagelist.CreateTemplateDialog
-import asia.nana7mi.arirang.ui.component.packagelist.LabelledDropdown
 
 /**
  * Why a newly created template is being created — the create dialog is reachable

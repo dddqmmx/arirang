@@ -39,6 +39,7 @@ import asia.nana7mi.arirang.ui.activity.PackageListConfigActivity
 import asia.nana7mi.arirang.ui.activity.SensorConfigActivity
 import asia.nana7mi.arirang.ui.activity.SimConfigActivity
 import asia.nana7mi.arirang.ui.activity.UniqueIdentifierConfigActivity
+import asia.nana7mi.arirang.ui.activity.SystemSettingConfigActivity
 import asia.nana7mi.arirang.ui.activity.VpnStatusConfigActivity
 import asia.nana7mi.arirang.ui.activity.WifiConfigActivity
 
@@ -101,7 +102,7 @@ fun HomeScreen(
                 title = stringResource(R.string.category_system_status),
                 items = listOf(
                     FeatureItem(R.string.feature_vpn_status, Icons.Default.VpnLock, VpnStatusConfigActivity::class.java, true),
-                    FeatureItem(R.string.feature_system_setting, Icons.Default.Settings, VpnStatusConfigActivity::class.java, true),
+                    FeatureItem(R.string.feature_system_setting, Icons.Default.Settings, SystemSettingConfigActivity::class.java, true),
                 ),
                 onUnavailable = { showUnavailableDialog = true },
                 onFeatureClick = onFeatureClick

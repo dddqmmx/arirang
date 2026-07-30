@@ -638,5 +638,94 @@ class ConfigSchemaTest {
         assertEquals(0, WifiConfigSchema.fromJson("{}").schemaVersion)
         assertEquals(0, BluetoothConfigSchema.fromJson("{}").schemaVersion)
         assertEquals(0, LocationConfigSchema.fromJson("{}").schemaVersion)
+        assertEquals(0, VpnStatusConfigSchema.fromJson("{}").schemaVersion)
+        assertEquals(0, SystemSettingConfigSchema.fromJson("{}").schemaVersion)
+    }
+
+    @Test
+    fun vpnStatusSchema_roundTripsAllFields() {
+        val original = VpnStatusConfigSchema(
+            enabled = true,
+            hideVpnTransport = true,
+            spoofedTransport = "CELLULAR",
+            hideVpnInterfaces = false,
+            hideAlwaysOnVpn = false,
+            hideProxy = true,
+            exemptPackages = listOf("com.example.one", "com.example.two"),
+            lastModified = 1700000000000L
+        )
+        val restored = VpnStatusConfigSchema.fromJson(original.toJson())
+
+        assertEquals(original.enabled, restored.enabled)
+        assertEquals(original.hideVpnTransport, restored.hideVpnTransport)
+        assertEquals(original.spoofedTransport, restored.spoofedTransport)
+        assertEquals(original.hideVpnInterfaces, restored.hideVpnInterfaces)
+        assertEquals(original.hideAlwaysOnVpn, restored.hideAlwaysOnVpn)
+        assertEquals(original.hideProxy, restored.hideProxy)
+        assertEquals(original.exemptPackages, restored.exemptPackages)
+        assertEquals(original.lastModified, restored.lastModified)
+        assertEquals(VpnStatusConfigSchema.SCHEMA_VERSION, restored.schemaVersion)
+    }
+
+    @Test
+    fun systemSettingSchema_roundTripsPerPackageOverrides() {
+        val original = SystemSettingConfigSchema(
+            enabled = true,
+            timeZoneId = "Asia/Shanghai",
+            languageTag = "zh-CN",
+            perPackage = mapOf(
+                "com.example.one" to SystemSettingOverrideSchema(
+                    enabled = true,
+                    timeZoneId = "Asia/Tokyo",
+                    languageTag = "ja-JP"
+                ),
+                // Empty fields mean "follow the global value"; they must survive
+                // the round trip as empty rather than becoming the global value.
+                "com.example.two" to SystemSettingOverrideSchema(enabled = false)
+            ),
+            lastModified = 1700000000000L
+        )
+        val restored = SystemSettingConfigSchema.fromJson(original.toJson())
+
+        assertEquals(original.enabled, restored.enabled)
+        assertEquals(original.timeZoneId, restored.timeZoneId)
+        assertEquals(original.languageTag, restored.languageTag)
+        assertEquals(2, restored.perPackage.size)
+
+        val first = restored.perPackage["com.example.one"]!!
+        assertTrue(first.enabled)
+        assertEquals("Asia/Tokyo", first.timeZoneId)
+        assertEquals("ja-JP", first.languageTag)
+
+        val second = restored.perPackage["com.example.two"]!!
+        assertFalse(second.enabled)
+        assertEquals("", second.timeZoneId)
+        assertEquals("", second.languageTag)
+    }
+
+    /**
+     * Guards the hazard that a missing field here breaks backup export for
+     * *every* config: ConfigBackupManager.export calls read() on each registered
+     * config, and read() rejects a snapshot that omits a required field.
+     */
+    @Test
+    fun newSchemas_emitEveryFieldConfigRegistryRequires() {
+        val vpn = VpnStatusConfigSchema().toJson()
+        listOf(
+            "schemaVersion", "lastModified", "enabled", "hideVpnTransport",
+            "spoofedTransport", "hideVpnInterfaces", "hideAlwaysOnVpn", "hideProxy",
+            "exemptPackages"
+        ).forEach { field ->
+            assertTrue("VpnStatusConfigSchema is missing '$field'", vpn.contains("\"$field\""))
+        }
+
+        val systemSetting = SystemSettingConfigSchema().toJson()
+        listOf("schemaVersion", "lastModified", "enabled", "timeZoneId", "languageTag", "perPackage")
+            .forEach { field ->
+                assertTrue(
+                    "SystemSettingConfigSchema is missing '$field'",
+                    systemSetting.contains("\"$field\"")
+                )
+            }
     }
 }

@@ -208,7 +208,7 @@ object PackageVisibilityPrefs {
     fun edit(context: Context, block: Edit.() -> Unit) {
         val pending = Edit().apply(block)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit(commit = true) {
-            pending.templates?.let { putString(KEY_TEMPLATES, gson.toJson(withoutSelfParents(it))) }
+            pending.templates?.let { putString(KEY_TEMPLATES, gson.toJson(normalizedTemplates(it))) }
             pending.appRules?.let { putString(KEY_APP_RULES, gson.toJson(it)) }
             pending.defaultSelection?.let { (mode, templateId) ->
                 // A TEMPLATE selection with no template is not a state the
@@ -226,8 +226,20 @@ object PackageVisibilityPrefs {
         SubmoduleConfigFiles.write(context)
     }
 
-    private fun withoutSelfParents(templates: List<Template>): List<Template> = templates.map {
-        if (it.parentId == it.id) it.copy(parentId = null) else it
+    /**
+     * Enforces the invariants a persisted template list has to satisfy,
+     * regardless of which caller produced it: no self-parent, and no leading or
+     * trailing whitespace in the name. Names are user-entered and end up in
+     * pickers, card titles and the exported config, where a stray space is
+     * invisible but makes two templates look identical.
+     */
+    private fun normalizedTemplates(templates: List<Template>): List<Template> = templates.map {
+        val name = it.name.trim()
+        when {
+            it.parentId == it.id -> it.copy(name = name, parentId = null)
+            name != it.name -> it.copy(name = name)
+            else -> it
+        }
     }
 
     fun setDefaultSelection(context: Context, mode: DisplayMode, templateId: String?) {
@@ -266,7 +278,7 @@ object PackageVisibilityPrefs {
     ): Template {
         val template = Template(
             id = "template_${Date().time}",
-            name = name,
+            name = name.trim(),
             parentId = parentId,
             listMode = listMode
         )
@@ -295,6 +307,50 @@ object PackageVisibilityPrefs {
     }
 
     fun resolvedTemplateListMode(template: Template): TemplateListMode = template.listMode
+
+    /**
+     * The parent chain above [template], nearest ancestor first.
+     *
+     * Stops if the chain loops back on itself, so a malformed config renders as
+     * a truncated chain rather than hanging the UI.
+     */
+    fun ancestorChain(template: Template, templates: List<Template>): List<Template> {
+        val byId = templates.associateBy { it.id }
+        val chain = mutableListOf<Template>()
+        val visited = mutableSetOf(template.id)
+        var current = template.parentId?.let(byId::get)
+        while (current != null && visited.add(current.id)) {
+            chain += current
+            current = current.parentId?.let(byId::get)
+        }
+        return chain
+    }
+
+    /**
+     * The templates [child] can inherit from without forming a cycle — that is,
+     * every template that is not [child] itself and does not already have
+     * [child] somewhere in its own parent chain.
+     *
+     * Worth filtering at the point of choice: [ConfigRegistry] only rejects a
+     * template that is its own parent, so a two-template cycle passes validation
+     * and then silently truncates in [resolvedTemplatePackages], which drops
+     * packages the user believes are inherited.
+     */
+    fun eligibleParents(child: Template, templates: List<Template>): List<Template> {
+        val byId = templates.associateBy { it.id }
+
+        fun inheritsFromChild(candidate: Template): Boolean {
+            val visited = mutableSetOf<String>()
+            var current: Template? = candidate
+            while (current != null && visited.add(current.id)) {
+                if (current.id == child.id) return true
+                current = current.parentId?.let(byId::get)
+            }
+            return false
+        }
+
+        return templates.filterNot(::inheritsFromChild)
+    }
 
     fun resolveRuleVisiblePackages(rule: AppRule?, config: Config): Set<String>? {
         val mode = rule?.mode ?: config.defaultMode

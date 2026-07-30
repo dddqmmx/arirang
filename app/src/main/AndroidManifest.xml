@@ -91,6 +91,12 @@
         <activity
             android:name=".ui.activity.packagelist.PackageTemplateManagerActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.activity.VpnStatusConfigActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.activity.SystemSettingConfigActivity"
+            android:exported="false" />
         <meta-data
             android:name="xposedmodule"
             android:value="true" />

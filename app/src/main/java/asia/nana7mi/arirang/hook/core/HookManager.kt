@@ -7,11 +7,13 @@ import asia.nana7mi.arirang.hook.bluetooth.FuckBluetooth
 import asia.nana7mi.arirang.hook.clipboard.FuckClipboard
 import asia.nana7mi.arirang.hook.gms.FuckGms
 import asia.nana7mi.arirang.hook.location.FuckLocation
+import asia.nana7mi.arirang.hook.network.FuckVpnStatus
 import asia.nana7mi.arirang.hook.packagelist.FuckPackageList
 import asia.nana7mi.arirang.hook.process.FuckProcess
 import asia.nana7mi.arirang.hook.settings.FuckSettingsProvider
 import asia.nana7mi.arirang.hook.sim.FuckSim
 import asia.nana7mi.arirang.hook.system.SystemServerHook
+import asia.nana7mi.arirang.hook.systemsetting.FuckAppLocale
 import asia.nana7mi.arirang.hook.wifi.FuckWifi
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -28,6 +30,8 @@ class HookManager : IXposedHookLoadPackage {
         FuckGms(),
         FuckProcess(),
         FuckPackageList(),
+        FuckVpnStatus(),
+        FuckAppLocale(),
         XposedActivation()
     )
 
