@@ -286,7 +286,7 @@
     <string name="vpn_remove_app">移除</string>
 
     <string name="system_setting_section_enable">系统值</string>
-    <string name="system_setting_enable">启用时区与语言伪装</string>
+    <string name="system_setting_enable">启用设置伪装</string>
     <string name="system_setting_enable_summary">向应用上报不同的时区或语言</string>
     <string name="system_setting_section_default">默认值</string>
     <string name="system_setting_section_default_summary">应用于所有没有单独设定的应用。</string>

@@ -78,6 +78,8 @@
     <string name="self_check_location_accuracy_time">精度: %1$.1fm | 時刻: %2$s</string>
 
     <string name="self_check_nav_props">プロパティ</string>
+    <string name="self_check_nav_timezone">タイムゾーン</string>
+    <string name="self_check_nav_locale">言語</string>
     <string name="self_check_nav_rawfiles">カーネルファイル</string>
     <string name="self_check_nav_drm">DRM</string>
     <string name="self_check_nav_settings">設定</string>
@@ -88,6 +90,8 @@
     <string name="self_check_channel_mismatch">⚠ 不一致</string>
     <string name="self_check_channel_leak">⚠ 漏洩</string>
     <string name="self_check_props_title">システムプロパティ（クロスチャネル）</string>
+    <string name="self_check_timezone_title">デフォルトタイムゾーン（全チャネル）</string>
+    <string name="self_check_locale_title">デフォルト言語（全チャネル）</string>
     <string name="self_check_rawfiles_title">カーネルファイル（/sys、/proc）</string>
     <string name="self_check_drm_title">DRM デバイス ID</string>
     <string name="self_check_settings_title">設定ストア</string>
@@ -102,6 +106,22 @@
     <string name="self_check_sensor_precision_monitor_stop">リアルタイム監視を停止</string>
     <string name="self_check_sensor_precision_monitoring">監視中…</string>
     <string name="self_check_props_hidden">読み取り可能なシステムプロパティはありません</string>
+    <string name="self_check_timezone_hidden">タイムゾーンを読み取れませんでした</string>
+    <string name="self_check_timezone_java">java.util.TimeZone.getDefault=%1$s</string>
+    <string name="self_check_timezone_zoneid">java.time.ZoneId.systemDefault=%1$s</string>
+    <string name="self_check_timezone_icu">android.icu.util.TimeZone.getDefault=%1$s</string>
+    <string name="self_check_timezone_prop">SystemProperties("persist.sys.timezone")=%1$s</string>
+    <string name="self_check_timezone_formatter">DateFormat のデフォルトゾーン=%1$s</string>
+    <string name="self_check_timezone_reread">setDefault(null) 後=%1$s</string>
+    <string name="self_check_timezone_mismatch">%1$s = %2$s %3$s</string>
+    <string name="self_check_locale_hidden">言語を読み取れませんでした</string>
+    <string name="self_check_locale_config">Configuration.locales[0]=%1$s</string>
+    <string name="self_check_locale_java">Locale.getDefault=%1$s</string>
+    <string name="self_check_locale_list">LocaleList.getDefault[0]=%1$s</string>
+    <string name="self_check_locale_app">LocaleManager.getApplicationLocales=%1$s</string>
+    <string name="self_check_locale_app_empty">（空 = システムに従う）</string>
+    <string name="self_check_locale_app_config">Application Configuration.locales[0]=%1$s</string>
+    <string name="self_check_locale_mismatch">%1$s = %2$s %3$s</string>
     <string name="self_check_rawfiles_hidden">カーネルファイルから識別データの漏洩はありません</string>
     <string name="self_check_drm_hidden">デバイス識別子を返した DRM スキームはありません</string>
     <string name="self_check_settings_hidden">識別可能な設定値は返されませんでした</string>

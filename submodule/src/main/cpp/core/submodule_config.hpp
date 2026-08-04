@@ -3,6 +3,7 @@
 #include "zygisk.hpp"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -88,6 +89,23 @@ struct SubmoduleConfig {
     std::string wifi_config_snapshot;
     jlong location_config_version = 0;
     std::string location_config_snapshot;
+
+    // Per-app time zone spoofing configuration (system setting half).
+    //
+    // Unlike every other signal in this module, the default time zone is
+    // resolved *in-process* from a *global* property with no IPC or per-app
+    // key, so it cannot be served from system_server like sensors or locale.
+    // The native layer therefore applies a process-local property-area CoW at
+    // specialize time (see timezone_prop_cow.cpp) using exactly this map.
+    // See submodule/doc/timezone_per_app_research.md.
+    bool system_setting_enabled = false;
+    // Empty means "leave the real time zone alone" at the global level.
+    std::string time_zone_global;
+    // package name -> effective time zone id. An empty-string entry explicitly
+    // marks the package as exempt from the global value (the app-side
+    // "override disabled" case); an absent entry means "follow time_zone_global".
+    std::map<std::string, std::string> time_zone_by_package;
+    jlong system_setting_config_version = 0;
 
     // Sensor spoofing configuration.
     bool sensor_config_enabled = false;

@@ -6,6 +6,7 @@
 #include "submodule_config.hpp"
 #include "sensor_spoofer.hpp"
 #include "system_property_spoofer.hpp"
+#include "timezone_prop_cow.hpp"
 
 #include <string>
 
@@ -63,12 +64,31 @@ public:
         // Copy it while the JNIEnv/string is still valid; later callbacks only
         // use the cached std::string.
         current_app_process_.clear();
+        current_app_package_.clear();
+        current_app_timezone_.clear();
         keep_module_loaded_in_app_ = false;
         if (env_ != nullptr && args != nullptr && args->nice_name != nullptr) {
             const char *nice_name = env_->GetStringUTFChars(args->nice_name, nullptr);
             if (nice_name != nullptr) {
                 current_app_process_ = nice_name;
                 env_->ReleaseStringUTFChars(args->nice_name, nice_name);
+            } else if (env_->ExceptionCheck()) {
+                env_->ExceptionClear();
+            }
+        }
+        // The package name comes from the app data dir, NOT the process name:
+        // background/isolated/multi-process come through as "<pkg>:<service>"
+        // or "<pkg>:push", so matching `nice_name` alone would miss every
+        // non-main process of a spoofed app. app_data_dir is "<user-dir>/<pkg>".
+        if (env_ != nullptr && args != nullptr && args->app_data_dir != nullptr) {
+            const char *data_dir = env_->GetStringUTFChars(args->app_data_dir, nullptr);
+            if (data_dir != nullptr) {
+                const std::string dir(data_dir);
+                const size_t slash = dir.find_last_of('/');
+                if (slash != std::string::npos && slash + 1 < dir.size()) {
+                    current_app_package_ = dir.substr(slash + 1);
+                }
+                env_->ReleaseStringUTFChars(args->app_data_dir, data_dir);
             } else if (env_->ExceptionCheck()) {
                 env_->ExceptionClear();
             }
@@ -84,15 +104,33 @@ public:
          *    per-process hooks.
          * 3. Hooks are reserved EXCLUSIVELY for framework-level components that serve
          *    as data providers (e.g., com.android.phone for SIM/IMEI data).
+         *
+         * The per-app time zone feature (§4) is the one deliberate exception whose
+         * constraint is different: it does NOT inject any hook. It performs a
+         * data-only property-area CoW during the specialize callback that fires in
+         * every forked process anyway, then lets DLCLOSE remove the module. See
+         * timezone_prop_cow.cpp and the research doc.
          */
         keep_module_loaded_in_app_ = args != nullptr &&
                                      args->uid == kAndroidPhoneUid &&
                                      current_app_process_ == "com.android.phone";
                                      
         if (!keep_module_loaded_in_app_) {
-            // Unload from ordinary app processes immediately after specialization
-            // so no native hooks, globals, or background work remain mapped there.
-            if (api_ != nullptr) api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            // Ordinary app: load the config to decide whether THIS package has a
+            // time zone override. In an ordinary app the disk read fails (the
+            // app cannot open the manager's private config paths), so the
+            // companion serves a trimmed, secret-free timezone view. DLCLOSE is
+            // deferred to postAppSpecialize so the CoW can run against the final
+            // credentialed address space before the module is unloaded.
+            ensure_config_loaded();
+            // Policy: skip isolated processes (webview/sandbox services, uid
+            // >= AID_ISOLATED_START 90000). They do not own a meaningful
+            // package identity and are not a real user-facing timezone consumer.
+            constexpr jint kAidIsolatedStart = 90000;
+            if (!current_app_package_.empty() && (args == nullptr || args->uid < kAidIsolatedStart)) {
+                current_app_timezone_ = arirang::resolve_timezone_for_package(
+                    config_, current_app_package_);
+            }
             return;
         }
         // Only the phone process gets this far, so the config read happens there
@@ -112,14 +150,25 @@ public:
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
-        if (!keep_module_loaded_in_app_) return;
-        // The phone process owns several telephony property write/read paths.
-        // Keep hooks here source-level so third-party apps observe spoofed data
-        // through normal framework IPC rather than by being injected.
-        ensure_config_loaded();
-        arirang::spoof_build_fields(env_, config_);
-        arirang::install_system_property_spoofer(api_, env_, config_, true);
-        arirang::log_info(std::string("installed phone process native hooks"));
+        if (keep_module_loaded_in_app_) {
+            // The phone process owns several telephony property write/read paths.
+            // Keep hooks here source-level so third-party apps observe spoofed data
+            // through normal framework IPC rather than by being injected.
+            ensure_config_loaded();
+            arirang::spoof_build_fields(env_, config_);
+            arirang::install_system_property_spoofer(api_, env_, config_, true);
+            arirang::log_info(std::string("installed phone process native hooks"));
+            return;
+        }
+
+        // Ordinary app: apply the per-process timezone illusion if this package
+        // has an override, then always unload the module (unchanged policy).
+        if (!current_app_timezone_.empty()) {
+            arirang::install_timezone_illusion(env_, current_app_timezone_);
+        }
+        if (api_ != nullptr) {
+            api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+        }
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *) override {
@@ -144,6 +193,8 @@ private:
     JNIEnv *env_ = nullptr;
     arirang::SubmoduleConfig config_;
     std::string current_app_process_;
+    std::string current_app_package_;
+    std::string current_app_timezone_;
     bool keep_module_loaded_in_app_ = false;
     bool config_loaded_ = false;
 };

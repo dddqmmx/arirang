@@ -44,7 +44,9 @@ class SubmoduleConfigFilesTest {
             "sensorGlobalVendorReplacement", "sensorVendorKeywords",
             "sensorBlacklist", "sensorOverrides", "sensorInjections",
             "sensorPrecisionRules",
-            "sensorConfigVersion"
+            "sensorConfigVersion",
+            "systemSettingEnabled", "timeZoneGlobal", "timeZoneByPackage",
+            "systemSettingConfigVersion"
         )
         val json = buildMinimalConfigJson()
         for (key in requiredKeys) {
@@ -171,6 +173,7 @@ class SubmoduleConfigFilesTest {
             "hookLogConfigVersion", "wifiConfigVersion",
             "bluetoothConfigVersion", "locationConfigVersion",
             "packageListConfigVersion", "sensorConfigVersion",
+            "systemSettingConfigVersion",
             "globalConfigVersion"
         )
         for (key in versionKeys) {
@@ -185,6 +188,49 @@ class SubmoduleConfigFilesTest {
         val tac = json.getJSONObject("tacBySlot")
         assertNotNull(imei)
         assertNotNull(tac)
+    }
+
+    @Test
+    fun timeZoneByPackage_foldsOverridesIntoNativeSemantics() {
+        val config = SystemSettingPrefs.Config(
+            enabled = true,
+            timeZoneId = "Asia/Shanghai",
+            perPackage = mapOf(
+                // Differs from global -> must be spelled out.
+                "com.example.explicit" to SystemSettingPrefs.Override(
+                    enabled = true, timeZoneId = "Europe/London"
+                ),
+                // Empty override follows the global -> omitted (native falls back).
+                "com.example.follows" to SystemSettingPrefs.Override(enabled = true),
+                // Same as global -> redundant -> omitted.
+                "com.example.redundant" to SystemSettingPrefs.Override(
+                    enabled = true, timeZoneId = "Asia/Shanghai"
+                ),
+                // Explicitly disabled while a global is set -> exempt marker.
+                "com.example.exempt" to SystemSettingPrefs.Override(enabled = false)
+            )
+        )
+
+        val map = SubmoduleConfigFiles.buildTimeZoneByPackage(config)
+        assertEquals("Europe/London", map.getString("com.example.explicit"))
+        assertFalse(map.has("com.example.follows"))
+        assertFalse(map.has("com.example.redundant"))
+        assertEquals("", map.getString("com.example.exempt"))
+    }
+
+    @Test
+    fun timeZoneByPackage_disabledConfigEmitsEmptyMap() {
+        val config = SystemSettingPrefs.Config(
+            enabled = false,
+            timeZoneId = "Asia/Shanghai",
+            perPackage = mapOf(
+                "com.example.explicit" to SystemSettingPrefs.Override(
+                    enabled = true, timeZoneId = "Europe/London"
+                ),
+                "com.example.exempt" to SystemSettingPrefs.Override(enabled = false)
+            )
+        )
+        assertEquals(0, SubmoduleConfigFiles.buildTimeZoneByPackage(config).length())
     }
 
     private fun buildMinimalConfigJson(): JSONObject {
@@ -301,5 +347,9 @@ class SubmoduleConfigFilesTest {
             .put("sensorInjections", org.json.JSONArray())
             .put("sensorPrecisionRules", org.json.JSONArray())
             .put("sensorConfigVersion", 1L)
+            .put("systemSettingEnabled", false)
+            .put("timeZoneGlobal", "")
+            .put("timeZoneByPackage", org.json.JSONObject())
+            .put("systemSettingConfigVersion", 1L)
     }
 }

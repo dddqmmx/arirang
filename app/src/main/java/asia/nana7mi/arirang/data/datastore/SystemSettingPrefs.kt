@@ -17,8 +17,12 @@ import java.util.Date
  * nullable — the distinction is between *no opinion* and *an opinion*, and an
  * empty string carries that without a third state.
  *
- * As with [VpnStatusPrefs] there is no MODE_PRIVATE migration (new config) and
- * no [SubmoduleConfigFiles] write (nothing here reaches the native layer).
+ * The **time zone half reaches the native submodule** via [SubmoduleConfigFiles]:
+ * the resolved per-package map is written into `arirang-submodule/config.json`
+ * and applied as a per-process property-area CoW at specialize time (see
+ * `submodule/doc/timezone_per_app_research.md`). The language half is served by
+ * the system_server `LocaleManagerService` hook. As with [VpnStatusPrefs] there
+ * is no MODE_PRIVATE migration (new config).
  */
 object SystemSettingPrefs {
     const val PREFS_NAME = "system_setting_prefs"
@@ -64,6 +68,9 @@ object SystemSettingPrefs {
             putString(KEY_LANGUAGE_TAG, config.languageTag.sanitizedLanguage())
             putString(KEY_PER_PACKAGE, overridesToJson(config.perPackage).toString())
         }
+        // Push the resolved time zone map to the native submodule so targets get
+        // their per-app property-area CoW at their next process start.
+        SubmoduleConfigFiles.write(context, systemSettingConfig = config)
     }
 
     fun importSchema(context: Context, schema: SystemSettingConfigSchema) {

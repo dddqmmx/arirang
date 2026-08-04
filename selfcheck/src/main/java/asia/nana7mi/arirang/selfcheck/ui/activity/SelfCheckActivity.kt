@@ -152,6 +152,8 @@ class SelfCheckActivity : AppCompatActivity() {
             CheckItem(R.string.self_check_unique_title, CheckSectionView(findViewById(R.id.uniqueSection)), R.id.navUniqueChip) { UniqueIdentifiersChecker().check(this) },
             CheckItem(R.string.self_check_build_title, CheckSectionView(findViewById(R.id.buildSection)), R.id.navBuildChip) { BuildInfoChecker().check(this) },
             CheckItem(R.string.self_check_props_title, CheckSectionView(findViewById(R.id.propsSection)), R.id.navPropsChip) { SystemPropertiesChecker().check(this) },
+            CheckItem(R.string.self_check_timezone_title, CheckSectionView(findViewById(R.id.timeZoneSection)), R.id.navTimeZoneChip) { TimeZoneChecker().check(this) },
+            CheckItem(R.string.self_check_locale_title, CheckSectionView(findViewById(R.id.localeSection)), R.id.navLocaleChip) { LocaleChecker().check(this) },
             CheckItem(R.string.self_check_rawfiles_title, CheckSectionView(findViewById(R.id.rawFilesSection)), R.id.navRawFilesChip) { RawKernelFilesChecker().check(this) },
             CheckItem(R.string.self_check_telephony_title, CheckSectionView(findViewById(R.id.telephonySection)), R.id.navTelephonyChip) { TelephonyChecker().check(this) },
             CheckItem(R.string.self_check_sim_title, CheckSectionView(findViewById(R.id.simSection)), R.id.navSimChip) { SimChecker().check(this) },

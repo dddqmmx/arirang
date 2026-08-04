@@ -78,6 +78,8 @@
     <string name="self_check_location_accuracy_time">精度：%1$.1fm | 时间：%2$s</string>
 
     <string name="self_check_nav_props">系统属性</string>
+    <string name="self_check_nav_timezone">时区</string>
+    <string name="self_check_nav_locale">语言</string>
     <string name="self_check_nav_rawfiles">内核文件</string>
     <string name="self_check_nav_drm">DRM</string>
     <string name="self_check_nav_settings">设置项</string>
@@ -88,6 +90,8 @@
     <string name="self_check_channel_mismatch">⚠ 不一致</string>
     <string name="self_check_channel_leak">⚠ 泄露</string>
     <string name="self_check_props_title">系统属性（多通道交叉）</string>
+    <string name="self_check_timezone_title">默认时区（全部通道）</string>
+    <string name="self_check_locale_title">默认语言（全部通道）</string>
     <string name="self_check_rawfiles_title">内核文件（/sys、/proc）</string>
     <string name="self_check_drm_title">DRM 设备标识</string>
     <string name="self_check_settings_title">系统设置表</string>
@@ -102,6 +106,22 @@
     <string name="self_check_sensor_precision_monitor_stop">停止实时监测</string>
     <string name="self_check_sensor_precision_monitoring">监测中…</string>
     <string name="self_check_props_hidden">没有可读取的系统属性</string>
+    <string name="self_check_timezone_hidden">无法读取时区</string>
+    <string name="self_check_timezone_java">java.util.TimeZone.getDefault=%1$s</string>
+    <string name="self_check_timezone_zoneid">java.time.ZoneId.systemDefault=%1$s</string>
+    <string name="self_check_timezone_icu">android.icu.util.TimeZone.getDefault=%1$s</string>
+    <string name="self_check_timezone_prop">SystemProperties("persist.sys.timezone")=%1$s</string>
+    <string name="self_check_timezone_formatter">DateFormat 默认时区=%1$s</string>
+    <string name="self_check_timezone_reread">setDefault(null) 后=%1$s</string>
+    <string name="self_check_timezone_mismatch">%1$s = %2$s %3$s</string>
+    <string name="self_check_locale_hidden">无法读取语言</string>
+    <string name="self_check_locale_config">Configuration.locales[0]=%1$s</string>
+    <string name="self_check_locale_java">Locale.getDefault=%1$s</string>
+    <string name="self_check_locale_list">LocaleList.getDefault[0]=%1$s</string>
+    <string name="self_check_locale_app">LocaleManager.getApplicationLocales=%1$s</string>
+    <string name="self_check_locale_app_empty">（空 = 跟随系统）</string>
+    <string name="self_check_locale_app_config">Application Configuration.locales[0]=%1$s</string>
+    <string name="self_check_locale_mismatch">%1$s = %2$s %3$s</string>
     <string name="self_check_rawfiles_hidden">没有内核文件泄露可识别数据</string>
     <string name="self_check_drm_hidden">没有 DRM scheme 返回设备标识</string>
     <string name="self_check_settings_hidden">没有返回可识别的设置项</string>

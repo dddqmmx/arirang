@@ -60,6 +60,20 @@
                     android:text="@string/self_check_nav_props" />
 
                 <com.google.android.material.chip.Chip
+                    android:id="@+id/navTimeZoneChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_timezone" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/navLocaleChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_locale" />
+
+                <com.google.android.material.chip.Chip
                     android:id="@+id/navRawFilesChip"
                     style="@style/Widget.Material3.Chip.Filter"
                     android:layout_width="wrap_content"
@@ -226,6 +240,20 @@
 
             <include
                 android:id="@+id/propsSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/timeZoneSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/localeSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

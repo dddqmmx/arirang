@@ -21,6 +21,10 @@ constexpr int kMaxJsonDepth = 64;
 constexpr size_t kMaxScalarStringSize = 4096;
 constexpr size_t kMaxRuleStringSize = 512;
 constexpr size_t kMaxRuleEntries = 256;
+// Mirrors SystemSettingPrefs.MAX_PACKAGE_OVERRIDES in the manager app. The
+// 64 KiB config budget is the real practical ceiling, but the parser bound
+// must at least accept everything the app is allowed to write.
+constexpr size_t kMaxPackageEntries = 2048;
 constexpr suseconds_t kCompanionTimeoutMicros = 250000;
 
 using Json = nlohmann::json;
@@ -52,9 +56,19 @@ bool configure_companion_socket(int fd) {
 // the Zygisk sandbox), so the peer end of this AF_UNIX socket is whichever
 // Zygisk-loaded process connected. Anyone who can reach the companion socket
 // path could otherwise read the on-disk config -- including any secrets an
-// app embeds in it -- so the peer must be root, system_server (AID_SYSTEM),
-// or the calling process's own uid before it is served anything.
-bool companion_peer_is_authorized(int fd) {
+// app embeds in it. Authorization is therefore tiered: privileged peers
+// (root / system_server / com.android.phone / own uid) may see the full
+// config; ordinary app processes may only see the trimmed timezone view
+// served by companion_handler.
+bool companion_may_see_secrets(const ucred &peer) {
+    constexpr uid_t kAidRoot = 0;
+    constexpr uid_t kAidSystem = 1000;
+    constexpr uid_t kAidRadio = 1001;
+    return peer.uid == kAidRoot || peer.uid == kAidSystem || peer.uid == kAidRadio ||
+           peer.uid == getuid();
+}
+
+bool companion_peer_is_authorized(int fd, ucred *peer_out) {
     ucred peer{};
     socklen_t peer_len = sizeof(peer);
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &peer_len) != 0 ||
@@ -68,17 +82,17 @@ bool companion_peer_is_authorized(int fd) {
     //   system (1000)      — system_server
     //   radio/phone (1001) — com.android.phone (telephony property hooks)
     //   own uid            — same process as the companion (defensive)
-    constexpr uid_t kAidRoot = 0;
-    constexpr uid_t kAidSystem = 1000;
-    constexpr uid_t kAidRadio = 1001;
-    if (peer.uid == kAidRoot || peer.uid == kAidSystem || peer.uid == kAidRadio ||
-        peer.uid == getuid()) {
+    if (companion_may_see_secrets(peer)) {
+        if (peer_out != nullptr) *peer_out = peer;
         return true;
     }
 
-    log_warn(std::string("companion_handler: rejecting untrusted peer uid=") +
-             std::to_string(peer.uid));
-    return false;
+    // Ordinary app processes also connect, but only to resolve their own
+    // per-app time zone override at specialize time. They are authorized to
+    // receive a *trimmed* timezone-only view (served by companion_handler),
+    // never the full config with secrets.
+    if (peer_out != nullptr) *peer_out = peer;
+    return true;
 }
 
 void validate_string(const std::string &value, size_t max_size, const char *key) {
@@ -231,6 +245,28 @@ bool apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         read_jlong(j, "locationConfigVersion", parsed.location_config_version);
         read_string(j, "locationConfigSnapshot", parsed.location_config_snapshot, kMaxConfigSize);
 
+        // Per-app time zone spoofing configuration.
+        read_bool(j, "systemSettingEnabled", parsed.system_setting_enabled);
+        read_string(j, "timeZoneGlobal", parsed.time_zone_global, kMaxRuleStringSize);
+        read_jlong(j, "systemSettingConfigVersion", parsed.system_setting_config_version);
+
+        if (const auto it = j.find("timeZoneByPackage");
+            it != j.end() && it->is_object()) {
+            if (it->size() > kMaxPackageEntries) {
+                throw std::length_error("too many entries in timeZoneByPackage");
+            }
+            parsed.time_zone_by_package.clear();
+            for (auto entry = it->begin(); entry != it->end(); ++entry) {
+                if (!entry.value().is_string()) continue;
+                const std::string package_name = entry.key();
+                if (package_name.empty() || package_name.size() > kMaxRuleStringSize) continue;
+                std::string value = entry.value().get<std::string>();
+                validate_string(value, kMaxRuleStringSize, "timeZoneByPackage value");
+                // An empty value is a deliberate "exempt from the global" marker.
+                parsed.time_zone_by_package[package_name] = std::move(value);
+            }
+        }
+
         // Sensor spoofing configuration.
         read_bool(j, "sensorConfigEnabled", parsed.sensor_config_enabled);
         read_bool(j, "sensorHideAll", parsed.sensor_hide_all);
@@ -332,7 +368,9 @@ bool apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         " sensorConfigEnabled=" + (config.sensor_config_enabled ? "true" : "false") +
         " sensorBlacklist=" + std::to_string(config.sensor_blacklist.size()) +
         " sensorOverrides=" + std::to_string(config.sensor_overrides.size()) +
-        " sensorInjections=" + std::to_string(config.sensor_injections.size())
+        " sensorInjections=" + std::to_string(config.sensor_injections.size()) +
+        " systemSettingEnabled=" + (config.system_setting_enabled ? "true" : "false") +
+        " timeZoneByPackage=" + std::to_string(config.time_zone_by_package.size())
     );
     return true;
 }
@@ -391,18 +429,59 @@ bool load_config_from_companion(zygisk::Api *api, SubmoduleConfig &config) {
     }
 }
 
+// Builds the narrow, secret-free JSON view served to ordinary app processes
+// at specialize time. It contains only the fields the per-app time zone CoW
+// needs (master enable flag, per-package timezone map, version), deliberately
+// excluding androidId/gsfId/widevineDrmId/serial and all other identity data.
+std::string build_timezone_view(const std::string &raw) {
+    try {
+        const Json j = Json::parse(raw);
+        if (!j.is_object()) return {};
+        Json out;
+        out["enabled"] = j.value("enabled", false);
+        out["systemSettingEnabled"] = j.value("systemSettingEnabled", false);
+        out["timeZoneGlobal"] = j.value("timeZoneGlobal", std::string{});
+        out["systemSettingConfigVersion"] =
+            j.value("systemSettingConfigVersion", jlong{0});
+        if (auto it = j.find("timeZoneByPackage");
+            it != j.end() && it->is_object()) {
+            Json map;
+            for (auto entry = it->begin(); entry != it->end(); ++entry) {
+                if (entry.value().is_string()) {
+                    map[entry.key()] = entry.value().get<std::string>();
+                }
+            }
+            out["timeZoneByPackage"] = std::move(map);
+        }
+        return out.dump();
+    } catch (const std::exception &) {
+        log_warn("companion_handler: failed to build timezone view");
+        return {};
+    }
+}
+
 void companion_handler(int fd) {
     // Protocol: uint32 byte length followed by exactly that many UTF-8 JSON
     // bytes. A zero length is a valid "no config" response and lets callers use
     // defaults without blocking module load.
     if (fd < 0 || !configure_companion_socket(fd)) return;
-    if (!companion_peer_is_authorized(fd)) return;
+    ucred peer{};
+    if (!companion_peer_is_authorized(fd, &peer)) return;
 
     try {
         std::string content = read_file(kConfigPathDe, kMaxConfigSize);
         if (content.empty()) {
             content = read_file(kConfigPathCe, kMaxConfigSize);
         }
+
+        // Ordinary app processes get a trimmed view (timezone rules only) so
+        // they can seed their own property-area CoW. They never see identity
+        // secrets. Privileged peers (root/system/radio/own-uid) get the full
+        // config, which they already legitimately consume.
+        if (!companion_may_see_secrets(peer)) {
+            content = build_timezone_view(content);
+        }
+
         const uint32_t size = static_cast<uint32_t>(content.size());
         if (!write_exact(fd, &size, sizeof(size))) return;
         if (size > 0) {

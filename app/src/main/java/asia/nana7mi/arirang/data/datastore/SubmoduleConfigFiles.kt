@@ -29,7 +29,8 @@ object SubmoduleConfigFiles {
         ConfigIds.BLUETOOTH to "bluetoothConfig",
         ConfigIds.LOCATION to "locationConfig",
         ConfigIds.PACKAGE_LIST to "packageListConfig",
-        ConfigIds.SENSOR to "sensorConfig"
+        ConfigIds.SENSOR to "sensorConfig",
+        ConfigIds.SYSTEM_SETTING to "systemSettingConfig"
     )
 
     fun configFile(context: Context): File {
@@ -43,7 +44,8 @@ object SubmoduleConfigFiles {
         simConfig: SimConfigPrefs.Config = SimConfigPrefs.loadConfig(context),
         deviceConfig: DeviceInfoPrefs.Config = DeviceInfoPrefs.loadConfig(context),
         uniqueIdentifierConfig: UniqueIdentifierPrefs.Config = UniqueIdentifierPrefs.loadConfig(context),
-        sensorConfig: SensorConfigPrefs.Config = SensorConfigPrefs.loadConfig(context)
+        sensorConfig: SensorConfigPrefs.Config = SensorConfigPrefs.loadConfig(context),
+        systemSettingConfig: SystemSettingPrefs.Config = SystemSettingPrefs.loadConfig(context)
     ) {
         val configFileDe = configFile(context)
         val versions = HashMap<String, Long>()
@@ -135,6 +137,10 @@ object SubmoduleConfigFiles {
             .put("sensorInjections", buildSensorInjections(sensorConfig))
             .put("sensorPrecisionRules", buildSensorPrecisionRules(sensorConfig))
             .put("sensorConfigVersion", configVersion(ConfigIds.SENSOR))
+            .put("systemSettingEnabled", systemSettingConfig.enabled)
+            .put("timeZoneGlobal", systemSettingConfig.timeZoneId)
+            .put("timeZoneByPackage", buildTimeZoneByPackage(systemSettingConfig))
+            .put("systemSettingConfigVersion", configVersion(ConfigIds.SYSTEM_SETTING))
         val json = configJson.toString()
         warnIfOverConsumerLimit(configJson, json)
 
@@ -293,6 +299,31 @@ object SubmoduleConfigFiles {
             }
         }
         return array
+    }
+
+    internal fun buildTimeZoneByPackage(config: SystemSettingPrefs.Config): JSONObject {
+        val map = JSONObject()
+        if (!config.enabled) return map
+        val global = config.timeZoneId
+        config.perPackage.forEach { (packageName, override) ->
+            when {
+                // Explicitly disabled: keep this package on the REAL zone even
+                // when a global default is set. Encoded as an empty-string
+                // entry the native resolver treats as "exempt from the global".
+                !override.enabled && global.isNotEmpty() ->
+                    map.put(packageName, "")
+
+                // Non-empty override that differs from the global default must
+                // be spelled out. Overrides equal to the global (or empty,
+                // meaning "follow the global") are omitted so the native layer
+                // falls back to timeZoneGlobal.
+                override.enabled &&
+                    override.timeZoneId.isNotEmpty() &&
+                    override.timeZoneId != global ->
+                    map.put(packageName, override.timeZoneId)
+            }
+        }
+        return map
     }
 
     private fun buildSimProperties(config: SimConfigPrefs.Config): SimProperties {

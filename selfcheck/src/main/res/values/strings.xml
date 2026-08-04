@@ -23,6 +23,8 @@
     <string name="self_check_nav_unique">Unique IDs</string>
     <string name="self_check_nav_build">Build</string>
     <string name="self_check_nav_props">Properties</string>
+    <string name="self_check_nav_timezone">Time Zone</string>
+    <string name="self_check_nav_locale">Language</string>
     <string name="self_check_nav_rawfiles">Kernel Files</string>
     <string name="self_check_nav_telephony">Phone</string>
     <string name="self_check_nav_sim">SIM</string>
@@ -49,6 +51,8 @@
     <string name="self_check_unique_title">Unique Identifiers</string>
     <string name="self_check_build_title">Build Information</string>
     <string name="self_check_props_title">System Properties (cross-channel)</string>
+    <string name="self_check_timezone_title">Default Time Zone (all tiers)</string>
+    <string name="self_check_locale_title">Default Language (all tiers)</string>
     <string name="self_check_rawfiles_title">Kernel Files (/sys, /proc)</string>
     <string name="self_check_telephony_title">Phone Identifiers</string>
     <string name="self_check_sim_title">SIM Card Information</string>
@@ -73,6 +77,22 @@
     <string name="self_check_unique_hidden">No readable unique identifier was returned</string>
     <string name="self_check_build_hidden">No readable build information was returned</string>
     <string name="self_check_props_hidden">No system property was readable</string>
+    <string name="self_check_timezone_hidden">No time zone was readable</string>
+    <string name="self_check_timezone_java">java.util.TimeZone.getDefault=%1$s</string>
+    <string name="self_check_timezone_zoneid">java.time.ZoneId.systemDefault=%1$s</string>
+    <string name="self_check_timezone_icu">android.icu.util.TimeZone.getDefault=%1$s</string>
+    <string name="self_check_timezone_prop">SystemProperties("persist.sys.timezone")=%1$s</string>
+    <string name="self_check_timezone_formatter">DateFormat default zone=%1$s</string>
+    <string name="self_check_timezone_reread">After setDefault(null)=%1$s</string>
+    <string name="self_check_timezone_mismatch">%1$s = %2$s %3$s</string>
+    <string name="self_check_locale_hidden">No locale was readable</string>
+    <string name="self_check_locale_config">Configuration.locales[0]=%1$s</string>
+    <string name="self_check_locale_java">Locale.getDefault=%1$s</string>
+    <string name="self_check_locale_list">LocaleList.getDefault[0]=%1$s</string>
+    <string name="self_check_locale_app">LocaleManager.getApplicationLocales=%1$s</string>
+    <string name="self_check_locale_app_empty">(empty = follow system)</string>
+    <string name="self_check_locale_app_config">Application Configuration.locales[0]=%1$s</string>
+    <string name="self_check_locale_mismatch">%1$s = %2$s %3$s</string>
     <string name="self_check_rawfiles_hidden">No kernel file exposed identifying data</string>
     <string name="self_check_telephony_hidden">No phone identifier was returned</string>
     <string name="self_check_sim_hidden">No active SIM card information was returned</string>

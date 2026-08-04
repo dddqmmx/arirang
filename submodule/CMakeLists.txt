@@ -108,6 +108,7 @@ add_library(arirang_zygisk SHARED
     src/main/cpp/spoofer/sensor_rules.cpp
     src/main/cpp/spoofer/sensor_vtable_patch.cpp
     src/main/cpp/spoofer/sensor_precision.cpp
+    src/main/cpp/spoofer/timezone_prop_cow.cpp
     src/main/cpp/spoofer/sensor_aosp_types.hpp
     src/main/cpp/spoofer/sensor_shared_state.hpp
     src/main/cpp/hook/inline_hook.cpp

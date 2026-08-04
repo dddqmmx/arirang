@@ -284,7 +284,7 @@
     <string name="vpn_remove_app">削除</string>
 
     <string name="system_setting_section_enable">システム値</string>
-    <string name="system_setting_enable">タイムゾーンと言語の偽装を有効にする</string>
+    <string name="system_setting_enable">設定偽装を有効にする</string>
     <string name="system_setting_enable_summary">アプリに異なるタイムゾーンや言語を報告します</string>
     <string name="system_setting_section_default">既定値</string>
     <string name="system_setting_section_default_summary">個別設定のないすべてのアプリに適用されます。</string>

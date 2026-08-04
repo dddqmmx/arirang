@@ -304,7 +304,7 @@
     <string name="vpn_remove_app">Remove</string>
 
     <string name="system_setting_section_enable">System values</string>
-    <string name="system_setting_enable">Enable time zone and language spoofing</string>
+    <string name="system_setting_enable">Enable settings spoofing</string>
     <string name="system_setting_enable_summary">Report a different time zone or language to apps</string>
     <string name="system_setting_section_default">Defaults</string>
     <string name="system_setting_section_default_summary">Applied to every app that has no override of its own.</string>
