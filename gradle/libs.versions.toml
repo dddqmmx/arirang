@@ -4,6 +4,7 @@ api = "82"
 coreSplashscreen = "1.2.0"
 datastorePreferences = "1.2.1"
 googleGson = "2.14.0"
+json = "20260719"
 kotlin = "2.4.10"
 coreKtx = "1.18.0"
 junit = "4.13.2"
@@ -32,6 +33,7 @@ androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", versi
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 api = { module = "de.robv.android.xposed:api", version.ref = "api" }
 google-gson = { module = "com.google.code.gson:gson", version.ref = "googleGson" }
+json = { module = "org.json:json", version.ref = "json" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
