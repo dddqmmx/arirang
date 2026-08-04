@@ -22,6 +22,7 @@
     <string name="category_permission">権限</string>
     <string name="category_anonymization">匿名化</string>
     <string name="category_control">制御</string>
+    <string name="category_system_status">システム状態</string>
 
     <string name="feature_clipboard">クリップボード</string>
     <string name="feature_sensor">センサー</string>
@@ -34,8 +35,8 @@
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">Bluetooth</string>
 
-    <string name="feature_background_network">バックグラウンド通信</string>
-    <string name="feature_force_proxy">強制プロキシ</string>
+    <string name="feature_vpn_status">VPN 状態</string>
+    <string name="feature_system_setting">システム設定</string>
 
     <string name="clipboard_permission_title">クリップボード読み取り権限</string>
     <string name="clipboard_overlay_permission_title">オーバーレイ権限が必要です</string>
@@ -380,6 +381,12 @@
     <string name="device_field_time">ビルド時刻</string>
     <string name="advanced_settings_summary">アーキテクチャと低レベルのパフォーマンス調整</string>
     <string name="advanced_settings_title">詳細設定</string>
+    <string name="backup_restore_title">バックアップと復元</string>
+    <string name="export_config_title">設定をエクスポート</string>
+    <string name="export_config_summary">アプリの設定ファイルを ZIP アーカイブにバックアップします</string>
+    <string name="import_config_title">設定をインポート</string>
+    <string name="import_config_summary">バックアップ ZIP アーカイブから設定を復元します</string>
+    <string name="import_success_restart">インポートが完了しました。変更を適用するため、アプリを再起動します。</string>
     <string name="about_source_code_title">ソースコード</string>
     <string name="about_source_code_content">GitHub リポジトリ</string>
     <string name="back">戻る</string>

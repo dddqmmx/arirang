@@ -33,6 +33,7 @@ fun HookLogDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val saveFailedMessage = stringResource(R.string.log_settings_save_failed)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -54,7 +55,7 @@ fun HookLogDialog(
                                 if (HookLogSettings.setEnabled(context, module.key, next)) {
                                     enabled = next
                                 } else {
-                                    Toast.makeText(context, R.string.log_settings_save_failed, Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, saveFailedMessage, Toast.LENGTH_SHORT).show()
                                 }
                             }
                             .padding(vertical = 8.dp),
@@ -81,8 +82,7 @@ fun HookLogDialog(
                                 if (HookLogSettings.setEnabled(context, module.key, checked)) {
                                     enabled = checked
                                 } else {
-                                    val toastMsg = context.getString(R.string.log_settings_save_failed)
-                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, saveFailedMessage, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         )

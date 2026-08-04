@@ -22,6 +22,7 @@
     <string name="category_permission">权限</string>
     <string name="category_anonymization">匿名化</string>
     <string name="category_control">控制</string>
+    <string name="category_system_status">系统状态</string>
 
     <string name="feature_clipboard">剪贴板读取</string>
     <string name="feature_sensor">传感器</string>
@@ -35,8 +36,8 @@
     <string name="feature_wifi_list">Wi-Fi</string>
     <string name="feature_bluetooth_list">蓝牙</string>
 
-    <string name="feature_background_network">后台联网</string>
-    <string name="feature_force_proxy">强制代理</string>
+    <string name="feature_vpn_status">VPN 状态</string>
+    <string name="feature_system_setting">系统设置</string>
 
     <string name="clipboard_permission_title">剪贴板读取权限</string>
     <string name="clipboard_overlay_permission_title">需要悬浮窗权限</string>
