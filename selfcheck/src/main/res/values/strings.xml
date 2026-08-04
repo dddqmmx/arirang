@@ -37,6 +37,7 @@
     <string name="self_check_nav_wifi">Wi-Fi</string>
     <string name="self_check_nav_accounts">Accounts</string>
     <string name="self_check_nav_network">Network</string>
+    <string name="self_check_nav_vpn">VPN</string>
     <string name="self_check_nav_bluetooth">Bluetooth</string>
     <string name="self_check_waiting">Waiting for result</string>
     <string name="self_check_status_checking">Checking</string>
@@ -73,6 +74,7 @@
     <string name="self_check_wifi_title">Wi-Fi Information</string>
     <string name="self_check_accounts_title">Device Accounts</string>
     <string name="self_check_network_title">Network Interfaces</string>
+    <string name="self_check_vpn_title">VPN Status</string>
     <string name="self_check_bluetooth_title">Bluetooth Devices</string>
     <string name="self_check_unique_hidden">No readable unique identifier was returned</string>
     <string name="self_check_build_hidden">No readable build information was returned</string>
@@ -106,6 +108,10 @@
     <string name="self_check_wifi_hidden">No Wi-Fi network or scan result was returned</string>
     <string name="self_check_accounts_hidden">No device account was returned</string>
     <string name="self_check_network_hidden">No network interface identifier was returned</string>
+    <string name="self_check_vpn_hidden">No VPN transport, VPN interface, or always-on VPN was visible</string>
+    <string name="self_check_vpn_transport_detected">ConnectivityManager: VPN transport detected</string>
+    <string name="self_check_vpn_interfaces">VPN interfaces: %1$s</string>
+    <string name="self_check_vpn_always_on">Always-on VPN package: %1$s</string>
     <string name="self_check_bluetooth_hidden">No paired Bluetooth device was returned</string>
     <string name="self_check_phone_permission_hint">Grant phone permission to check SIM, IMEI, subscriber and phone number visibility</string>
     <string name="self_check_accounts_permission_hint">Grant account permission to check whether device accounts are visible</string>

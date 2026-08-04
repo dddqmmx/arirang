@@ -89,6 +89,7 @@ object CheckDefinitions {
     )
 
     val REQUIRED_PERMISSIONS = listOf(
+        android.Manifest.permission.ACCESS_NETWORK_STATE,
         android.Manifest.permission.ACCESS_FINE_LOCATION,
         android.Manifest.permission.READ_PHONE_STATE,
         android.Manifest.permission.READ_PHONE_NUMBERS,

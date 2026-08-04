@@ -19,6 +19,7 @@
     <string name="self_check_nav_wifi">Wi-Fi</string>
     <string name="self_check_nav_accounts">アカウント</string>
     <string name="self_check_nav_network">ネットワーク</string>
+    <string name="self_check_nav_vpn">VPN</string>
     <string name="self_check_nav_bluetooth">Bluetooth</string>
     <string name="self_check_waiting">結果を待機中</string>
     <string name="self_check_status_checking">確認中</string>
@@ -35,6 +36,7 @@
     <string name="self_check_wifi_title">Wi-Fi情報</string>
     <string name="self_check_accounts_title">端末アカウント</string>
     <string name="self_check_network_title">ネットワークインターフェース</string>
+    <string name="self_check_vpn_title">VPN 状態</string>
     <string name="self_check_bluetooth_title">Bluetoothデバイス</string>
     <string name="self_check_unique_hidden">読み取り可能な一意識別子は返されませんでした</string>
     <string name="self_check_build_hidden">読み取り可能なビルド情報は返されませんでした</string>
@@ -45,6 +47,10 @@
     <string name="self_check_wifi_hidden">Wi-Fiネットワークまたはスキャン結果は返されませんでした</string>
     <string name="self_check_accounts_hidden">端末アカウントは返されませんでした</string>
     <string name="self_check_network_hidden">ネットワークインターフェース識別子は返されませんでした</string>
+    <string name="self_check_vpn_hidden">VPN トランスポート、VPN インターフェース、常時接続 VPN は検出されませんでした</string>
+    <string name="self_check_vpn_transport_detected">ConnectivityManager: VPN トランスポートを検出</string>
+    <string name="self_check_vpn_interfaces">VPN インターフェース: %1$s</string>
+    <string name="self_check_vpn_always_on">常時接続 VPN アプリ: %1$s</string>
     <string name="self_check_bluetooth_hidden">ペアリング済みBluetoothデバイスは返されませんでした</string>
     <string name="self_check_phone_permission_hint">電話権限を許可すると、SIM、IMEI、加入者ID、電話番号の可視性を確認できます</string>
     <string name="self_check_accounts_permission_hint">アカウント権限を許可すると、端末アカウントが可視かどうかを確認できます</string>

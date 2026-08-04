@@ -158,6 +158,13 @@
                     android:text="@string/self_check_nav_network" />
 
                 <com.google.android.material.chip.Chip
+                    android:id="@+id/navVpnChip"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/self_check_nav_vpn" />
+
+                <com.google.android.material.chip.Chip
                     android:id="@+id/navBluetoothChip"
                     style="@style/Widget.Material3.Chip.Filter"
                     android:layout_width="wrap_content"
@@ -338,6 +345,13 @@
 
             <include
                 android:id="@+id/networkSection"
+                layout="@layout/item_self_check_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" />
+
+            <include
+                android:id="@+id/vpnSection"
                 layout="@layout/item_self_check_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

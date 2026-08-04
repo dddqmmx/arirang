@@ -166,6 +166,7 @@ class SelfCheckActivity : AppCompatActivity() {
             CheckItem(R.string.self_check_wifi_title, CheckSectionView(findViewById(R.id.wifiSection)), R.id.navWifiChip) { WifiChecker().check(this) },
             CheckItem(R.string.self_check_accounts_title, CheckSectionView(findViewById(R.id.accountsSection)), R.id.navAccountsChip) { AccountsChecker().check(this) },
             CheckItem(R.string.self_check_network_title, CheckSectionView(findViewById(R.id.networkSection)), R.id.navNetworkChip) { NetworkChecker().check(this) },
+            CheckItem(R.string.self_check_vpn_title, CheckSectionView(findViewById(R.id.vpnSection)), R.id.navVpnChip) { VpnChecker().check(this) },
             CheckItem(R.string.self_check_bluetooth_title, CheckSectionView(findViewById(R.id.bluetoothSection)), R.id.navBluetoothChip) { BluetoothChecker().check(this) }
         )
 
