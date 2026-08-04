@@ -22,10 +22,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * ## What this cannot do
  *
- * `VpnStatusPrefs.Config.hideVpnInterfaces` has no implementation here and
- * cannot have one: `NetworkInterface.getNetworkInterfaces()` resolves through
- * libcore's `getifaddrs()` inside the calling app's own process and never
- * reaches system_server. Hiding `tun*` from it would mean loading into every
+ * `VpnStatusPrefs.Config.hideVpnInterfaces` hides tunnel names returned in
+ * ConnectivityService's LinkProperties. It cannot hide them from
+ * `NetworkInterface.getNetworkInterfaces()`: that resolves through libcore's
+ * `getifaddrs()` inside the calling app's own process and never reaches
+ * system_server. Hiding `tun*` from that API would mean loading into every
  * third-party app, which the project's design constraint forbids.
  */
 class FuckVpnStatus : BaseHookModule(matchSystem = true) {
@@ -263,10 +264,12 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         val copy = HookBridge.newInstance(LinkProperties::class.java, original) as LinkProperties
 
         val iface = original.interfaceName
-        if (config.hideVpnTransport && iface != null && isVpnInterface(iface)) {
-            // Rename interface to avoid detection by name. We use wlan0 as it
-            // is the most common Wi-Fi interface name.
-            HookBridge.setObjectField(copy, "mIfaceName", "wlan0")
+        if (config.hideVpnInterfaces && iface != null && isVpnInterface(iface)) {
+            // setInterfaceName also rebuilds every RouteInfo with the new
+            // interface. Writing mIfaceName directly leaves routes referring
+            // to tun0, which makes LinkProperties fail while unparcelling in
+            // the client with "Route added with non-matching interface".
+            copy.setInterfaceName("wlan0")
             changed = true
         }
 

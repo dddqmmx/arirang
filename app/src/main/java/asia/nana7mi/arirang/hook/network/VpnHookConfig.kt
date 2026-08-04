@@ -13,6 +13,7 @@ internal data class VpnHookConfig(
     val enabled: Boolean = false,
     val hideVpnTransport: Boolean = true,
     val spoofedTransport: String = SPOOFED_TRANSPORT_WIFI,
+    val hideVpnInterfaces: Boolean = true,
     val hideAlwaysOnVpn: Boolean = true,
     val hideProxy: Boolean = false,
     /** Packages that keep seeing the real state. */
@@ -61,6 +62,7 @@ internal object VpnHookConfigFile {
             enabled = schema.enabled,
             hideVpnTransport = schema.hideVpnTransport,
             spoofedTransport = schema.spoofedTransport,
+            hideVpnInterfaces = schema.hideVpnInterfaces,
             hideAlwaysOnVpn = schema.hideAlwaysOnVpn,
             hideProxy = schema.hideProxy,
             exemptPackages = schema.exemptPackages.toSet()
@@ -80,6 +82,10 @@ internal object VpnHookConfigFile {
             spoofedTransport = prefs.getString(VpnStatusPrefs.KEY_SPOOFED_TRANSPORT, null)
                 ?.takeIf { it.isNotBlank() }
                 ?: defaults.spoofedTransport,
+            hideVpnInterfaces = prefs.getBoolean(
+                VpnStatusPrefs.KEY_HIDE_VPN_INTERFACES,
+                defaults.hideVpnInterfaces
+            ),
             hideAlwaysOnVpn = prefs.getBoolean(
                 VpnStatusPrefs.KEY_HIDE_ALWAYS_ON_VPN,
                 defaults.hideAlwaysOnVpn
