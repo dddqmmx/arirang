@@ -17,6 +17,7 @@ endif()
 set(ARIRANG_APPLICATION_ID "" CACHE STRING "Android application id that owns the submodule config.")
 set(ARIRANG_SUBMODULE_CONFIG_DIR "" CACHE STRING "Submodule config directory under app files.")
 set(ARIRANG_SUBMODULE_CONFIG_FILE "" CACHE STRING "Submodule config file name.")
+set(ARIRANG_MODULE_VERSION "" CACHE STRING "Submodule version string reported to the manager app via env var.")
 
 if(ARIRANG_APPLICATION_ID STREQUAL "")
     message(FATAL_ERROR "ARIRANG_APPLICATION_ID is required")
@@ -27,12 +28,18 @@ endif()
 if(ARIRANG_SUBMODULE_CONFIG_FILE STREQUAL "")
     message(FATAL_ERROR "ARIRANG_SUBMODULE_CONFIG_FILE is required")
 endif()
+if(ARIRANG_MODULE_VERSION STREQUAL "")
+    message(FATAL_ERROR "ARIRANG_MODULE_VERSION is required")
+endif()
 
 # These cache values are rendered into a C++ string literal and a privileged
 # absolute path. Restrict them to their intended grammar before configure_file
 # so a poisoned Gradle property cannot inject C++ or traverse directories.
 if(NOT ARIRANG_APPLICATION_ID MATCHES "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
     message(FATAL_ERROR "ARIRANG_APPLICATION_ID is not a valid Android application id")
+endif()
+if(NOT ARIRANG_MODULE_VERSION MATCHES "^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    message(FATAL_ERROR "ARIRANG_MODULE_VERSION is not a safe version string")
 endif()
 foreach(component ARIRANG_SUBMODULE_CONFIG_DIR ARIRANG_SUBMODULE_CONFIG_FILE)
     string(LENGTH "${${comzponent}}" component_length)

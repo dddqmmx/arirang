@@ -22,6 +22,9 @@
     <string name="status_title">Status</string>
     <string name="status_activated">Module Activated</string>
     <string name="status_deactivated">Module Deactivated</string>
+    <string name="status_submodule_missing">Submodule not installed</string>
+    <string name="status_normal">Module running normally</string>
+    <string name="status_submodule_version">Submodule version: %1$s</string>
 
     <string name="category_permission">Permissions</string>
     <string name="category_anonymization">Anonymization</string>

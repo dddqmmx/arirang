@@ -18,6 +18,9 @@
     <string name="status_title">稼働状態</string>
     <string name="status_activated">モジュールが有効化されました</string>
     <string name="status_deactivated">モジュールが無効化されています</string>
+    <string name="status_submodule_missing">サブモジュールがインストールされていません</string>
+    <string name="status_normal">モジュールは正常に動作しています</string>
+    <string name="status_submodule_version">サブモジュールバージョン: %1$s</string>
 
     <string name="category_permission">権限</string>
     <string name="category_anonymization">匿名化</string>

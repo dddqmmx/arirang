@@ -46,6 +46,7 @@ import asia.nana7mi.arirang.ui.activity.WifiConfigActivity
 @Composable
 fun HomeScreen(
     activated: Boolean,
+    submoduleVersion: String?,
     onFeatureClick: (Class<*>?) -> Unit
 ) {
     var showUnavailableDialog by remember { mutableStateOf(false) }
@@ -65,7 +66,7 @@ fun HomeScreen(
         }
 
         item {
-            StatusCard(activated = activated)
+            StatusCard(activated = activated, submoduleVersion = submoduleVersion)
         }
 
         item {

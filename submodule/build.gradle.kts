@@ -163,6 +163,7 @@ val remoteInstallScriptPath = "/data/local/tmp/arirang_install_module.sh"
 val arirangApplicationId = rootProject.extra["arirangApplicationId"] as String
 val arirangSubmoduleConfigDir = rootProject.extra["arirangSubmoduleConfigDir"] as String
 val arirangSubmoduleConfigFile = rootProject.extra["arirangSubmoduleConfigFile"] as String
+val arirangSubmoduleVersion = rootProject.extra["arirangSubmoduleVersion"] as String
 
 val moduleLibrarySources = listOf(
     "common.sh",
@@ -226,6 +227,7 @@ val configureNative by tasks.registering(Exec::class) {
             "-DARIRANG_APPLICATION_ID=$arirangApplicationId",
             "-DARIRANG_SUBMODULE_CONFIG_DIR=$arirangSubmoduleConfigDir",
             "-DARIRANG_SUBMODULE_CONFIG_FILE=$arirangSubmoduleConfigFile",
+            "-DARIRANG_MODULE_VERSION=$arirangSubmoduleVersion",
             "-G", "Ninja"
         )
     }

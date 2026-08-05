@@ -18,6 +18,9 @@
     <string name="status_title">运行状态</string>
     <string name="status_activated">模块已激活</string>
     <string name="status_deactivated">模块未激活</string>
+    <string name="status_submodule_missing">Submodule 未安装</string>
+    <string name="status_normal">模块运行正常</string>
+    <string name="status_submodule_version">Submodule 版本: %1$s</string>
 
     <string name="category_permission">权限</string>
     <string name="category_anonymization">匿名化</string>

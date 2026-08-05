@@ -23,6 +23,7 @@ class HomeFragment : Fragment() {
                 ArirangTheme {
                     HomeScreen(
                         activated = isXposedActivation(),
+                        submoduleVersion = submoduleVersion(),
                         onFeatureClick = ::openFeature
                     )
                 }
@@ -37,5 +38,9 @@ class HomeFragment : Fragment() {
 
     fun isXposedActivation(): Boolean {
         return false
+    }
+
+    fun submoduleVersion(): String? {
+        return System.getenv("ARIRANG_SUBMODULE_VERSION")
     }
 }

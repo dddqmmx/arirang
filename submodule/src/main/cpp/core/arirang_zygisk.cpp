@@ -8,6 +8,7 @@
 #include "system_property_spoofer.hpp"
 #include "timezone_prop_cow.hpp"
 
+#include <cstdlib>
 #include <string>
 
 namespace {
@@ -92,6 +93,22 @@ public:
             } else if (env_->ExceptionCheck()) {
                 env_->ExceptionClear();
             }
+        }
+
+        // Process-local presence marker, delivered ONLY to the manager app.
+        //
+        // Environment variables are per-process: setenv() below writes into THIS
+        // forked child before the app starts, and every other app forks its own
+        // zygote child that never inherits it. This is the same per-process
+        // targeting Zygisk uses to decide inject-vs-skip, applied to reporting
+        // "the submodule is installed" back to the manager.
+        //
+        // Deliberately NOT a system property or shared file: those are globally
+        // readable and would leak module presence to the very apps being spoofed.
+        if (args != nullptr &&
+            current_app_package_ == arirang::kApplicationId &&
+            args->uid >= 10000 && args->uid < 90000) {
+            setenv("ARIRANG_SUBMODULE_VERSION", arirang::kModuleVersion, 1);
         }
         
         /* 

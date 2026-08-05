@@ -3,6 +3,7 @@
 namespace arirang {
 
 inline constexpr const char *kApplicationId = "@ARIRANG_APPLICATION_ID@";
+inline constexpr const char *kModuleVersion = "@ARIRANG_MODULE_VERSION@";
 inline constexpr const char *kConfigPathDe = "@ARIRANG_CONFIG_PATH_DE@";
 inline constexpr const char *kConfigPathCe = "@ARIRANG_CONFIG_PATH_CE@";
 
