@@ -164,6 +164,7 @@ val arirangApplicationId = rootProject.extra["arirangApplicationId"] as String
 val arirangSubmoduleConfigDir = rootProject.extra["arirangSubmoduleConfigDir"] as String
 val arirangSubmoduleConfigFile = rootProject.extra["arirangSubmoduleConfigFile"] as String
 val arirangSubmoduleVersion = rootProject.extra["arirangSubmoduleVersion"] as String
+val arirangSubmoduleVersionCode = rootProject.extra["arirangSubmoduleVersionCode"] as String
 
 val moduleLibrarySources = listOf(
     "common.sh",
@@ -278,9 +279,21 @@ val stageModule by tasks.registering(Sync::class) {
     // Stage the exact Magisk/KernelSU/APatch module root. Files copied here are
     // zipped without an extra directory level, so paths must match the runtime
     // module layout expected by post-fs-data.sh and service.sh.
+    // The staged module.prop derives its version fields from the root-project
+    // extras (single source of truth); module/module.prop stays valid on its
+    // own for direct reads but the build always rewrites these two lines so the
+    // Magisk version, the CMake ARIRANG_MODULE_VERSION define and the runtime
+    // status card can never drift.
     from("module/module.prop") {
         into("")
         filePermissions { unix("rw-r--r--") }
+        filter { line ->
+            when {
+                line.startsWith("version=") -> "version=$arirangSubmoduleVersion"
+                line.startsWith("versionCode=") -> "versionCode=$arirangSubmoduleVersionCode"
+                else -> line
+            }
+        }
     }
     from("module/post-fs-data.sh") {
         into("")

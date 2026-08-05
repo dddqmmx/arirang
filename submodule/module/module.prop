@@ -1,6 +1,6 @@
 id=arirang-submodule
 name=arirang-submodule
-version=0.3.1-experimental
-versionCode=2
+version=0.4.1-experimental
+versionCode=3
 author=PaulPerkenstein
 description=Zygote-level native framework fallback layer for Arirang surfaces that cannot be rewritten from system Java hooks.
