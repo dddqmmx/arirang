@@ -6,6 +6,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.ProviderInfo
 import android.content.pm.ResolveInfo
 import android.os.Binder
+import android.util.ArrayMap
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
@@ -13,6 +14,7 @@ import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 class FuckPackageList : BaseHookModule(matchSystem = true) {
@@ -47,9 +49,168 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             })
 
             HookLog.i(HookLog.Module.PACKAGE_LIST, "ServiceManager hook installed successfully")
+
+            hookPmsInternals(lpparam.classLoader)
         }.onFailure {
             HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to install ServiceManager hook", it)
         }
+    }
+
+    private val internalHooked = AtomicBoolean(false)
+    private val callingPackagesCache = ConcurrentHashMap<Int, Set<String>>()
+    @Volatile
+    private var cachedConfigVersion = -1L
+
+    /**
+     * PMS internal hook layer.
+     *
+     * Mirrors the classic "hide at the source" design: instead of enumerating
+     * every public `IPackageManager` binder method, hook the package-visibility
+     * chokepoints inside `com.android.server.pm.ComputerEngine` (Android 12+),
+     * which every single-package query and every enumeration funnels through:
+     *
+     *  - [shouldFilterApplication] / [shouldFilterApplicationIncludingUninstalled]
+     *    `(PackageStateInternal, int callingUid, int userId)`: returning `true`
+     *    makes the target package invisible to that caller for
+     *    `getInstalledPackages`, `getInstalledApplications`, `getPackageInfo`,
+     *    `getPackageUid`, `getApplicationInfo`, `resolveIntent`, … all at once.
+     *  - `getPackageStates()`: filter the returned state map for paths that
+     *    iterate the raw registry without consulting [shouldFilterApplication],
+     *    most notably `getPackagesHoldingPermissions`.
+     *
+     * The existing binder-level hooks remain installed as a safety net; the
+     * filtering is idempotent so double-filtering is harmless.
+     */
+    private fun hookPmsInternals(classLoader: ClassLoader) {
+        if (!internalHooked.compareAndSet(false, true)) return
+
+        val engineClass = HookBridge.findClassIfExists("com.android.server.pm.ComputerEngine", classLoader)
+        if (engineClass == null) {
+            HookLog.w(HookLog.Module.PACKAGE_LIST, "ComputerEngine not found; internal PMS hooks skipped")
+            return
+        }
+
+        for (name in listOf("shouldFilterApplication", "shouldFilterApplicationIncludingUninstalled")) {
+            val overloads = engineClass.declaredMethods.filter { m ->
+                m.name == name &&
+                    m.parameterTypes.size == 3 &&
+                    m.parameterTypes[1] == Int::class.javaPrimitiveType &&
+                    m.parameterTypes[2] == Int::class.javaPrimitiveType &&
+                    m.parameterTypes[0].name.endsWith("PackageStateInternal")
+            }
+            for (method in overloads) {
+                runCatching {
+                    HookBridge.findAndHookMethod(
+                        engineClass, name,
+                        method.parameterTypes[0], Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+                        beforeHookedMethod { hideTargetForCaller() }
+                    )
+                    HookLog.d(
+                        HookLog.Module.PACKAGE_LIST,
+                        "hooked internal $name(${method.parameterTypes[0].simpleName})"
+                    )
+                }.onFailure {
+                    HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to hook internal $name", it)
+                }
+            }
+        }
+
+        val statesMethod = engineClass.declaredMethods.find {
+            it.name == "getPackageStates" && it.parameterTypes.isEmpty()
+        }
+        if (statesMethod != null) {
+            runCatching {
+                HookBridge.findAndHookMethod(
+                    engineClass, "getPackageStates",
+                    afterHookedMethod { filterPackageStatesMap() }
+                )
+                HookLog.d(HookLog.Module.PACKAGE_LIST, "hooked internal getPackageStates")
+            }.onFailure {
+                HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to hook internal getPackageStates", it)
+            }
+        }
+    }
+
+    /** before-hook for `shouldFilterApplication*`: force `true` when the target must stay hidden. */
+    private fun XC_MethodHook.MethodHookParam.hideTargetForCaller() {
+        if (isInternalCall.get() == true) return
+        val callingUid = args.getOrNull(1) as? Int ?: return
+        if (callingUid.appId() < 10000) return
+        config.loadIfUpdated()
+        if (!config.enabled) return
+        val targetPackage = extractPackageStateName(args.getOrNull(0)) ?: return
+        val callingPackages = resolveCallingPackages(this.thisObject, callingUid)
+        if (!config.shouldKeepForPackages(callingUid, callingPackages, targetPackage)) {
+            HookLog.d(
+                HookLog.Module.PACKAGE_LIST,
+                "internal filter: hiding '$targetPackage' from ${callingPackages.firstOrNull() ?: callingUid}"
+            )
+            result = true
+        }
+    }
+
+    /** after-hook for `getPackageStates()`: strip hidden packages from the returned registry map. */
+    private fun XC_MethodHook.MethodHookParam.filterPackageStatesMap() {
+        if (isInternalCall.get() == true) return
+        val callingUid = Binder.getCallingUid()
+        if (callingUid.appId() < 10000) return
+        config.loadIfUpdated()
+        if (!config.enabled) return
+        val states = result as? ArrayMap<*, *> ?: return
+        val callingPackages = resolveCallingPackages(this.thisObject, callingUid)
+
+        val hiddenKeys = HashSet<Any?>()
+        for (i in 0 until states.size) {
+            val key = states.keyAt(i)
+            val packageName = key as? String ?: extractPackageStateName(states.valueAt(i)) ?: continue
+            if (!config.shouldKeepForPackages(callingUid, callingPackages, packageName)) {
+                hiddenKeys.add(key)
+            }
+        }
+        if (hiddenKeys.isEmpty()) return
+
+        val filtered = ArrayMap<Any?, Any?>()
+        for (i in 0 until states.size) {
+            val key = states.keyAt(i)
+            if (key in hiddenKeys) continue
+            filtered.put(key, states.valueAt(i))
+        }
+        HookLog.d(
+            HookLog.Module.PACKAGE_LIST,
+            "getPackageStates: filtered ${hiddenKeys.size} package(s) from ${callingPackages.firstOrNull() ?: callingUid}"
+        )
+        result = filtered
+    }
+
+    private fun extractPackageStateName(state: Any?): String? {
+        if (state == null) return null
+        return runCatching {
+            HookBridge.callMethod(state, "getPackageName") as? String
+        }.getOrNull()
+    }
+
+    /**
+     * Resolves a UID to its package set with a small per-UID cache.
+     *
+     * The internal [shouldFilterApplication] hook fires once per package inside
+     * a full enumeration loop; without a cache every one of those calls would
+     * re-issue the `getPackagesForUid` reflection round-trip. The cache is keyed
+     * by UID, capped in size, and invalidated whenever the config reloads.
+     */
+    private fun resolveCallingPackages(pmObject: Any, uid: Int): Set<String> {
+        if (uid <= 0) return emptySet()
+        val version = config.version
+        if (cachedConfigVersion != version) {
+            cachedConfigVersion = version
+            callingPackagesCache.clear()
+        }
+        callingPackagesCache[uid]?.let { return it }
+        val resolved = getPackagesForUid(pmObject, uid)
+        if (callingPackagesCache.size >= CALLING_PACKAGES_CACHE_CAP) {
+            callingPackagesCache.clear()
+        }
+        callingPackagesCache[uid] = resolved
+        return resolved
     }
 
     private val pmHooked = AtomicBoolean(false)
@@ -377,4 +538,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     }
 
     private fun Int.appId(): Int = Math.floorMod(this, 100_000)
+
+    private companion object {
+        private const val CALLING_PACKAGES_CACHE_CAP = 32
+    }
 }

@@ -30,6 +30,14 @@ internal class PackageListHookConfig(private val prefsName: String) {
     val enabled: Boolean
         get() = state.enabled
 
+    /**
+     * Monotonic config generation, bumped on every reload that changes the
+     * parsed snapshot. Internal PMS hooks use it to invalidate their
+     * per-UID caller-package cache when the config changes.
+     */
+    val version: Long
+        get() = state.timestamp
+
     private val pref by lazy {
         HookConfigFile.xSharedPreferences(prefsName)
     }
