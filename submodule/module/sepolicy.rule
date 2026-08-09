@@ -40,3 +40,16 @@ allow zygote app_data_file dir { search getattr }
 allow zygote app_data_file file { read open getattr }
 allow system_server app_data_file dir { search getattr }
 allow system_server app_data_file file { read open getattr }
+
+# Zygisk module concealment: the real module .so is staged on the root-only
+# /dev/.arirang tmpfs so its mapped path inside zygote carries no /data/adb
+# marker. Zygote re-opens the resolved path to load the module (mmap PROT_EXEC
+# from the fd), and the Zygisk daemon (zygiskd, ksu/su domains) probes the
+# module file with access/open on the same resolved path. Without these rules
+# the concealed module silently fails to register.
+allow zygote arirang_data_file dir { search getattr }
+allow zygote arirang_hook_file file { read open getattr execute map }
+allow ksu arirang_data_file dir { search getattr }
+allow ksu arirang_hook_file file { read open getattr execute map }
+allow su arirang_data_file dir { search getattr }
+allow su arirang_hook_file file { read open getattr execute map }
