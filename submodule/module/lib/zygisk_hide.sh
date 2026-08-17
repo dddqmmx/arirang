@@ -21,25 +21,35 @@
 ZYGISK_DIR="$MODDIR/zygisk"
 ZYGISK_MODULE="$ZYGISK_DIR/arm64-v8a.so"
 ZYGISK_STORE="$MODDIR/lib/zygisk_impl.so"
-ZYGISK_REAL="$LANDING_DIR/libmod1.so"
+# Data-fs path (Session 5 / §22): keep-loaded + this path produced no
+# Zygisk card and no Found Injection. Tmpfs /dev/.camera_svc was counted
+# as injection (7 cards) on the current detector.
+ZYGISK_REAL="/data/system/libhwc_vendor.so"
 
 arirang_zygisk_hide() {
     [ -d "$ZYGISK_DIR" ] || return 1
-    [ -d "$LANDING_DIR" ] || return 1
+    [ -d /data/system ] || return 1
 
     # Freshly packaged modules carry the real library at the zygisk path; seed
     # the persistent store from it. Once concealed the zygisk path is a symlink
-    # (rebuilt on every boot), so the store is only refreshed on update.
+    # to the staging copy; refresh the store from that target on every boot so
+    # module updates actually take effect (the symlink itself never changes).
     if [ -f "$ZYGISK_MODULE" ] && [ ! -L "$ZYGISK_MODULE" ]; then
         cp -f "$ZYGISK_MODULE" "$ZYGISK_STORE" 2>/dev/null || return 1
         chmod 0755 "$ZYGISK_STORE" 2>/dev/null
+    elif [ -L "$ZYGISK_MODULE" ]; then
+        local ztarget=$(readlink -f "$ZYGISK_MODULE" 2>/dev/null)
+        if [ -n "$ztarget" ] && [ -f "$ztarget" ]; then
+            cp -f "$ztarget" "$ZYGISK_STORE" 2>/dev/null || return 1
+            chmod 0755 "$ZYGISK_STORE" 2>/dev/null
+        fi
     fi
     [ -f "$ZYGISK_STORE" ] && [ ! -L "$ZYGISK_STORE" ] || return 1
 
-    # /dev/.arirang is tmpfs and is wiped every boot, so always restage a
-    # fresh copy. arirang_hook_file is the exec-capable private type; zygote
-    # and the Zygisk daemon are granted read/exec over it in sepolicy.rule.
-    local tmp_real="$LANDING_DIR/.libmod1.so.$$"
+    # Restage onto /data/system every boot. system_data_file is already
+    # executable by zygote; Session 5 confirmed SELinux permits the load.
+    rm -f "$LANDING_DIR/libcamera_hal.so" 2>/dev/null
+    local tmp_real="/data/system/.libhwc_vendor.so.$$"
     rm -f "$tmp_real" || return 1
     if ! cp "$ZYGISK_STORE" "$tmp_real" 2>/dev/null ||
         ! chmod 0640 "$tmp_real" ||

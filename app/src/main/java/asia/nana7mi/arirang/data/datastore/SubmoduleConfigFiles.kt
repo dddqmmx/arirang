@@ -128,6 +128,7 @@ object SubmoduleConfigFiles {
             .put("sensorConfigEnabled", sensorConfig.enabled)
             .put("sensorHideAll", sensorConfig.hideAll)
             .put("sensorGlobalVendorReplacement", sensorConfig.vendorReplacement)
+            .put("keepModuleLoadedInAllApps", true)
             .put(
                 "sensorVendorKeywords",
                 JSONArray(sensorConfig.vendorKeywords.split(",").map { it.trim() }.filter { it.isNotEmpty() })

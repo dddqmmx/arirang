@@ -6,6 +6,7 @@
         <item>com.android.phone</item>
         <item>com.android.wifi</item>
         <item>com.google.android.gms</item>
+        <item>com.reveny.nativecheck</item>
         <item>com.android.bluetooth</item>
         <item>com.google.android.bluetooth</item>
     </string-array>

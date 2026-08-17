@@ -54,7 +54,7 @@ fi
 
 # ----- phase 5: conceal the zygisk module mapping ---------------------------
 # Must run before zygote loads Zygisk modules so the resolved module path
-# recorded in process maps is the benign /dev/.arirang path instead of the
+# recorded in process maps is the benign staging path instead of the
 # canonical /data/adb/modules/.../zygisk path.
 if ! arirang_zygisk_hide; then
     arirang_log e "arirang_post_fs_data" "zygisk concealment phase failed"

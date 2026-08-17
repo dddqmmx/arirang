@@ -48,8 +48,15 @@ allow system_server app_data_file file { read open getattr }
 # module file with access/open on the same resolved path. Without these rules
 # the concealed module silently fails to register.
 allow zygote arirang_data_file dir { search getattr }
-allow zygote arirang_hook_file file { read open getattr execute map }
+allow zygote arirang_hook_file file { read open getattr execute map map_write }
 allow ksu arirang_data_file dir { search getattr }
-allow ksu arirang_hook_file file { read open getattr execute map }
+allow ksu arirang_hook_file file { read open getattr execute map map_write }
 allow su arirang_data_file dir { search getattr }
-allow su arirang_hook_file file { read open getattr execute map }
+allow su arirang_hook_file file { read open getattr execute map map_write }
+
+# Runtime dynstr scrub: every app process swaps the zygisk entry symbol names
+# in its own private copy of the module mapping (the framework resolves them
+# once in Zygote; app-side copies never need them). Requires mprotect(PROT_
+# WRITE) on the mapped pages; map_write alone cannot read or modify the file
+# (root-owned 0640, no read/open grant for app domains, private CoW copy).
+allow { untrusted_app platform_app priv_app } arirang_hook_file file { map_write }
