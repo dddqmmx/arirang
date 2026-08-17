@@ -28,27 +28,6 @@ namespace {
 // insufficient because an untrusted APK can request a misleading nice name.
 constexpr jint kAndroidPhoneUid = 1001;
 
-// FNV-1a of the first 22 bytes of "com.reveny.nativecheck".
-// Isolated (:iso…) and AppZygote (_zygote) share that prefix. The
-// package bytes are never stored; a contiguous detector name in the
-// mapped image is itself an injection signal.
-constexpr uint32_t kDetectorNameHash = 0x813ba9d2u;
-constexpr size_t kDetectorNameLen = 22;
-
-uint32_t fnv1a_prefix(const std::string &s, size_t n) {
-    if (s.size() < n) return 0;
-    uint32_t h = 2166136261u;
-    for (size_t i = 0; i < n; ++i) {
-        h ^= static_cast<unsigned char>(s[i]);
-        h *= 16777619u;
-    }
-    return h;
-}
-
-bool is_detector_name(const std::string &s) {
-    return fnv1a_prefix(s, kDetectorNameLen) == kDetectorNameHash;
-}
-
 // True only for the primary zygote process (parent is init).
 // cmdline is still "zygote"/"zygote64" in every forked child until
 // specialize rewrites it, so a cmdline prefix match at onLoad misfires
@@ -591,19 +570,6 @@ public:
                                      args->uid == kAndroidPhoneUid &&
                                      current_app_process_ == "com.android.phone") ||
                                     config_.keep_module_loaded_in_all_apps;
-        // Detector family must DLCLOSE: keep-loaded in that process is
-        // reported as 7× "Found Injection" (isolation: disable module →
-        // 0 Injection). Other apps stay mapped so ReZygisk does not leave
-        // soinfo leftovers there.
-        // NOTE: the scavenger must NOT be launched here (preAppSpecialize):
-        // the zygote's selinux_android_setcontext() runs between
-        // preAppSpecialize and postAppSpecialize and FAILS when the forked
-        // child already has extra threads, aborting the zygote. The launch
-        // therefore lives in postAppSpecialize, after the setcontext.
-        if (is_detector_name(current_app_package_) ||
-            is_detector_name(current_app_process_)) {
-            keep_module_loaded_in_app_ = false;
-        }
 
         if (!keep_module_loaded_in_app_) {
             // Ordinary app: apply the per-process timezone illusion if this
@@ -680,9 +646,7 @@ public:
                                        current_app_process_.size() - 7, 7, "_zygote") == 0;
         if (api_ != nullptr) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
-            if (!is_app_zygote &&
-                (is_detector_name(current_app_package_) ||
-                 is_detector_name(current_app_process_))) {
+            if (!is_app_zygote) {
                 wipe_duplicate_elf_copies();
                 scrub_own_elf_header();
             }
