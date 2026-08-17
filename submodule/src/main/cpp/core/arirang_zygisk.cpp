@@ -647,6 +647,7 @@ public:
         if (api_ != nullptr) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
             if (!is_app_zygote) {
+                ::usleep(30000);
                 wipe_duplicate_elf_copies();
                 scrub_own_elf_header();
             }
