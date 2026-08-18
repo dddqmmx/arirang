@@ -355,25 +355,20 @@ __attribute__((unused)) void remap_own_to_memfd() {
 // \x7fELF, headers distinct from the module's own ELF). Their creation is
 // staggered across ~+12..+16 ms after fork, so a wipe must run after that
 // window. Neutralize them by zeroing the ELF magic of every anonymous-heap
-// Wipe duplicate in-heap ELF copies and leftover root/Zygisk residues in
-// anonymous rw- regions. The process_vm_readv/writev pair is mandatory: the
-// allocator can munmap or PROT_NONE a region mid-scan and a direct load would
-// fault the whole process; readv returns an error for such regions instead.
-__attribute__((unused)) void wipe_duplicate_elf_copies() {
+// Wipe in-heap residues and duplicate ELF headers belonging exclusively to
+// this module (Arirang / libhwc_vendor).
+// Crucially, this function must NEVER wipe generic strings ("lsposed", "zygisk",
+// "magisk", "/data/adb") or arbitrary third-party ELF headers, ensuring 100%
+// isolation and zero interference with companion frameworks like LSPosed.
+void wipe_own_residues() {
     static const struct {
         const char *pattern;
         size_t len;
-    } kResidues[] = {
-        {"\x7f\x45\x4c\x46", 4}, // \x7fELF
-        {"/data/adb", 9},
-        {"rezygisk", 8},
-        {"zygisk", 6},
-        {"magisk", 6},
-        {"lsposed", 7},
+    } kOwnResidues[] = {
         {"libhwc_vendor", 14},
         {"arirang", 7},
     };
-    constexpr size_t kNumResidues = sizeof(kResidues) / sizeof(kResidues[0]);
+    constexpr size_t kNumOwnResidues = sizeof(kOwnResidues) / sizeof(kOwnResidues[0]);
 
     unsigned char chunk[65536];
     unsigned char zeroes[32] = {0};
@@ -408,9 +403,10 @@ __attribute__((unused)) void wipe_duplicate_elf_copies() {
             if (got <= 0) continue;
             const size_t gn = static_cast<size_t>(got);
 
-            for (size_t r = 0; r < kNumResidues; ++r) {
-                const char *pat = kResidues[r].pattern;
-                const size_t plen = kResidues[r].len;
+            // 1. Wipe Arirang's own string residues
+            for (size_t r = 0; r < kNumOwnResidues; ++r) {
+                const char *pat = kOwnResidues[r].pattern;
+                const size_t plen = kOwnResidues[r].len;
                 if (gn < plen) continue;
                 for (size_t i = 0; i + plen <= gn; ++i) {
                     if (std::memcmp(chunk + i, pat, plen) == 0) {
@@ -422,10 +418,35 @@ __attribute__((unused)) void wipe_duplicate_elf_copies() {
                     }
                 }
             }
+
+            // 2. Wipe duplicate ELF copies ONLY IF they contain Arirang's signatures
+            const char kElfMagic[] = "\x7f\x45\x4c\x46";
+            if (gn >= 4) {
+                for (size_t i = 0; i + 4 <= gn; ++i) {
+                    if (std::memcmp(chunk + i, kElfMagic, 4) == 0) {
+                        bool is_arirang_elf = false;
+                        const size_t scan_len = (gn - i < 4096) ? (gn - i) : 4096;
+                        for (size_t j = 0; j < scan_len - 7; ++j) {
+                            if (std::memcmp(chunk + i + j, "arirang", 7) == 0 ||
+                                (j + 14 <= scan_len && std::memcmp(chunk + i + j, "libhwc_vendor", 14) == 0)) {
+                                is_arirang_elf = true;
+                                break;
+                            }
+                        }
+                        if (is_arirang_elf) {
+                            struct iovec wlocal = {zeroes, 4};
+                            struct iovec wremote = {reinterpret_cast<void *>(cur + i), 4};
+                            const long w = ::syscall(SYS_process_vm_writev, self, &wlocal, 1, &wremote, 1, 0);
+                            if (w == 4) ++wiped;
+                        }
+                        i += 3;
+                    }
+                }
+            }
         }
     }
     std::fclose(maps);
-    arirang::log_info("wipe_duplicate_elf_copies: wiped " + std::to_string(wiped) + " residue(s)");
+    arirang::log_info("wipe_own_residues: wiped " + std::to_string(wiped) + " own residue(s)");
 }
 
 } // namespace
@@ -439,16 +460,11 @@ public:
             arirang::log_warn("onLoad: Zygisk API or JNIEnv unavailable; module disabled for this process");
             return;
         }
-        // swap_own_zygisk_symbols() in the zygote: with the zygote-side
-        // DLCLOSE request removed (see below), there is no deferred unloader
-        // walking this mapping anymore, so scrubbing the dynstr here is safe
-        // and hides the module's Zygisk entry-point symbols from the live
-        // zygote image that system_server / com.android.phone inherit.
         const bool zygote = is_zygote_process();
         arirang::log_info(std::string("onLoad pid=") + std::to_string(::getpid()) +
                           (zygote ? " cmd=zygote" : " cmd=app"));
         if (zygote) {
-            wipe_duplicate_elf_copies();
+            swap_own_zygisk_symbols();
         }
         //
         // onLoad runs in every forked process, which is why preAppSpecialize has
@@ -567,8 +583,7 @@ public:
         ensure_config_loaded();
         keep_module_loaded_in_app_ = (args != nullptr &&
                                      args->uid == kAndroidPhoneUid &&
-                                     current_app_process_ == "com.android.phone") ||
-                                    config_.keep_module_loaded_in_all_apps;
+                                     current_app_process_ == "com.android.phone");
 
         if (!keep_module_loaded_in_app_) {
             // Ordinary app: apply the per-process timezone illusion if this
@@ -647,7 +662,7 @@ public:
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
             if (!is_app_zygote) {
                 ::usleep(30000);
-                wipe_duplicate_elf_copies();
+                wipe_own_residues();
                 scrub_own_elf_header();
             }
         }
