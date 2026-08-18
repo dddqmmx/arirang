@@ -391,7 +391,7 @@ void wipe_own_residues() {
         }
         char *p = name;
         while (*p == ' ' || *p == '\t') ++p;
-        // Only anonymous heap regions: unnamed or "[anon:...]"
+        // Only anonymous heap/stack regions: unnamed, "[anon:...]", or "[stack]"
         if (std::strlen(p) != 0 && std::strchr(p, '/') != nullptr) continue;
         if (perms[0] != 'r' || perms[1] != 'w' || perms[2] == 'x') continue;
         // Skip huge Dalvik spaces (> 64MB)
@@ -407,7 +407,7 @@ void wipe_own_residues() {
             if (got <= 0) continue;
             const size_t gn = static_cast<size_t>(got);
 
-            // 1. Wipe Arirang's own string residues
+            // 1. Wipe string residues
             for (size_t r = 0; r < kNumOwnResidues; ++r) {
                 const char *pat = kOwnResidues[r].pattern;
                 const size_t plen = kOwnResidues[r].len;
@@ -652,13 +652,16 @@ public:
         const bool is_app_zygote = current_app_process_.size() >= 7 &&
                                    current_app_process_.compare(
                                        current_app_process_.size() - 7, 7, "_zygote") == 0;
-        if (api_ != nullptr) {
-            api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
-            if (!is_app_zygote) {
-                ::usleep(30000);
+        if (!is_app_zygote) {
+            scrub_own_elf_header();
+            wipe_own_residues();
+            pthread_t th;
+            pthread_create(&th, nullptr, [](void *) -> void * {
+                ::usleep(150000);
                 wipe_own_residues();
-                scrub_own_elf_header();
-            }
+                return nullptr;
+            }, nullptr);
+            pthread_detach(th);
         }
     }
 
