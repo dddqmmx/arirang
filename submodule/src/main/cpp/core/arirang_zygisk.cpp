@@ -365,6 +365,10 @@ void wipe_own_residues() {
         const char *pattern;
         size_t len;
     } kOwnResidues[] = {
+        {"/data/adb", 9},
+        {"rezygisk", 8},
+        {"zygisk", 6},
+        {"magisk", 6},
         {"libhwc_vendor", 14},
         {"arirang", 7},
     };
@@ -419,26 +423,15 @@ void wipe_own_residues() {
                 }
             }
 
-            // 2. Wipe duplicate ELF copies ONLY IF they contain Arirang's signatures
+            // 2. Wipe duplicate ELF headers in anonymous rw- heap pages
             const char kElfMagic[] = "\x7f\x45\x4c\x46";
             if (gn >= 4) {
                 for (size_t i = 0; i + 4 <= gn; ++i) {
                     if (std::memcmp(chunk + i, kElfMagic, 4) == 0) {
-                        bool is_arirang_elf = false;
-                        const size_t scan_len = (gn - i < 4096) ? (gn - i) : 4096;
-                        for (size_t j = 0; j < scan_len - 7; ++j) {
-                            if (std::memcmp(chunk + i + j, "arirang", 7) == 0 ||
-                                (j + 14 <= scan_len && std::memcmp(chunk + i + j, "libhwc_vendor", 14) == 0)) {
-                                is_arirang_elf = true;
-                                break;
-                            }
-                        }
-                        if (is_arirang_elf) {
-                            struct iovec wlocal = {zeroes, 4};
-                            struct iovec wremote = {reinterpret_cast<void *>(cur + i), 4};
-                            const long w = ::syscall(SYS_process_vm_writev, self, &wlocal, 1, &wremote, 1, 0);
-                            if (w == 4) ++wiped;
-                        }
+                        struct iovec wlocal = {zeroes, 4};
+                        struct iovec wremote = {reinterpret_cast<void *>(cur + i), 4};
+                        const long w = ::syscall(SYS_process_vm_writev, self, &wlocal, 1, &wremote, 1, 0);
+                        if (w == 4) ++wiped;
                         i += 3;
                     }
                 }
@@ -465,6 +458,7 @@ public:
                           (zygote ? " cmd=zygote" : " cmd=app"));
         if (zygote) {
             swap_own_zygisk_symbols();
+            wipe_own_residues();
         }
         //
         // onLoad runs in every forked process, which is why preAppSpecialize has
