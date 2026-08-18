@@ -1,7 +1,6 @@
 #include "zygisk.hpp"
 #include "arirang_build_config.hpp"
 #include "build_spoofer.hpp"
-#include "elf_residue_scavenger.hpp"
 #include "jni_utils.hpp"
 #include "logging.hpp"
 #include "submodule_config.hpp"

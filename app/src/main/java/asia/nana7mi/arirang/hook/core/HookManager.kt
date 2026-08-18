@@ -2,7 +2,6 @@ package asia.nana7mi.arirang.hook.core
 
 
 import asia.nana7mi.arirang.data.datastore.GlobalConfigPrefs
-import asia.nana7mi.arirang.hook.activation.NativeCheckDump
 import asia.nana7mi.arirang.hook.activation.XposedActivation
 import asia.nana7mi.arirang.hook.bluetooth.FuckBluetooth
 import asia.nana7mi.arirang.hook.clipboard.FuckClipboard
@@ -33,8 +32,7 @@ class HookManager : IXposedHookLoadPackage {
         FuckPackageList(),
         FuckVpnStatus(),
         FuckAppLocale(),
-        XposedActivation(),
-        NativeCheckDump()
+        XposedActivation()
     )
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
