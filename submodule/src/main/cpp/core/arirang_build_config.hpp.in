@@ -1,10 +1,63 @@
 #pragma once
 
+#include <string>
+
 namespace arirang {
 
-inline constexpr const char *kApplicationId = "@ARIRANG_APPLICATION_ID@";
+// No full application-id or config-path literal may exist in the loaded
+// module image: root detectors scan mapped libraries for marker substrings
+// (arirang / nana7mi / zygisk / libmod1 ...). Every such path is therefore
+// assembled at runtime from short fragments. Each fragment is address-taken
+// when appended, so the compiler keeps them as separate .rodata entries and
+// no run >= 6 bytes of any marker pattern exists anywhere in the binary.
 inline constexpr const char *kModuleVersion = "@ARIRANG_MODULE_VERSION@";
-inline constexpr const char *kConfigPathDe = "@ARIRANG_CONFIG_PATH_DE@";
-inline constexpr const char *kConfigPathCe = "@ARIRANG_CONFIG_PATH_CE@";
+
+// "asia.nana7mi.arirang"
+inline std::string application_id() {
+    std::string id;
+    id.append("asia", 4);
+    id.append(".n", 2);
+    id.append("ana7", 4);
+    id.append("mi.", 3);
+    id.append("ari", 3);
+    id.append("rang", 4);
+    return id;
+}
+
+// "/data/user_/de/0/<appid>/files/arirang-submodule/config.json" (DE).
+inline std::string config_path_de() {
+    std::string p;
+    p.append("/data/user_", 10);
+    p.append("de/0/", 5);
+    p += application_id();
+    p.append("/files/", 7);
+    p.append("a", 1);
+    p.append("rir", 3);
+    p.append("ang-", 4);
+    p.append("subm", 4);
+    p.append("odul", 4);
+    p.append("e/", 2);
+    p.append("config", 6);
+    p.append(".json", 5);
+    return p;
+}
+
+// "/data/user/0/<appid>/files/arirang-submodule/config.json" (CE).
+inline std::string config_path_ce() {
+    std::string p;
+    p.append("/data/", 6);
+    p.append("user/0/", 7);
+    p += application_id();
+    p.append("/files/", 7);
+    p.append("a", 1);
+    p.append("rir", 3);
+    p.append("ang-", 4);
+    p.append("subm", 4);
+    p.append("odul", 4);
+    p.append("e/", 2);
+    p.append("config", 6);
+    p.append(".json", 5);
+    return p;
+}
 
 } // namespace arirang

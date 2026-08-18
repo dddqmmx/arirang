@@ -168,3 +168,62 @@ arirang_vendor_bind() {
     arirang_log i "arirang_post_fs_data" "hook .so bind-mounted at $bind_target"
     return 0
 }
+
+# Re-establish the bind mount at the recorded vendor target after the service
+# worker detached it post-injection. The staged hook survives on the /dev
+# tmpfs, so re-mounting restores exactly the resolution the injector verifies.
+# Fails closed on any record, hook, or target mutation. Used by service.sh.
+arirang_ensure_bind_mounted() {
+    local bind_target record_size
+
+    if ! arirang_is_root_dir_with_mode "$LANDING_DIR" 750 ||
+        ! arirang_has_data_context "$LANDING_DIR"; then
+        return 1
+    fi
+    if ! arirang_is_root_file_with_mode "$LANDING_BINDPATH" 600 ||
+        ! arirang_has_data_context "$LANDING_BINDPATH"; then
+        return 1
+    fi
+    if ! arirang_is_root_file_with_mode "$LANDING_HOOK" 640 ||
+        ! arirang_has_hook_context "$LANDING_HOOK"; then
+        return 1
+    fi
+
+    record_size=$(stat -c '%s' "$LANDING_BINDPATH" 2>/dev/null) || return 1
+    case "$record_size" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ "$record_size" -gt 0 ] && [ "$record_size" -le 256 ] || return 1
+
+    bind_target=$(cat "$LANDING_BINDPATH" 2>/dev/null) || return 1
+    arirang_config_value_is_safe "$bind_target" 256 || return 1
+    arirang_vendor_target_allowed "$bind_target" || return 1
+
+    # Fast path: the bind is already live and resolves to the staged hook.
+    if arirang_is_mountpoint "$bind_target" &&
+        arirang_same_file "$LANDING_HOOK" "$bind_target"; then
+        printf '%s' "$bind_target"
+        return 0
+    fi
+
+    # Detached state: the target is the original vendor library again. Covering
+    # it is only safe if it is untouched, unmapped, and unreferenced. Repeat the
+    # mutable predicates immediately before mount(2) like arirang_vendor_bind.
+    if ! arirang_is_root_regular_file "$bind_target" ||
+        arirang_is_mountpoint "$bind_target" ||
+        arirang_vendor_target_is_mapped "$bind_target" ||
+        arirang_vendor_target_is_referenced "$bind_target"; then
+        return 1
+    fi
+
+    if ! mount --bind "$LANDING_HOOK" "$bind_target" 2>/dev/null; then
+        return 1
+    fi
+
+    if ! arirang_is_mountpoint "$bind_target" ||
+        ! arirang_same_file "$LANDING_HOOK" "$bind_target"; then
+        umount "$bind_target" 2>/dev/null || :
+        return 1
+    fi
+    printf '%s' "$bind_target"
+}

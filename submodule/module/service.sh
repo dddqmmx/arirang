@@ -18,6 +18,7 @@ MODDIR=$(CDPATH= cd "$SCRIPT_DIR" 2>/dev/null && pwd -P) || {
     exit 1
 }
 . "$MODDIR/lib/common.sh"
+. "$MODDIR/lib/vendor_bind.sh"
 
 LOG_TAG="arirang_service"
 PIDOF=""
@@ -154,13 +155,61 @@ arirang_pid_maps_supported_widevine() {
     return 1
 }
 
-arirang_pid_maps_path() {
-    local pid="$1" wanted_path="$2" map_line map_path
+# Extract the "dev inode" pair from a maps line (fields 3 and 4, 0-based).
+arirang_maps_dev_inode_from_line() {
+    local line="$1" previous field_index=0 dev inode
+    while [ "$field_index" -lt 3 ]; do
+        previous="$line"
+        line=${line#* }
+        [ "$line" != "$previous" ] || return 1
+        while [ "${line# }" != "$line" ]; do
+            line=${line# }
+        done
+        field_index=$((field_index + 1))
+    done
+    dev=${line%% *}
+    case "$dev" in
+        ''|*[!0-9a-fA-F:]*) return 1 ;;
+    esac
+    line=${line#* }
+    [ "$line" != "$dev" ] || return 1
+    while [ "${line# }" != "$line" ]; do
+        line=${line# }
+    done
+    inode=${line%% *}
+    case "$inode" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    printf '%s %s' "$dev" "$inode"
+}
+
+# Match a process mapping by device:inode rather than pathname. After the
+# worker detaches the vendor bind, the daemon's resident hook mapping keeps its
+# inode but its pathname becomes unresolvable (maps shows "/"), so a pathname
+# comparison can no longer identify an already-injected HAL.
+arirang_pid_maps_dev_inode() {
+    local pid="$1" file="$2" map_line dev_ino wanted_dev wanted_ino major minor wanted
     local IFS="$ARIRANG_WORD_IFS"
     [ -r "/proc/$pid/maps" ] || return 1
+
+    wanted_dev=$(stat -c '%d' "$file" 2>/dev/null) || return 1
+    case "$wanted_dev" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    wanted_ino=$(stat -c '%i' "$file" 2>/dev/null) || return 1
+    case "$wanted_ino" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+
+    # The maps "dev" column is "major:minor" in hex; Linux st_dev encodes it
+    # as (major << 20) | minor.
+    major=$((wanted_dev >> 20))
+    minor=$((wanted_dev & 0xfffff))
+    wanted=$(printf '%02x:%02x %s' "$major" "$minor" "$wanted_ino") || return 1
+
     while IFS= read -r map_line; do
-        map_path=$(arirang_maps_path_from_line "$map_line") || continue
-        [ "$map_path" = "$wanted_path" ] && return 0
+        dev_ino=$(arirang_maps_dev_inode_from_line "$map_line") || continue
+        [ "$dev_ino" = "$wanted" ] && return 0
     done < "/proc/$pid/maps"
     return 1
 }
@@ -207,7 +256,10 @@ arirang_pid_matches_hal() {
             arirang_pid_maps_supported_widevine "$pid" || return 1
             ;;
     esac
-    arirang_pid_maps_path "$pid" "$BIND_TARGET" && return 1
+    # Match the staged hook by device:inode: once the worker detaches the bind,
+    # the resident mapping's pathname is no longer resolvable, but the identity
+    # of the loaded file survives.
+    arirang_pid_maps_dev_inode "$pid" "$LANDING_HOOK" && return 1
 
     hook_gid=$(arirang_file_gid "$LANDING_HOOK") || return 1
     arirang_pid_has_file_group "$pid" "$hook_gid" || return 1
@@ -289,7 +341,7 @@ arirang_acquire_service_lock() {
 
 arirang_worker_main() {
     local HAL_RESULT HAL_PID HAL_NAME HAL_START CURRENT_START CURRENT_BIND
-    local INJECTOR_EXIT i
+    local INJECTOR_EXIT i ROUND INJECTED_ANY
     IS_WORKER=true
     SERVICE_LOCK_HELD=true
 
@@ -301,72 +353,107 @@ arirang_worker_main() {
 
     log -p i -t "$LOG_TAG" "worker started pid=$$ waiting for Widevine HAL"
 
-    HAL_RESULT=""
-    i=0
-    while [ "$i" -lt 300 ]; do
-        HAL_RESULT=$(arirang_find_unique_hal) || HAL_RESULT=""
-        [ -n "$HAL_RESULT" ] && break
-        # Periodic heartbeat so cold-boot triage can see the worker is alive.
-        if [ $((i % 30)) -eq 0 ]; then
-            log -p i -t "$LOG_TAG" "still waiting for Widevine HAL (${i}s)"
+    INJECTOR_EXIT=1
+    INJECTED_ANY=false
+    ROUND=0
+    while :; do
+        ROUND=$((ROUND + 1))
+        HAL_RESULT=""
+        i=0
+        while [ "$i" -lt 300 ]; do
+            HAL_RESULT=$(arirang_find_unique_hal) || HAL_RESULT=""
+            [ -n "$HAL_RESULT" ] && break
+            # Periodic heartbeat so cold-boot triage can see the worker is alive.
+            if [ $((i % 30)) -eq 0 ]; then
+                log -p i -t "$LOG_TAG" "still waiting for Widevine HAL (round ${ROUND}, ${i}s)"
+            fi
+            sleep 1
+            i=$((i + 1))
+        done
+        if [ -z "$HAL_RESULT" ]; then
+            if [ "$INJECTED_ANY" = true ]; then
+                # The daemon was injected earlier; only a replacement HAL is
+                # worth waking for, so keep watching instead of giving up.
+                log -p i -t "$LOG_TAG" "no replacement Widevine HAL yet; continuing to watch"
+                sleep 5
+                continue
+            fi
+            log -p e -t "$LOG_TAG" "Widevine HAL daemon not running or failed identity checks after ${i}s"
+            INJECTOR_EXIT=1
+            break
         fi
-        sleep 1
-        i=$((i + 1))
-    done
-    if [ -z "$HAL_RESULT" ]; then
-        log -p e -t "$LOG_TAG" "Widevine HAL daemon not running or failed identity checks after ${i}s"
-        exit 1
-    fi
 
-    HAL_PID=""
-    HAL_NAME=""
-    HAL_START=""
-    {
-        IFS=$(printf '\036')
-        # shellcheck disable=SC2162
-        read -r HAL_PID HAL_NAME HAL_START _ || true
-    } <<ARIRANG_HAL_EOF
+        HAL_PID=""
+        HAL_NAME=""
+        HAL_START=""
+        {
+            IFS=$(printf '\036')
+            # shellcheck disable=SC2162
+            read -r HAL_PID HAL_NAME HAL_START _ || true
+        } <<ARIRANG_HAL_EOF
 $HAL_RESULT
 ARIRANG_HAL_EOF
-    if [ -z "$HAL_PID" ] || [ -z "$HAL_NAME" ] || [ -z "$HAL_START" ]; then
-        log -p e -t "$LOG_TAG" "invalid HAL discovery result"
-        exit 1
-    fi
-    case "$HAL_PID" in ''|*[!0-9]*) log -p e -t "$LOG_TAG" "invalid HAL pid"; exit 1 ;; esac
-    case "$HAL_START" in ''|*[!0-9]*) log -p e -t "$LOG_TAG" "invalid HAL start time"; exit 1 ;; esac
+        if [ -z "$HAL_PID" ] || [ -z "$HAL_NAME" ] || [ -z "$HAL_START" ]; then
+            log -p e -t "$LOG_TAG" "invalid HAL discovery result"
+            INJECTOR_EXIT=1
+            break
+        fi
+        case "$HAL_PID" in ''|*[!0-9]*) log -p e -t "$LOG_TAG" "invalid HAL pid"; INJECTOR_EXIT=1; break ;; esac
+        case "$HAL_START" in ''|*[!0-9]*) log -p e -t "$LOG_TAG" "invalid HAL start time"; INJECTOR_EXIT=1; break ;; esac
 
-    CURRENT_START=$(arirang_pid_start_time "$HAL_PID") || CURRENT_START=""
-    CURRENT_BIND=$(arirang_read_verified_bind_target) || CURRENT_BIND=""
-    if [ "$CURRENT_START" != "$HAL_START" ] ||
-        [ "$CURRENT_BIND" != "$BIND_TARGET" ] ||
-        ! arirang_pid_matches_hal "$HAL_PID" "$HAL_NAME"; then
-        log -p e -t "$LOG_TAG" "HAL or bind target changed before injection"
-        exit 1
-    fi
+        CURRENT_START=$(arirang_pid_start_time "$HAL_PID") || CURRENT_START=""
+        # The bind may have been detached after a previous successful injection;
+        # arirang_ensure_bind_mounted re-establishes and verifies it.
+        CURRENT_BIND=$(arirang_ensure_bind_mounted) || CURRENT_BIND=""
+        if [ "$CURRENT_START" != "$HAL_START" ] ||
+            [ "$CURRENT_BIND" != "$BIND_TARGET" ] ||
+            ! arirang_pid_matches_hal "$HAL_PID" "$HAL_NAME"; then
+            log -p e -t "$LOG_TAG" "HAL or bind target changed before injection"
+            INJECTOR_EXIT=1
+            break
+        fi
 
-    rm -f "$INJECTOR_LOG" || exit 1
-    : > "$INJECTOR_LOG" || exit 1
-    chown 0:0 "$INJECTOR_LOG" 2>/dev/null || exit 1
-    chmod 0600 "$INJECTOR_LOG" || exit 1
-    chcon u:object_r:arirang_data_file:s0 "$INJECTOR_LOG" 2>/dev/null || exit 1
-    if ! arirang_is_root_file_with_mode "$INJECTOR_LOG" 600 ||
-        ! arirang_has_data_context "$INJECTOR_LOG"; then
-        log -p e -t "$LOG_TAG" "injector log failed ownership, mode, or label checks"
-        exit 1
-    fi
+        rm -f "$INJECTOR_LOG" || exit 1
+        : > "$INJECTOR_LOG" || exit 1
+        chown 0:0 "$INJECTOR_LOG" 2>/dev/null || exit 1
+        chmod 0600 "$INJECTOR_LOG" || exit 1
+        chcon u:object_r:arirang_data_file:s0 "$INJECTOR_LOG" 2>/dev/null || exit 1
+        if ! arirang_is_root_file_with_mode "$INJECTOR_LOG" 600 ||
+            ! arirang_has_data_context "$INJECTOR_LOG"; then
+            log -p e -t "$LOG_TAG" "injector log failed ownership, mode, or label checks"
+            INJECTOR_EXIT=1
+            break
+        fi
 
-    log -p i -t "$LOG_TAG" "injecting $BIND_TARGET into verified pid=$HAL_PID after ${i}s"
-    (
-        ulimit -f 2048 || exit 1
-        "$INJECTOR" "$HAL_PID" "$BIND_TARGET" "$HAL_START"
-    ) > "$INJECTOR_LOG" 2>&1
-    INJECTOR_EXIT=$?
+        log -p i -t "$LOG_TAG" "injecting $BIND_TARGET into verified pid=$HAL_PID after ${i}s"
+        (
+            ulimit -f 2048 || exit 1
+            "$INJECTOR" "$HAL_PID" "$BIND_TARGET" "$HAL_START"
+        ) > "$INJECTOR_LOG" 2>&1
+        INJECTOR_EXIT=$?
 
-    while IFS= read -r line || [ -n "$line" ]; do
-        log -p i -t "$LOG_TAG" "$line"
-    done < "$INJECTOR_LOG"
+        while IFS= read -r line || [ -n "$line" ]; do
+            log -p i -t "$LOG_TAG" "$line"
+        done < "$INJECTOR_LOG"
 
-    log -p i -t "$LOG_TAG" "injector exit=$INJECTOR_EXIT"
+        log -p i -t "$LOG_TAG" "injector exit=$INJECTOR_EXIT"
+        if [ "$INJECTOR_EXIT" -ne 0 ]; then
+            break
+        fi
+
+        INJECTED_ANY=true
+        # The hook is now resident in the daemon; detach the vendor bind so no
+        # cross-device mount remains visible system-wide. The staged hook file
+        # survives on the /dev tmpfs, so a later daemon restart can be
+        # re-injected by re-establishing the bind (see arirang_ensure_bind_mounted).
+        umount -l "$BIND_TARGET" 2>/dev/null || :
+        if arirang_is_mountpoint "$BIND_TARGET"; then
+            log -p w -t "$LOG_TAG" "bind still mounted at $BIND_TARGET after detach attempt"
+        else
+            log -p i -t "$LOG_TAG" "bind detached; watching for HAL replacement"
+        fi
+    done
+
     # Explicit cleanup: some Android shells do not reliably run EXIT traps for
     # background subshells after a successful inject.
     rmdir "$SERVICE_LOCK" 2>/dev/null || :
@@ -405,11 +492,13 @@ if [ -z "$BIND_TARGET" ]; then
 fi
 
 # If the hook is already mapped into the live Widevine HAL, skip re-injection.
+# The resident hook is matched by device:inode because the worker detaches the
+# bind after injection, leaving the mapping without a resolvable pathname.
 raw_check=$("$PIDOF" "android.hardware.drm@1.4-service.widevine" 2>/dev/null) || raw_check=""
 if [ -n "$raw_check" ]; then
     already=0
     for pid in $raw_check; do
-        if arirang_pid_maps_path "$pid" "$BIND_TARGET"; then
+        if arirang_pid_maps_dev_inode "$pid" "$LANDING_HOOK"; then
             already=1
         fi
     done
