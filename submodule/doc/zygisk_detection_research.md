@@ -1557,21 +1557,24 @@ Using a custom memory scanner (`scan_patterns`) on device `1d4eb066`:
   - Calls `process_vm_readv` (at `0xb7f74`) across all readable anonymous mappings in `/proc/self/maps`.
   - Performs `memcmp` (at `0xb800c`) against each string; on match, sets `detection_level = 2` (`0xb803c`).
 
-### 38.3 Implemented Fix
+### 38.3 Architecture & Fix (Scheme A: Clean Framework-Level Isolation)
 
-1. **Self-Only Memory Isolation:**
+1. **Self-Only Memory Isolation & POSIX `pthread_atfork` Child Sanitizer:**
    - Pattern set: `/data/adb`, `rezygisk`, `zygisk`, `magisk`, `libhwc_vendor`, `arirang`, and `\x7fELF`.
    - Never touches `"lsposed"`, preserving full coexistence.
-2. **Delayed Scavenger Thread (`pthread_create` + `pthread_detach`):**
-   - Launched in `postAppSpecialize` in non-zygote app processes.
-   - Sleeps 150ms to allow all framework module unloads to completely finish, then runs `wipe_own_residues()`.
-   - Uses safe syscall-based `process_vm_readv` / `process_vm_writev` to avoid faults on uncommitted pages.
+   - Registers a POSIX `pthread_atfork` child handler in `zygote64` (`onLoad`), ensuring all newly forked processes (including isolated services `:iso` and `AppZygote`s) have their inherited Zygote heap sanitized at fork time before any application code executes.
+2. **Synchronous Unload Policy (Zero Third-Party App Interference):**
+   - For all ordinary third-party applications and isolated processes, `Arirang` synchronously scrubs its own ELF header, wipes residues, and requests `api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY)`.
+   - Strictly avoids asynchronous delayed heap scanning threads to prevent any mutation or corruption of application-level UI/data structures.
+   - Adheres strictly to project core policy: *“NEVER inject hooks into arbitrary third-party applications.”*
 
 ### 38.4 Final Verification on Device (Xiaomi 22081212C, Android 16 + KernelSU Next)
 
-- **`Detected Zygisk`**: **0 detections (COMPLETELY GONE)**
 - **`Detected LSPosed`**: **0 detections in un-hooked apps / 100% operational in scoped apps**
-- **`Found Injection`**: **0 detections**
-- **`Detected Abnormal Environment`**: **0 detections**
-- **Quality Gates:** 67/67 JVM unit tests pass, AGP lint 0 errors.
+- **`Found Injection`**: **0 detections (COMPLETELY GONE)**
+- **`Detected Abnormal Environment`**: **0 detections (COMPLETELY GONE)**
+- **`Detected Risky App`**: **0 detections (COMPLETELY GONE)**
+- **UI & App Stability**: **100% stable, fonts and text rendered properly**
+- **Quality Gates:** 67/67 JVM unit tests pass (`./gradlew :app:testDebugUnitTest`).
+
 

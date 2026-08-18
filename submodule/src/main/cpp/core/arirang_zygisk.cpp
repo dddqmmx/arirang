@@ -459,6 +459,9 @@ public:
         if (zygote) {
             swap_own_zygisk_symbols();
             wipe_own_residues();
+            ::pthread_atfork(nullptr, nullptr, []() {
+                wipe_own_residues();
+            });
         }
         //
         // onLoad runs in every forked process, which is why preAppSpecialize has
@@ -649,19 +652,10 @@ public:
         // app-zygote makes ART's PreZygoteFork fail with
         // "Failed to reach single-threaded state" at every child fork,
         // aborting the app-zygote and breaking all detector process spawns.
-        const bool is_app_zygote = current_app_process_.size() >= 7 &&
-                                   current_app_process_.compare(
-                                       current_app_process_.size() - 7, 7, "_zygote") == 0;
-        if (!is_app_zygote) {
+        if (api_ != nullptr) {
+            api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
             scrub_own_elf_header();
             wipe_own_residues();
-            pthread_t th;
-            pthread_create(&th, nullptr, [](void *) -> void * {
-                ::usleep(150000);
-                wipe_own_residues();
-                return nullptr;
-            }, nullptr);
-            pthread_detach(th);
         }
     }
 
