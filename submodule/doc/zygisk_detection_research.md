@@ -1530,3 +1530,48 @@ Using a custom memory scanner (`scan_patterns`) on device `1d4eb066`:
 - **System Integrity & Testing:**
   - All 67 JVM unit tests pass (`./gradlew :app:testDebugUnitTest`).
   - Arirang hooks in `system_server` and `com.android.phone` remain fully operational.
+
+---
+
+## 38. Phase 12: LSPosed Compatibility & Delayed Framework-Unload Scavenger
+
+### 38.1 Problem: LSPosed Memory Interception & Post-Unload Heap Residues
+
+1. **LSPosed Memory Collision:**
+   - A blind wipe of `"lsposed"` or arbitrary in-memory ELF images can break companion modules like LSPosed if they manage Dex paths or JNI bridges in the same process heap.
+   - Solution: Exclude `"lsposed"` strictly from residue wiping and only zero anonymous in-heap `\x7fELF` magic while leaving valid mappings intact.
+
+2. **Framework Post-Unload Heap Allocations:**
+   - In third-party apps, ReZygisk/framework unloads modules *after* `postAppSpecialize` returns.
+   - During this final unload, framework routines format log messages or process module paths (`/data/adb`, `magisk`, `zygisk`), re-dropping these strings into `[anon:scudo:primary]`.
+   - Any wipe executed *during* `postAppSpecialize` is too early to catch these post-unload allocations.
+
+### 38.2 Binary Reverse Engineering (`libreveny.so` Check ID 1)
+
+- **Disassembly Analysis (`0x675e0` → `0xb74e0` → `0xb6bac`):**
+  - Check 1 decrypts 4 target strings at `0xdb3d8`:
+    - `b'/data/adb'`
+    - `b'zygisk'`
+    - `b'rezygisk'`
+    - `b'magisk'`
+  - Calls `process_vm_readv` (at `0xb7f74`) across all readable anonymous mappings in `/proc/self/maps`.
+  - Performs `memcmp` (at `0xb800c`) against each string; on match, sets `detection_level = 2` (`0xb803c`).
+
+### 38.3 Implemented Fix
+
+1. **Self-Only Memory Isolation:**
+   - Pattern set: `/data/adb`, `rezygisk`, `zygisk`, `magisk`, `libhwc_vendor`, `arirang`, and `\x7fELF`.
+   - Never touches `"lsposed"`, preserving full coexistence.
+2. **Delayed Scavenger Thread (`pthread_create` + `pthread_detach`):**
+   - Launched in `postAppSpecialize` in non-zygote app processes.
+   - Sleeps 150ms to allow all framework module unloads to completely finish, then runs `wipe_own_residues()`.
+   - Uses safe syscall-based `process_vm_readv` / `process_vm_writev` to avoid faults on uncommitted pages.
+
+### 38.4 Final Verification on Device (Xiaomi 22081212C, Android 16 + KernelSU Next)
+
+- **`Detected Zygisk`**: **0 detections (COMPLETELY GONE)**
+- **`Detected LSPosed`**: **0 detections in un-hooked apps / 100% operational in scoped apps**
+- **`Found Injection`**: **0 detections**
+- **`Detected Abnormal Environment`**: **0 detections**
+- **Quality Gates:** 67/67 JVM unit tests pass, AGP lint 0 errors.
+
