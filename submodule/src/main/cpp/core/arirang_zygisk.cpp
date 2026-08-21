@@ -20,8 +20,96 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <string>
+#include <vector>
 
 namespace {
+
+void wipe_memory_residues() {
+    pid_t pid = ::getpid();
+    FILE *maps = std::fopen("/proc/self/maps", "r");
+    if (!maps) return;
+
+    struct Region {
+        uintptr_t start;
+        size_t len;
+        bool scudo;
+    };
+    std::vector<Region> regions;
+    regions.reserve(128);
+
+    char line[512];
+    while (std::fgets(line, sizeof(line), maps) != nullptr) {
+        unsigned long long start = 0, end = 0;
+        char perms[8] = {0};
+        char mapname[256] = {0};
+        int n = std::sscanf(line, "%llx-%llx %7s %*s %*s %*s %255[^\n]", &start, &end, perms, mapname);
+        if (n < 3) continue;
+
+        if (perms[0] == 'r' && perms[1] == 'w' && (n == 3 || mapname[0] == '\0' || std::strstr(mapname, "[anon:") != nullptr || std::strcmp(mapname, "[stack]") == 0)) {
+            size_t total_len = end - start;
+            if (total_len > 0 && total_len <= 64 * 1024 * 1024) {
+                // The framework's unload residue lives in the scudo allocator
+                // (measured: every observed chunk was in [anon:scudo:*]). The
+                // generic string needles are safe anywhere; the 4-byte \x7fELF
+                // needle is not — it also matches legitimate app data
+                // (downloaded ELF buffers, in-heap image copies), so it only
+                // fires inside scudo regions.
+                regions.push_back({static_cast<uintptr_t>(start), total_len,
+                                   std::strstr(mapname, "[anon:scudo") != nullptr});
+            }
+        }
+    }
+    std::fclose(maps);
+
+    static const struct {
+        const char *pattern;
+        size_t len;
+        bool scudo_only;
+    } kTargets[] = {
+        {"/data/adb", 9, false},
+        {"rezygisk", 8, false},
+        {"zygisk", 6, false},
+        {"magisk", 6, false},
+        {"arirang", 7, false},
+        {"libhwc_vendor", 13, false},
+        {"\x7f\x45\x4c\x46", 4, true}
+    };
+
+    constexpr size_t kChunkSize = 64 * 1024;
+    std::vector<char> buf(kChunkSize);
+    long wiped = 0;
+
+    for (const auto &reg : regions) {
+        for (size_t off = 0; off < reg.len; off += kChunkSize) {
+            size_t to_read = (reg.len - off < kChunkSize) ? (reg.len - off) : kChunkSize;
+            struct iovec local = {buf.data(), to_read};
+            struct iovec remote = {reinterpret_cast<void*>(reg.start + off), to_read};
+
+            ssize_t n = ::process_vm_readv(pid, &local, 1, &remote, 1, 0);
+            if (n <= 0) continue;
+
+            bool modified = false;
+            for (const auto &tgt : kTargets) {
+                if (tgt.scudo_only && !reg.scudo) continue;
+                if (static_cast<size_t>(n) < tgt.len) continue;
+                for (size_t k = 0; k + tgt.len <= static_cast<size_t>(n); ++k) {
+                    if (std::memcmp(buf.data() + k, tgt.pattern, tgt.len) == 0) {
+                        std::memset(buf.data() + k, 0, tgt.len);
+                        modified = true;
+                        ++wiped;
+                    }
+                }
+            }
+
+            if (modified) {
+                struct iovec wlocal = {buf.data(), static_cast<size_t>(n)};
+                struct iovec wremote = {reinterpret_cast<void*>(reg.start + off), static_cast<size_t>(n)};
+                ::process_vm_writev(pid, &wlocal, 1, &wremote, 1, 0);
+            }
+        }
+    }
+    arirang::log_info("wipe_memory_residues: sanitized " + std::to_string(wiped) + " pattern hit(s)");
+}
 
 // AOSP Process.PHONE_UID / android.uid.phone. Process-name matching alone is
 // insufficient because an untrusted APK can request a misleading nice name.
@@ -348,100 +436,6 @@ __attribute__((unused)) void remap_own_to_memfd() {
                       "/" + std::to_string(nsegs) + " segments, size=" + std::to_string(memfd_size));
 }
 
-// The Zygisk framework (ReZygisk/libzygisk) keeps private in-heap copies of
-// its own ELF image; when it unloads itself from an app process those copies
-// remain and are counted one-for-one by root detectors as "Detected Zygisk"
-// leftovers (empirically: exactly 2 anonymous-heap blocks starting with
-// \x7fELF, headers distinct from the module's own ELF). Their creation is
-// staggered across ~+12..+16 ms after fork, so a wipe must run after that
-// window. Neutralize them by zeroing the ELF magic of every anonymous-heap
-// Wipe in-heap residues and duplicate ELF headers belonging exclusively to
-// this module (Arirang / libhwc_vendor).
-// Crucially, this function must NEVER wipe generic strings ("lsposed", "zygisk",
-// "magisk", "/data/adb") or arbitrary third-party ELF headers, ensuring 100%
-// isolation and zero interference with companion frameworks like LSPosed.
-void wipe_own_residues() {
-    static const struct {
-        const char *pattern;
-        size_t len;
-    } kOwnResidues[] = {
-        {"/data/adb", 9},
-        {"rezygisk", 8},
-        {"zygisk", 6},
-        {"magisk", 6},
-        {"libhwc_vendor", 14},
-        {"arirang", 7},
-    };
-    constexpr size_t kNumOwnResidues = sizeof(kOwnResidues) / sizeof(kOwnResidues[0]);
-
-    unsigned char chunk[65536];
-    unsigned char zeroes[32] = {0};
-    const pid_t self = ::getpid();
-    int wiped = 0;
-    FILE *maps = std::fopen("/proc/self/maps", "r");
-    if (maps == nullptr) return;
-    char line[512];
-    while (std::fgets(line, sizeof(line), maps) != nullptr) {
-        unsigned long long start = 0, end = 0;
-        char perms[8] = {0};
-        char name[300] = {0};
-        if (std::sscanf(line, "%llx-%llx %7s %*s %*s %*s %299[^\n]", &start, &end,
-                        perms, name) < 3) {
-            continue;
-        }
-        char *p = name;
-        while (*p == ' ' || *p == '\t') ++p;
-        // Only anonymous heap/stack regions: unnamed, "[anon:...]", or "[stack]"
-        if (std::strlen(p) != 0 && std::strchr(p, '/') != nullptr) continue;
-        if (perms[0] != 'r' || perms[1] != 'w' || perms[2] == 'x') continue;
-        // Skip huge Dalvik spaces (> 64MB)
-        if ((end - start) > 64 * 1024 * 1024) continue;
-
-        const uintptr_t s = static_cast<uintptr_t>(start);
-        const uintptr_t e = static_cast<uintptr_t>(end);
-        for (uintptr_t cur = s; cur < e; cur += sizeof(chunk)) {
-            const size_t to_read = (e - cur > sizeof(chunk)) ? sizeof(chunk) : (e - cur);
-            struct iovec local = {chunk, to_read};
-            struct iovec remote = {reinterpret_cast<void *>(cur), to_read};
-            const long got = ::syscall(SYS_process_vm_readv, self, &local, 1, &remote, 1, 0);
-            if (got <= 0) continue;
-            const size_t gn = static_cast<size_t>(got);
-
-            // 1. Wipe string residues
-            for (size_t r = 0; r < kNumOwnResidues; ++r) {
-                const char *pat = kOwnResidues[r].pattern;
-                const size_t plen = kOwnResidues[r].len;
-                if (gn < plen) continue;
-                for (size_t i = 0; i + plen <= gn; ++i) {
-                    if (std::memcmp(chunk + i, pat, plen) == 0) {
-                        struct iovec wlocal = {zeroes, plen};
-                        struct iovec wremote = {reinterpret_cast<void *>(cur + i), plen};
-                        const long w = ::syscall(SYS_process_vm_writev, self, &wlocal, 1, &wremote, 1, 0);
-                        if (w == static_cast<long>(plen)) ++wiped;
-                        i += plen - 1;
-                    }
-                }
-            }
-
-            // 2. Wipe duplicate ELF headers in anonymous rw- heap pages
-            const char kElfMagic[] = "\x7f\x45\x4c\x46";
-            if (gn >= 4) {
-                for (size_t i = 0; i + 4 <= gn; ++i) {
-                    if (std::memcmp(chunk + i, kElfMagic, 4) == 0) {
-                        struct iovec wlocal = {zeroes, 4};
-                        struct iovec wremote = {reinterpret_cast<void *>(cur + i), 4};
-                        const long w = ::syscall(SYS_process_vm_writev, self, &wlocal, 1, &wremote, 1, 0);
-                        if (w == 4) ++wiped;
-                        i += 3;
-                    }
-                }
-            }
-        }
-    }
-    std::fclose(maps);
-    arirang::log_info("wipe_own_residues: wiped " + std::to_string(wiped) + " own residue(s)");
-}
-
 } // namespace
 
 class ArirangZygisk final : public zygisk::ModuleBase {
@@ -456,11 +450,18 @@ public:
         const bool zygote = is_zygote_process();
         arirang::log_info(std::string("onLoad pid=") + std::to_string(::getpid()) +
                           (zygote ? " cmd=zygote" : " cmd=app"));
+        // Always wipe inherited zygote heap residues (strings like /data/adb,
+        // rezygisk, zygisk, magisk left by ReZygisk's module loading).
+        // On KernelSU Next + ReZygisk, onLoad is NOT called in the zygote
+        // itself — it runs per-fork in each child process. The zygote's own
+        // allocator creates these strings when loading modules, and every fork
+        // inherits them via CoW pages. Wiping here (before specialize) ensures
+        // the detector's isolated-service memory scan finds nothing.
+        wipe_memory_residues();
         if (zygote) {
             swap_own_zygisk_symbols();
-            wipe_own_residues();
             ::pthread_atfork(nullptr, nullptr, []() {
-                wipe_own_residues();
+                wipe_memory_residues();
             });
         }
         //
@@ -622,10 +623,6 @@ public:
                 arirang::log_info(std::string("installed phone process native hooks"));
                 return;
             }
-            // keepModuleLoadedInAllApps: stay mapped, install no app hooks.
-            // Detector package name is intentionally not written here —
-            // a contiguous "com.reveny.*" in the mapped image is itself
-            // an injection signal.
             arirang::log_info("kept module mapped, no app hooks (keepModuleLoadedInAllApps) scavenger=off");
             return;
         }
@@ -640,22 +637,9 @@ public:
         if (!current_app_timezone_.empty()) {
             arirang::install_timezone_illusion(env_, current_app_timezone_);
         }
-        // The framework's unload bookkeeping still drops two in-heap
-        // \x7fELF copies of the module into the detector process; a
-        // survivor thread launched here scrubs them shortly after (its
-        // code lives in an anonymous region, so it outlives the dlclose).
-        // The launch must stay here, AFTER the zygote's SELinux context
-        // transition: an extra thread before selinux_android_setcontext
-        // aborts the zygote (see the note in preAppSpecialize).
-        // App-zygotes ("<package>_zygote") must also be excluded: they
-        // prefix-match is_detector_name() and a raw-clone thread in the
-        // app-zygote makes ART's PreZygoteFork fail with
-        // "Failed to reach single-threaded state" at every child fork,
-        // aborting the app-zygote and breaking all detector process spawns.
+        wipe_memory_residues();
         if (api_ != nullptr) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
-            scrub_own_elf_header();
-            wipe_own_residues();
         }
     }
 

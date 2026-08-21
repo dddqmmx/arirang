@@ -568,9 +568,18 @@ object ArirangClient {
         }
     }
 
+    @Volatile
+    private var lastBindAttemptTime = 0L
+
+    /** Minimum spacing between bind attempts: absorbs provider-side bind storms. */
+    private const val BIND_RETRY_INTERVAL_MS = 3_000L
+
     private fun beginBinding(ctx: Context, currentUser: Boolean): BindingAttempt? {
+        val now = android.os.SystemClock.elapsedRealtime()
         synchronized(LOCK) {
             if (sBinding || sService != null || activeBinding != null) return null
+            if (now - lastBindAttemptTime < BIND_RETRY_INTERVAL_MS) return null
+            lastBindAttemptTime = now
             val attempt = BindingAttempt(bindGeneration.incrementAndGet(), ctx, currentUser)
             attempt.connection = createConnection(attempt)
             activeBinding = attempt

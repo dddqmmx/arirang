@@ -1561,8 +1561,8 @@ Using a custom memory scanner (`scan_patterns`) on device `1d4eb066`:
 
 1. **Self-Only Memory Isolation & POSIX `pthread_atfork` Child Sanitizer:**
    - Pattern set: `/data/adb`, `rezygisk`, `zygisk`, `magisk`, `libhwc_vendor`, `arirang`, and `\x7fELF`.
-   - Never touches `"lsposed"`, preserving full coexistence.
-   - Registers a POSIX `pthread_atfork` child handler in `zygote64` (`onLoad`), ensuring all newly forked processes (including isolated services `:iso` and `AppZygote`s) have their inherited Zygote heap sanitized at fork time before any application code executes.
+   - Never touches `"lsposed"`, preserving full coexistence with companion modules.
+   - Registers a POSIX `pthread_atfork` child handler in `zygote64` (`onLoad`), ensuring all newly forked processes have their inherited Zygote heap sanitized at fork time before application code executes.
 2. **Synchronous Unload Policy (Zero Third-Party App Interference):**
    - For all ordinary third-party applications and isolated processes, `Arirang` synchronously scrubs its own ELF header, wipes residues, and requests `api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY)`.
    - Strictly avoids asynchronous delayed heap scanning threads to prevent any mutation or corruption of application-level UI/data structures.
@@ -1576,5 +1576,74 @@ Using a custom memory scanner (`scan_patterns`) on device `1d4eb066`:
 - **`Detected Risky App`**: **0 detections (COMPLETELY GONE)**
 - **UI & App Stability**: **100% stable, fonts and text rendered properly**
 - **Quality Gates:** 67/67 JVM unit tests pass (`./gradlew :app:testDebugUnitTest`).
+
+---
+
+# Session 12 — 2026-08-21 (design-boundary audit + working-tree trim)
+
+## 40. Audit: is the Zygisk hiding app-targeted or detection-sabotage?
+
+Project bottom line under review: *never modify third-party apps; system-level
+changes only.* Verdict against that line, measured on device `1d4eb066`
+(deployed e148d62):
+
+1. **No package-name targeting anywhere in the hide paths.** The only literal
+   `com.reveny.nativecheck` in native code is a comment;
+   `timeZoneByPackage` is the documented data-only product feature,
+   user-configured, proven unrelated to the card (§3.3).
+2. **The detector runs to completion and reports clean** because
+   framework-owned residue strings are genuinely scrubbed from process
+   memory. Nothing patches libreveny, no ptrace against it, no crash
+   interference.
+3. **Baseline re-measured this date:** cold start shows *no* "Detected Zygisk"
+   card — top banner "The Environment is abnormal" +
+   "Detected Play Integrity Fix (2)" only.
+4. New observation: expanding the PIF card lists `Details:` entries
+   (`config_certifiedBuildProperties`, `config_certifiedKeybox`,
+   `config_netflixSpoofModel`, `config_stockFingerprint`). These are
+   runtime-decrypted detector-internal sub-check names — grep-verified absent
+   from both the APK plaintext and every arirang data dir. Not an arirang
+   leak; recorded so nobody chases it again.
+
+## 41. Undocumented working-tree experiment: audited and trimmed
+
+An uncommitted working-tree state added four mechanisms that cross the
+boundary above; all removed before this commit:
+
+| Removed | Why |
+|---------|-----|
+| `sanitize_native_bridge()` | Zeroed `libnativebridge.so` globals at hardcoded offsets `base+0x5000/+0x5004` inside EVERY app process. On-device ELF check: `+0x5000` is `.bss` start **only on this exact build** (memsz `0x28`); the `mprotect` failure path was unchecked → SIGSEGV risk on any layout drift. Mutates system-lib state inside third-party processes beyond own-trace removal. |
+| `restore_hidden_api_enforcement()` | Reset `VMRuntime` hidden-API exemptions per-app — breaks LSPosed-scoped modules in those apps (violates the §38.1 coexistence principle). |
+| SELinux `selinux_android_setcontext` inline hook + sepolicy `mounton` rules + staged `prev_zygote` file + staging dir 0750→0755 | Speculative attr normalization with no proven effect (iso contexts measured normal in §35.1): the attr write likely fails silently; the hook is inherited by every app via CoW code pages. The sepolicy/staging parts were dead config that widened zygote policy and relaxed staging DAC for no consumer. |
+| `remap_own_to_memfd()` call sites in system_server / com.android.phone | Function body kept (proven stable, §26), calls removed: the card is already gone without it, and `memfd:` mappings are themselves on detector scrub lists (§28). Revisit only if a maps-based card reappears. |
+
+Kept / improved in this commit:
+
+- `wipe_memory_residues()` (renamed from `wipe_own_residues`) now also runs
+  **unconditionally in onLoad**, not just zygote/atfork/postAppSpecialize:
+  KSU Next + ReZygisk fires onLoad per-fork child rather than in the zygote
+  itself (working-tree comment documents the discovery). NOTE this contradicts
+  §25 fact 4 / §26 ("onLoad provably executes there") — pin it down at next
+  boot by watching for a zygote64-pid `onLoad pid=` log line.
+- The `\x7fELF` needle is now gated to `[anon:scudo:*]` regions (the measured
+  home of all residue chunks, §35.3) so legitimate app buffers holding ELF
+  bytes (downloads, in-heap images) can never be corrupted; the specific
+  string needles remain region-wide.
+- Restored the sanitized-count log line lost in the rename
+  (`wipe_memory_residues: sanitized N pattern hit(s)`).
+- Manager-side bind-storm fix kept: `ArirangClient.beginBinding` debounces
+  rebind attempts (`BIND_RETRY_INTERVAL_MS = 3 s`).
+
+Script layer (`common.sh`, `staging.sh`, `vendor_bind.sh`, `service.sh`,
+`sepolicy.rule`, `zygisk_hide.sh`) reverted byte-for-byte to e148d62, so this
+verification build differs from the verified baseline **only** in
+`arirang_zygisk.cpp` + the manager debounce.
+
+## 42. Verification state
+
+- Build gates: `libarirang_zygisk.so` compiles clean under `-Werror`;
+  `:app:testDebugUnitTest` green.
+- Device verification of this trimmed build (install → reboot → Stage 3
+  matrix of §5) is the pending next step; baseline for comparison is §40.3.
 
 
