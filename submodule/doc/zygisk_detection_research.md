@@ -1705,6 +1705,19 @@ Additional observations from the same session:
   path strings land in a not-yet-scanned region — arirang's presence changes
   heap churn enough to shift that race. If true, no clean module-side fix
   exists.
+- Late-session state-matrix clarification: an intermediate "dirty while
+  disabled" reading was contaminated — the `disable` flag from the control
+  test was still on disk, so that boot was genuinely disabled yet flagged;
+  after removing the flag, ReZygisk re-registered and injected the module
+  and the card returned, persisting across repeated UI samples (not a
+  transitional-frame artifact). The disabled state is clean 3/3 on its own
+  boots; the enabled state flags. The self-trigger hypothesis above remains
+  the only model consistent with every measurement, but its arirang-gating
+  step (why the disabled heap never self-triggers) is unexplained.
+- Next session's decisive instrument: strace the detector's Check-1 moment
+  (iso-service attach, per §19 tooling) in enabled vs disabled states and
+  diff the readv/scanned-region sets — that directly shows whether the scan
+  reads its own freshly-written strings.
 
 **Conclusion: the byte-identical last-known-clean binary**
 (`/data/local/tmp/libhwc_vendor.so`, 2026-08-18 15:15, restored into the
