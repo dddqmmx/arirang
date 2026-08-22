@@ -1646,4 +1646,97 @@ verification build differs from the verified baseline **only** in
 - Device verification of this trimmed build (install → reboot → Stage 3
   matrix of §5) is the pending next step; baseline for comparison is §40.3.
 
+---
+
+# Session 12b — 2026-08-22 (language leak root-caused; Zygisk card drift discovered)
+
+## 43. Per-app language leaking into Settings UI — NOT arirang's doing
+
+User report: configuring an app's language changed the *System Settings* UI
+language. Investigated end to end:
+
+1. **Hook audit** (`FuckAppLocale`, system_server only): the apply path hooks
+   `PackageConfigPersister.updateConfigIfNeeded`, which AOSP calls ONLY from
+   `ActivityTaskManagerService.onProcessAdded` with a container that always
+   belongs to the very package named in the arguments — cross-package leakage
+   is structurally impossible. Stack probes on device confirmed every
+   `com.android.settings` query arrived via that benign path.
+2. **No platform writes**: arirang never calls
+   `LocaleManager.setApplicationLocales` anywhere; the manager's
+   `AppCompatDelegate.setApplicationLocales` calls are own-package scoped.
+3. **Root cause**: the REAL platform per-app locale record was
+   `com.android.settings → [de-DE]` (verified via
+   `cmd locale get-app-locales`). Settings rendered German because Android's
+   own persisted per-app language said so — writable only through the
+   system's own UI. Cleared with
+   `cmd locale set-app-locales com.android.settings --user 0`; Settings
+   returned to Japanese immediately. No code change required.
+4. **Tooling note**: the hook-side config mirror lives under
+   `/data/misc/apexdata/<uuid>/prefs/<pkg>/` (the LSPosed XSharedPreferences
+   view) and syncs only when the app itself writes prefs — hand-edits of the
+   real shared_prefs file are invisible to hooks and cost hours of confusion.
+
+## 44. "Detected Zygisk (2)" returned — environment drift, not code
+
+The trimmed build (§41) deployed cleanly, but nativecheck showed the card
+again. Systematic isolation, all measured today:
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Trim regression | deploy pristine e148d62 bytes | still flagged |
+| Debug props left behind | `resetprop -d persist.arirang.log.*` | still flagged |
+| Injected system_setting prefs activating hooks | delete file | still flagged |
+| Staged-file ELF header as copy source | zero magic on disk | still flagged |
+| Late string landing past sweep window | freeze-samples 60 ms–3 s | string absent ≤3 s |
+| Framework-level change (ReZygisk itself detectable) | disable module | **no card** |
+
+**Conclusion: the byte-identical last-known-clean binary**
+(`/data/local/tmp/libhwc_vendor.so`, 2026-08-18 15:15, restored into the
+store and re-staged) **now flags 3/3 launches while module-disabled stays
+clean on the same boot.** Some unidentified device-state change since the
+morning baseline makes even the previously-clean build detectable.
+Investigation order for next session: restore the manager app to its exact
+pre-session APK; bisect reboot-count effects; diff the staging chain
+(store ↔ staged ↔ loaded) against the morning layout.
+
+## 45. Scavenger revived with four measured fixes (deployed)
+
+The race documented in §27/§35 is real again, so the delayed scrubber came
+back (`elf_residue_scavenger.{hpp,cpp}` restored from 85d7977^ and rebuilt):
+
+1. **Granule-confined writes** — the first revived build aborted processes
+   with `Scudo ERROR: corrupted chunk header`: zeroing a match that crossed a
+   16-byte chunk boundary corrupted neighbouring scudo headers. Every write
+   is now confined to one aligned granule; destroying any single magic byte
+   defeats the detector's compare.
+2. **CPU budget** — that same build hung boot outright: full-speed loops per
+   process starved the boot critical path (no `sys.boot_completed`, no
+   tombstones). Now: 4 flat iterations cover the ~14 ms detection window,
+   then sleep-paced sweeps, hard wall-clock bail.
+3. **Full-region sweep** — the surviving trigger copy sits at arbitrary
+   offsets (observed +447 KB into an unnamed anon region), far beyond any
+   fixed prefix; sweeps walk whole regions through a 1 MB clone-argument
+   scratch buffer.
+4. **String needles removed again** — live capture first suggested adding
+   `/data/adb`-family needles, but the control run proved that string exists
+   with the module disabled too (the detector's own sweep artifact); wiping
+   it would only mutate data the module does not own.
+
+Status after all fixes: first launch after boot is consistently clean;
+repeat launches within the same boot usually still flag. With §44's drift
+unresolved the scavenger cannot be validated properly — it stays deployed as
+the best-known mechanism, gated on §44's investigation list.
+
+## 46. Session 12b bottom line
+
+- The language feature does not touch third-party apps' code and did not
+  cause the Settings leak; the platform record was the cause and clearing it
+  is the complete fix. The design boundary holds.
+- The Zygisk-card regression is environmental: identical clean bytes now
+  flag. All in-module levers verified unchanged; the differential lives in
+  device state outside the module.
+- Also fixed en route: two latent crash vectors in the revived scavenger
+  (scudo header corruption; boot starvation) — both now have regression
+  notes in the file header.
+
 

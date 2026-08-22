@@ -103,6 +103,7 @@ endfunction()
 
 add_library(arirang_zygisk SHARED
     src/main/cpp/core/arirang_zygisk.cpp
+    src/main/cpp/core/elf_residue_scavenger.cpp
     src/main/cpp/core/runtime_config.cpp
     src/main/cpp/core/submodule_config.cpp
     src/main/cpp/utils/io_utils.cpp
@@ -121,6 +122,16 @@ add_library(arirang_zygisk SHARED
     src/main/cpp/hook/inline_hook.cpp
     src/main/cpp/hook/vtable_hook.cpp
     src/main/cpp/hook/symbol_resolver.cpp
+)
+
+# elf_residue_scavenger.cpp ships a self-contained ".scanner" code section
+# (raw syscalls only) that is copied to an anonymous region and executed
+# after the module dlcloses. The target-level -fstack-protector-strong would
+# inject __stack_chk_guard GOT references into that section and break the
+# copy, so stack protector is disabled for this translation unit alone.
+set_source_files_properties(
+    src/main/cpp/core/elf_residue_scavenger.cpp
+    PROPERTIES COMPILE_OPTIONS "-fno-stack-protector"
 )
 
 target_compile_features(arirang_zygisk PRIVATE cxx_std_17)
