@@ -1848,6 +1848,54 @@ The deployed resting configuration remains HEAD (3f4ef05): constructor memfd
 remap + full-coverage scavenger + synchronous wipe. First-launch-after-boot
 is intermittently clean; repeat launches flag under today's device state.
 
+---
+
+# Session 12e — 2026-08-23 (channel confirmed stable-passing blocker)
+
+## 53. Why every sweep fails: the source fd stays open
+
+Late-session discovery: the trigger string (`/data/adb/modules` maps text)
+is RE-READ from its source on every check pass. The check service holds/
+re-opens `/proc/<zygiskd>/fd/15`, which resolves to a live maps file; each
+of its scanning passes copies fresh content into its own heap. Wiping the
+stored copy is therefore futile — the next readv re-imports it from the
+still-open source fd. This closes the loop on why phase-0 tight loops,
+full-scudo sweeps, and granule-confined writes all failed to produce stable
+passing: the exposure is upstream of every in-process mitigation.
+
+## 54. Final measured state matrix (today, all variants)
+
+| Configuration | Result |
+|---|---|
+| arirang enabled (+ any mitigation variant: scavenger on/off, constructor on, pristine pipeline build) | flagged, consistently |
+| arirang disabled (LSPosed active alone) | clean, 7/7 + extended 4/4 |
+| zygote heap sanitized once via root-side writer | flagged again (source fd re-imports) |
+
+## 55. Conclusion and the two remaining paths
+
+The residual card is fed by **ReZygisk's own injection machinery**: while
+processing a module-enabled fork, zygiskd holds `/proc/<child>/maps` (and/or
+the zygote's) open past the window where the detector's probing can observe
+it. LSPosed-alone boots do not exhibit the holding behavior (7/7 clean),
+which localizes it to ReZygisk's handling of non-LSPosed modules' load/
+unload lifecycle — most likely the DLCLOSE-driven unload bookkeeping
+keeping the maps handle alive through the bookkeeping pass.
+
+Module-side options are exhausted (§46 list plus today's additions). The two
+remaining paths both live outside this repository:
+
+1. **Patch ReZygisk** (open-source, user-controlled stack): ensure
+   `closedir`/`close` of maps/mem fds before the unload-bookkeeping stage,
+   or open them `O_CLOEXEC` and drop them before returning to the child —
+   the captured trace (Session 12c §47) gives the exact observable to test
+   against (`/proc/<pid>/fd/15` must no longer resolve to a live maps file).
+2. **Switch the Zygisk provider** (KernelSU native Zygisk instead of
+   ReZygisk, Session 9 §34 option 2): a provider whose daemon does not
+   retain cross-process fds removes the channel wholesale.
+
+Both preserve the design boundary: no code injection into third-party apps,
+system-side changes only.
+
 **Conclusion: the byte-identical last-known-clean binary**
 (`/data/local/tmp/libhwc_vendor.so`, 2026-08-18 15:15, restored into the
 store and re-staged) **now flags 3/3 launches while module-disabled stays
