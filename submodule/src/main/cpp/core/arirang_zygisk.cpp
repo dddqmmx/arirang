@@ -676,7 +676,11 @@ public:
                                        current_app_process_.size() - 7, 7,
                                        "_zygote") == 0;
         if (!is_app_zygote) {
-            // Scavenger disabled for the A/B (see note above).
+            // The scavenger survives the dlclose (anon RX code copy) and
+            // keeps scrubbing \x7fELF magic past the framework's unload
+            // window; the A/B without it also exposed an extra "Detected
+            // Abnormal Environment" card, so it stays enabled.
+            arirang::launch_residue_scavenger();
         }
         if (api_ != nullptr) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
