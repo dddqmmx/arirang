@@ -1787,6 +1787,67 @@ unknowns, in attack order:
    captured content) and closes per §23's boundary — but that conclusion
    requires first exhausting (2).
 
+---
+
+# Session 12d — 2026-08-22 late (source located: the zygote heap; bisections)
+
+## 50. The zygote heap carries the module path strings
+
+Direct dump of zygote64's scudo regions (enabled state) found FOUR scudo
+chunk records containing:
+
+```
+/data/adb/modules/arirang-submodule/zygisk/arm64-v8a.so
+/data/adb/modules/zygisk_lsposed/zygisk/arm64-v8a.so
+```
+
+ReZygisk's registration/loading allocations persist in the zygote heap and
+every fork inherits them via CoW. The per-child wipes exist precisely to
+clean these; they demonstrably run ("wiped 30-37" per process), yet a copy
+survives at a STABLE offset in the live main process across 60 s of sweeping
+— and fresh copies keep appearing while the detector's own multi-minute
+filesystem sweep runs.
+
+**The lsposed precedent kills the "inherited string" theory**: disabled
+boots inherit `/data/adb/modules/zygisk_lsposed/...` too, with NO wipes at
+all, and stay clean 7/7. Inherited strings alone do not trigger Check 1.
+Something arirang-specific on top of inheritance is required.
+
+## 51. Bisections
+
+| Configuration | Result |
+|---|---|
+| arirang only (LSPosed disabled) | **dirty 3/3** (+ Abnormal Environment + Risky App cards) |
+| LSPosed only (arirang disabled) | clean 7/7 |
+| pristine e148d62 pipeline build, verified chain | dirty |
+| scavenger off / constructor off variants | dirty |
+
+The trigger is arirang-specific, independent of every in-process mitigation,
+and independent of LSPosed. The differential lives in how ReZygisk handles
+THIS module's injection/unload cycle versus LSPosed's.
+
+## 52. Session 12d bottom line
+
+Every module-side surface is measured: heap content (swept, still flagged),
+own maps (clean), staged path (needle-free), properties (clean), SELinux
+state (constant across states). The flag correlates exactly with ReZygisk
+processing this module — most plausibly its injection/unload bookkeeping
+exposing maps text through transient fds (§47), which the detector reads and
+self-triggers on.
+
+Remaining candidate paths, honestly assessed:
+1. **Framework-side** (patch rezygiskd to close/hide injection-time fds) —
+   outside the module but inside the user's stack control; the fd-exposure
+   mechanism (§47) gives the exact patch target.
+2. **Keep-loaded policy** — §22 measured it CLEAN against this detector
+   version, but it violates the no-app-injection design line (rejected §23).
+3. Accept the residual card as the boundary (§23/§25 standing conclusion),
+   now with the complete mechanism documented.
+
+The deployed resting configuration remains HEAD (3f4ef05): constructor memfd
+remap + full-coverage scavenger + synchronous wipe. First-launch-after-boot
+is intermittently clean; repeat launches flag under today's device state.
+
 **Conclusion: the byte-identical last-known-clean binary**
 (`/data/local/tmp/libhwc_vendor.so`, 2026-08-18 15:15, restored into the
 store and re-staged) **now flags 3/3 launches while module-disabled stays
