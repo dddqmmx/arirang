@@ -1688,7 +1688,23 @@ again. Systematic isolation, all measured today:
 | Injected system_setting prefs activating hooks | delete file | still flagged |
 | Staged-file ELF header as copy source | zero magic on disk | still flagged |
 | Late string landing past sweep window | freeze-samples 60 ms–3 s | string absent ≤3 s |
+| Detector app data accumulation | `pm clear com.reveny.nativecheck` | still flagged |
+| Stale property-area bytes from the deleted props | full reboot (rebuilds `/dev/__properties__`) | still flagged |
+| Anonymous `\x7fELF` copy as the trigger | scan dirty instances repeatedly | **inconsistent** — some flagged instances have zero anon ELF hits |
 | Framework-level change (ReZygisk itself detectable) | disable module | **no card** |
+
+Additional observations from the same session:
+
+- The `Detected Risky App (1..3)` cards that flap across boots are the
+  detector flagging `me.weishu.kernelsu` and friends — pre-existing,
+  unrelated to arirang.
+- The `/data/adb/modules` string in the detector's settled heap exists in
+  BOTH module states (verified in the disabled control) and is most likely
+  the detector's own path-probing artifact. A working hypothesis for the
+  flakiness, unproven: Check 1's anon scan can self-trigger when its own
+  path strings land in a not-yet-scanned region — arirang's presence changes
+  heap churn enough to shift that race. If true, no clean module-side fix
+  exists.
 
 **Conclusion: the byte-identical last-known-clean binary**
 (`/data/local/tmp/libhwc_vendor.so`, 2026-08-18 15:15, restored into the
