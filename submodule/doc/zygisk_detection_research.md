@@ -1719,6 +1719,74 @@ Additional observations from the same session:
   diff the readv/scanned-region sets — that directly shows whether the scan
   reads its own freshly-written strings.
 
+---
+
+# Session 12c — 2026-08-22 evening (detection channel captured via full zygote strace)
+
+## 47. The channel: cross-process fd exposure, bypassing hidepid
+
+Full `strace -f -p <zygote64>` traces captured for one enabled-dirty and one
+disabled-clean detection run (974k / 758k lines). The differential:
+
+1. **Both states**: the detector's check services probe an early-boot
+   daemon's fd — `/proc/<early-pid>/fd/N` (enabled boot: pid 18473 fd 15,
+   5 opens; disabled boot: pid 1228 fd 13, 12 opens). Opening another
+   process's fd symlink resolves to the underlying file, sidestepping
+   `hidepid=invisible` on `/proc`.
+2. **Enabled state**: that read returned **zygote maps text** containing
+   `/data/adb/modules/rezygisk/lib64/libzygisk.so` mapping lines. The check
+   service stores the content in its own heap; its own anonymous-memory scan
+   then finds it. Trace-wide: `/data/adb/modules` occurs **7×** in the
+   enabled trace, **0×** in the disabled trace.
+3. **Disabled state**: the same probe returned linker namespace config text
+   (`ld.config.txt` content) — benign.
+4. State matrix re-confirmed with extended sampling: module-disabled is
+   clean **7/7** launches across two boots; module-enabled flagged **9/9**
+   on today's builds. The attr/prev theory from §44's leftovers was
+   falsified en route: every app on this ROM shows `prev=u:r:init:s0` in
+   BOTH module states (KSU zygote launch chain) and the detector ignores it.
+5. The detector main process makes ZERO cross-process accesses itself; all
+   cross-proc work happens in the check services. Its own maps are clean
+   (no module mappings inherit into apps).
+
+## 48. Fixes landed this session
+
+- **Constructor memfd remap**: `remap_own_to_memfd()` now runs from an ELF
+  constructor — dlopen time inside the zygote, before any entry callback
+  (onLoad provably never fires there: 0 `cmd=zygote` logs vs 15 `cmd=app`
+  per boot). Verified live: the r-x segment shows `/memfd:libcamera_hal.so
+  (deleted)` in zygote64/system_server/phone maps. The remaining file-backed
+  segments expose only `/data/system/libhwc_vendor.so`, which matches none
+  of Check 1's four needles.
+- **Scavenger coverage fixes**: phase 0 tight loop (sub-ms passes over
+  scudo prefixes for the first 100 ms), full-scudo sweeps through the
+  100 ms–4 s window (measured residue offsets 39 K/155 K/185 K all sit
+  beyond fixed prefixes), full-region sweeps after.
+- **A/B**: scavenger-off does NOT clean the card (6/6 still flagged) — the
+  scavenger is not the amplifier. A transient extra "Detected Abnormal
+  Environment" card appeared in the last three A/B cycles (cause unknown,
+  watch it).
+
+## 49. Session 12c bottom line & next actions
+
+The card is fed by **content the detector legitimately reads out of a
+cross-process fd**, not by anything left in app processes. Remaining
+unknowns, in attack order:
+
+1. Identify the exact daemon holding the maps fd in enabled boots (candidates:
+   zygiskd/zygisk-ptrace monitor family — target pids sat immediately after
+   zygote64 both traced boots) and WHY it holds maps iff arirang is enabled.
+   LSPosed-only boots do not show the exposure, so it is arirang-gated, not
+   generic-module-gated.
+2. If the holder is tied to a module-side behavior (companion request,
+   staging open, remap support), remove or reshape that behavior — e.g.
+   ensure the companion never spawns (disk-config primary path already
+   exists) and confirm the fd disappears from every early-boot daemon.
+3. If the holder is framework-owned regardless of us, the residual card is
+   ReZygisk's own exposure (its lib paths were the flaggable strings in the
+   captured content) and closes per §23's boundary — but that conclusion
+   requires first exhausting (2).
+
 **Conclusion: the byte-identical last-known-clean binary**
 (`/data/local/tmp/libhwc_vendor.so`, 2026-08-18 15:15, restored into the
 store and re-staged) **now flags 3/3 launches while module-disabled stays

@@ -445,6 +445,24 @@ void wipe_own_residues() {
 
 } // namespace
 
+// ELF constructor: runs at dlopen time, inside whichever process loads this
+// library — i.e. the ZYGOTE, before any zygisk_module_entry callback fires
+// (measured: onLoad never executes in the zygote on KSU Next + ReZygisk; the
+// entry is invoked per forked child instead).
+//
+// Why here: detection services read the ZYGOTE's maps content through
+// /proc/<monitor>/fd/N handles held by boot-time daemons (traced live:
+// every check service opened /proc/18473/fd/15 and scanned the copied
+// lines). As long as the staged library's /data/adb-free path appears in the
+// zygote's maps, that channel is clean; converting the r-x segments to a
+// memfd removes even the staging path from the exposed maps.
+//
+// r-x segments only — relocation/GOT/dynstr segments carry linker live
+// state that breaks when replaced (§26.3 zygote restart loop).
+__attribute__((constructor)) static void arirang_zygisk_ctor() {
+    remap_own_to_memfd();
+}
+
 class ArirangZygisk final : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
@@ -658,16 +676,7 @@ public:
                                        current_app_process_.size() - 7, 7,
                                        "_zygote") == 0;
         if (!is_app_zygote) {
-            // The framework's unload bookkeeping drops ELF-image copies AND
-            // loader path strings ("/data/adb/modules", measured live at
-            // scudo offset ~39704) into the heap AFTER postAppSpecialize
-            // returns — a synchronous wipe races it and loses on some boots
-            // (same binary clean at boot A, flagged at boot B). The
-            // scavenger thread's code lives in an anonymous region, so it
-            // survives the dlclose and keeps scrubbing for a bounded
-            // window. Launch BEFORE the DLCLOSE option: it copies its
-            // section out of this module's own mappings.
-            arirang::launch_residue_scavenger();
+            // Scavenger disabled for the A/B (see note above).
         }
         if (api_ != nullptr) {
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);

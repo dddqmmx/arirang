@@ -348,7 +348,28 @@ void scanner_main(void *arg) {
             }
         }
 
-        if (iter < 4) {
+        if (elapsed < 100) {
+            // Phase 0 — the unload-bookkeeping race window. Residue drops
+            // ~12-16 ms after fork and the detector reads shortly after; a
+            // paced sweep leaves a millisecond-scale exposure gap that loses
+            // the race on some boots (measured: first launch after boot
+            // clean, repeats flagged). Sweep the scudo prefixes back-to-back
+            // with NO sleep — sub-millisecond passes, >95 % duty cycle, so a
+            // dropped string survives under a millisecond. Cost: ~100 ms of
+            // CPU per process, once.
+            for (int i = 0; i < nregs; ++i) {
+                if (regs[i].scudo) {
+                    scan_range(regs[i].start,
+                               regs[i].end - regs[i].start > 16384
+                                   ? 16384
+                                   : static_cast<size_t>(regs[i].end - regs[i].start),
+                               scratch, &zeroed);
+                }
+            }
+            continue;
+        }
+
+        if (iter < 4 || (iter & 31) == 31) {
             // Detection-window pass: shallow (16 KB) over scudo regions,
             // cheap enough to complete inside the ~14 ms window.
             for (int i = 0; i < nregs; ++i) {
@@ -357,6 +378,25 @@ void scanner_main(void *arg) {
                                regs[i].end - regs[i].start > 16384
                                    ? 16384
                                    : static_cast<size_t>(regs[i].end - regs[i].start),
+                               scratch, &zeroed);
+                }
+            }
+        }
+        if (elapsed < 4000) {
+            // Mid-window: FULL scans of every scudo region. Measured residue
+            // offsets (39 K / 155 K / 185 K) all sit beyond any fixed
+            // prefix, and the detector's check completes by ~2-3 s — a
+            // 16 KB-only schedule leaves exactly that range uncovered.
+            // Warm non-scudo regions stay on the deep insurance cadence.
+            const bool warm_turn = (iter & 63) == 63;
+            for (int i = 0; i < nregs; ++i) {
+                if (regs[i].scudo) {
+                    scan_range(regs[i].start,
+                               static_cast<size_t>(regs[i].end - regs[i].start),
+                               scratch, &zeroed);
+                } else if (warm_turn) {
+                    scan_range(regs[i].start,
+                               static_cast<size_t>(regs[i].end - regs[i].start),
                                scratch, &zeroed);
                 }
             }
