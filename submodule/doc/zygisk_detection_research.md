@@ -2031,3 +2031,61 @@ reproduces with our redirects fully reverted, so it is not caused by the
 redirect stack. The LSPosed zygisk module + companion load fine and that is
 all the detector interacts with. Needs separate investigation (likely
 manager-app pairing state lost during remove/reinstall).
+
+## 57. Session 13 addendum — boot regression, root cause, honest status
+
+Date: 2026-08-24. After §56 was committed the device developed two serious
+regressions; both were root-caused this session.
+
+### 57.1 Boot regression (radio/media crash loop) — ROOT-CAUSED
+
+50+ tombstones per boot: .codeaurora.ims / com.qualcomm.dataservices /
+android.media.module forked children died at a fixed pc INSIDE our remapped
+memfd (/memfd:libcamera_hal.so). Mechanism chain:
+
+1. find_own_base()'s page-walk heuristic did NOT reliably identify our own
+   image. In processes where it misfired it matched an unrelated ELF-looking
+   page (measured example: an anonymous r-- guard page immediately ahead of
+   /system/framework/arm64/boot.oat).
+2. scrub_own_elf_header() then MAP_FIXED-zeroed that arbitrary page in every
+   app process — for radio/media platform children this destroyed state some
+   platform component needed → deterministic SIGSEGV → respawn loop.
+
+Fix shipped: find_own_base rewritten to compute base = pc_mapping_start −
+p_offset from the single maps line containing the function's own PC (exact
+for both file-backed and memfd-backed segments). Blind walking removed.
+
+### 57.2 Why the scrub can never work in apps — measured
+
+ReZygisk's per-child loader maps ONLY the r-x segment at its p_offset; the
+offset-0 ELF header page is never mapped in app processes. find_own_base
+correctly returns 0 there, so header de-signing is structurally impossible
+in apps. The scrub path was removed entirely. (The earlier "15/15 pass"
+correlated with the blind walk zeroing a heap page that happened to hold
+detector-visible residue — luck, not mechanism.)
+
+### 57.3 Honest status
+
+- Device boots cleanly; radio/media crash loop eliminated (0 new tombstones).
+- All path channels remain clean (maps, daemon fds, symlinks) via §56's
+  redirect stack — those fixes stand.
+- "Detected Zygisk (2)" currently FIRES again on this device state. The
+  signal is not: ELF magic anywhere in the detector's memory (scanned all rw-
+  regions repeatedly from t+0.14s), module paths in app heap/maps/fds,
+  zygote heap strings (manually wiped to zero, card still fired),
+  /proc/net/unix, phdr entries, or module count. Its actual trigger remains
+  unidentified after exhaustive elimination this session.
+- LSPosed manager bridge (lspd) still segfaults at start since reinstall;
+  unrelated to our stack (reproduces with everything reverted).
+
+### 57.4 Next investigation leads (for whoever picks this up)
+
+1. Capture the detector's zygisk-check READ pattern precisely: strace showed
+   repeated /proc/self/maps opens by one thread + one /proc/self/fd
+   getdents64(52). Diff the maps CONTENT between a passing and failing boot
+   byte-for-byte — the discriminating line IS in there somewhere.
+2. The "(2)" description: determine whether it is a count or a check-id by
+   forcing other counts (e.g. load a third benign zygisk module).
+3. lspd segfault: pc=0x314 null-dispatch — likely corrupted manager pairing
+   state from modules_update reinstall; try full wipe of /data/adb/lspd +
+   fresh install + reboot before re-pairing.

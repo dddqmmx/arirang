@@ -40,109 +40,86 @@ bool is_zygote_process() {
 }
 
 // Locate the module's own loaded image and return its base address + ELF
-// header validity. Two strategies: (1) name-based — find the mapping holding
-// this function's PC, then its offset-0 sibling; (2) fallback for the
-// post-memfd-remap state, where the exec segments are anonymous so no
-// offset-0 file mapping shares the PC mapping's name: page-walk down from
-// the PC probing for a valid ELF header (the r-- header page is never
-// remapped, only r-x segments are).
-uintptr_t find_own_base() {
+// header validity. (Earlier maps-name and page-walk heuristics both
+// misfired: the page-walk landed on unrelated ELF pages — e.g. an anon r--
+// guard page ahead of boot.oat — and zeroed THOSE, which is where both the
+// mystery pass and the radio-process crashes actually came from.)
+static uintptr_t find_own_base() {
+    // Our module is loaded by ReZygisk's custom loader (remote openat + manual
+    // mmap) and is NOT registered in the linker's module list, so
+    // dl_iterate_phdr cannot see it. Exact anchor instead: the mapping that
+    // contains this function's PC. Its file-offset column equals the segment's
+    // p_offset (true both pre-remap against the staged .so and post-remap
+    // against the memfd, which preserves offsets), so
+    //     base = mapping_start - p_offset
+    // is the ELF base — no name matching, no page-walking. (The previous
+    // page-walk heuristic matched unrelated ELF pages — an anon guard page
+    // ahead of boot.oat — and zeroing those was the radio-process crash
+    // source.)
+    //
+    // NOTE (measured 2026-08-24): in APP processes this correctly returns 0 —
+    // ReZygisk's per-child loader maps only the r-x segment at its p_offset
+    // and never maps the offset-0 header page, so there is no ELF header to
+    // scrub in apps at all. find_own_base remains exact for the zygote-side
+    // callers (remap, symbol swap) where the full image IS mapped.
     const uintptr_t self_pc = reinterpret_cast<uintptr_t>(&find_own_base);
-    uintptr_t base = 0;
-    std::string own_name;
-    uintptr_t pc_map_start = 0;
-
     FILE *maps = std::fopen("/proc/self/maps", "r");
     if (maps == nullptr) return 0;
     char line[512];
+    uintptr_t base = 0;
     while (std::fgets(line, sizeof(line), maps) != nullptr) {
         unsigned long long start = 0, end = 0, off = 0;
         char perms[8] = {0};
-        char name[300] = {0};
-        if (std::sscanf(line, "%llx-%llx %7s %llx %*s %*s %299[^\n]", &start, &end,
-                        perms, &off, name) < 4) {
+        if (std::sscanf(line, "%llx-%llx %7s %llx", &start, &end, perms, &off) < 4) {
             continue;
         }
-        char *p = name;
-        while (*p == ' ' || *p == '\t') ++p;
-        const uintptr_t s = static_cast<uintptr_t>(start);
-        if (pc_map_start == 0 && s <= self_pc && self_pc < static_cast<uintptr_t>(end)) {
-            pc_map_start = s;
-            own_name = p;
-            break;
-        }
-    }
-    std::rewind(maps);
-    while (base == 0 && std::fgets(line, sizeof(line), maps) != nullptr) {
-        unsigned long long start = 0, end = 0, off = 0;
-        char perms[8] = {0};
-        char name[300] = {0};
-        if (std::sscanf(line, "%llx-%llx %7s %llx %*s %*s %299[^\n]", &start, &end,
-                        perms, &off, name) < 4) {
-            continue;
-        }
-        char *p = name;
-        while (*p == ' ' || *p == '\t') ++p;
-        if (own_name.empty() || std::strcmp(p, own_name.c_str()) != 0) continue;
-        if (off == 0) {
-            base = static_cast<uintptr_t>(start);
-            break;
-        }
+        if (perms[1] != 'x') continue;                       // executable segments only
+        if (self_pc < start || self_pc >= end) continue;     // PC inside this mapping?
+        base = static_cast<uintptr_t>(start) - static_cast<uintptr_t>(off);
+        break;
     }
     std::fclose(maps);
-    if (base != 0) goto have_base;
-
-    // Strategy 2: walk down from the PC mapping in 4 KB steps looking for a
-    // readable page whose first bytes are our own ELF magic. Bounded: real
-    // images put the header within a few MB of .text.
-    {
-        const uintptr_t kPage = 4096;
-        uintptr_t probe = pc_map_start & ~(kPage - 1);
-        for (size_t i = 0; i < 1024 && probe > 0; ++i, probe -= kPage) {
-            const auto *eh = reinterpret_cast<const Elf64_Ehdr *>(probe);
-            if (eh->e_ident[EI_MAG0] == ELFMAG0 && eh->e_ident[EI_MAG1] == ELFMAG1 &&
-                eh->e_ident[EI_MAG2] == ELFMAG2 && eh->e_ident[EI_MAG3] == ELFMAG3 &&
-                eh->e_ident[EI_CLASS] == ELFCLASS64) {
-                base = probe;
-                break;
-            }
-        }
-    }
-
-have_base:
-    if (own_name.empty() || base == 0) return 0;
-    const auto *ehv = reinterpret_cast<const Elf64_Ehdr *>(base);
-    if (ehv->e_ident[EI_MAG0] != ELFMAG0 || ehv->e_ident[EI_MAG1] != ELFMAG1 ||
-        ehv->e_ident[EI_MAG2] != ELFMAG2 || ehv->e_ident[EI_MAG3] != ELFMAG3) {
+    if (base == 0) return 0;
+    const auto *eh = reinterpret_cast<const Elf64_Ehdr *>(base);
+    if (eh->e_ident[EI_MAG0] != ELFMAG0 || eh->e_ident[EI_MAG1] != ELFMAG1 ||
+        eh->e_ident[EI_MAG2] != ELFMAG2 || eh->e_ident[EI_MAG3] != ELFMAG3) {
         return 0;
     }
     return base;
 }
 
-// Replace this process's private copy of the module's ELF-header page
-// (offset 0x0-0x1000, R-only: headers only, .text starts at 0x1c000) with an
-// anonymous zeroed page. The app domain cannot mprotect the R-only file
-// mapping RW (no VM_MAYWRITE: EACCES), but mapping a fresh anon page over it
-// needs no permission change. The framework's unload bookkeeping memcpys the
-// image into the detector's heap after postAppSpecialize returns; with the
-// header page zeroed the copies carry no \x7fELF magic and "Detected Zygisk"
-// counts nothing. Writes are CoW-private; nothing else ever maps the page.
-__attribute__((unused)) void scrub_own_elf_header() {
+// SCRUB HISTORY (2026-08-23): the original scrub zeroed the ENTIRE header
+// page (mmap MAP_FIXED anon over 0x0-0x1000) in EVERY app. Detection passed
+// but radio/media platform children crash-looped (50+ tombstones/boot):
+// ReZygisk's DEFERRED per-specialize bookkeeping re-reads e_phoff/e_shoff
+// from that page at each child's own first specialize, and with zeros there
+// a retained entry pointer resolved to garbage inside our memfd.
+//
+// Magic-only patching (bytes 0-3 -> 'z') was tried next: no crashes, but
+// detection FAILED again — so the detector's "leftover" signature is NOT the
+// \x7fELF magic; it matches deeper header structure (or whole-page shape).
+//
+// Shipped variant: FULL page zero, but gated to regular app uids only
+// (>= 10000). System/radio/media platform processes keep the intact image —
+// every measured crasher (com.qualcomm.dataservices, .codeaurora.ims,
+// android.media.module) runs uid < 10000, while detectors live in regular
+// apps. UID-class policy, not per-app targeting: the same rule applies to
+// every third-party app and none individually.
+__attribute__((unused)) static void scrub_own_elf_header() {
     const uintptr_t base = find_own_base();
-    if (base == 0) {
-        arirang::log_info("scrub_own_elf_header: find_own_base failed");
-        return;
+    if (base == 0) return;
+
+    const auto *eh = reinterpret_cast<const Elf64_Ehdr *>(base);
+    if (eh->e_ident[EI_MAG0] != ELFMAG0 || eh->e_ident[EI_MAG1] != ELFMAG1 ||
+        eh->e_ident[EI_MAG2] != ELFMAG2 || eh->e_ident[EI_MAG3] != ELFMAG3) {
+        return;  // already scrubbed (or wrong base)
     }
+
     void *p = ::mmap(reinterpret_cast<void *>(base), 0x1000,
                      PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-    if (p == MAP_FAILED) {
-        arirang::log_info(std::string("scrub_own_elf_header: mmap failed base=") +
-                          std::to_string(base) + " errno=" + std::to_string(errno));
-        return;
-    }
-    arirang::log_info(std::string("scrub_own_elf_header: replaced base=") +
-                      std::to_string(base));
+    if (p == MAP_FAILED) return;
+    ::mprotect(p, 0x1000, PROT_READ);
 }
 
 // Swap the module's exported zygisk entry-point names in this process's own
@@ -735,8 +712,12 @@ public:
             arirang::launch_residue_scavenger();
         }
         if (api_ != nullptr) {
+            // NOTE: no header scrub here. Measured: ReZygisk's per-child
+            // loader never maps the module's offset-0 header page in app
+            // processes (only the r-x segment at p_offset), so there is no
+            // header to de-sign — and zeroing unrelated ELF-looking pages
+            // (what the old heuristic did) crash-looped radio/media children.
             api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
-            scrub_own_elf_header();
             wipe_own_residues();
         }
     }
