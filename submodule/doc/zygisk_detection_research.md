@@ -1946,3 +1946,88 @@ the best-known mechanism, gated on §44's investigation list.
   notes in the file header.
 
 
+
+## 56. Session 13 — path-redirect stack (no ReZygisk modification), stable pass
+
+Date: 2026-08-23. Goal: hide Zygisk against nativecheck 7.7.0 WITHOUT touching
+ReZygisk code, per the standing constraint (system-level changes only; never
+modify third-party apps, and this round also no modifications to ReZygisk).
+
+### 56.1 Root cause chain (three stacked exposure channels)
+
+1. **ReZygisk injection lib path** (ptracer.c:184 hardcodes
+   `/data/adb/modules/rezygisk/lib{,64}/libzygisk.so`): the ptracer remote-
+   openat's that path in every forked child and maps it FILE-BACKED → the
+   path string lands permanently in each injected process's maps.
+2. **Per-module zygisk lib paths** (zygiskd.c:70 and :474): zygiskd opens
+   `/data/adb/modules/<id>/zygisk/<arch>.so`, holds that fd for boot lifetime
+   (its `/proc/<pid>/fd/N` link renders the canonical path), file-backs it
+   into the zygote's maps, and sends the same canonical string over the
+   ReadModules socket protocol into zygote-side heap.
+3. **Own-image ELF-header copies** (framework unload bookkeeping): after
+   DLCLOSE_MODULE_LIBRARY the framework memcpy's the module image (including
+   its `\x7fELF` header page) into anonymous heap; `scrub_own_elf_header()`
+   silently failed post-memfd-remap because `find_own_base()` matched by
+   mapping NAME and the remapped exec segments no longer shared a name with
+   the offset-0 header mapping ("find_own_base failed" in logs every boot).
+
+### 56.2 Fixes shipped
+
+- `module/lib/rezygisk_redirect.sh`: symlink redirect for (a) rezygisk's own
+  injection libs → `/data/system/librz_inj{32,64}.so`, (b) EVERY other
+  module's `zygisk/<arch>.so` → `/data/system/librz_mod_<id>_<arch>.so`
+  (generic loop, module-id sanitized to [a-zA-Z0-9._-]; skips our own module,
+  which keeps its existing `libhwc_vendor.so` staging). Idempotent across
+  updates. Kernel renders resolved targets in maps AND in fd links, so all
+  path channels go needle-free without touching any module's code.
+- `arirang_zygisk.cpp find_own_base()` strategy 2: when the name-based lookup
+  fails (post-remap state), page-walk down from the PC's mapping probing for
+  a valid 64-bit ELF magic — the r-- header page is never remapped so the
+  magic is intact at base. `scrub_own_elf_header()` now actually runs in app
+  processes; the two leftover header copies are destroyed before/at unload
+  instead of surviving into detector-visible heap.
+- `wipe_own_residues()` additionally called from `preAppSpecialize`
+  (earliest child hook) — beats the detector's ~14 ms self-scan more reliably
+  than the postAppSpecialize wipe alone.
+- pthread_atfork parent-slot wipe was tried and REMOVED: measured on Android
+  16 + KSU Next + ReZygisk, zygote forks never invoke bionic atfork parent
+  handlers (zero handler logs across thousands of forks). Documented in-code.
+
+### 56.3 Verification
+
+- Honest test harness (`cycle3.sh`): force-stop → relaunch → 12 s settle →
+  uiautomator dump ×2 → grep "Zygisk". (Earlier harness dumped at 7 s and
+  raced the async detection completion — produced false passes; do not reuse.)
+- Result with LSPosed v2.1.1 + arirang-submodule BOTH registered (state.json
+  confirms both loaded in zygote64, both companions running):
+  **20+ consecutive passes across 3 cold boots**, plus 6/6 on the final
+  clean build. All channels audited on final state: zygote maps 0 needle
+  hits, daemon fd links all render `/data/system/librz_*`, module symlinks
+  correct, spoofed props intact, no arirang AVC denials.
+
+### 56.4 Negative results (do not re-chase)
+
+- Zygote-heap canonical-path strings (from ReadModules protocol) are NOT the
+  trigger: manual zyzero wipe of both zygotes to 0 residue, residue stayed 0,
+  card still fired. They persist regardless (delivered per-connection) but
+  don't matter.
+- `/proc/net/unix` socket names (`/data/adb/rezygisk/*`): world-readable but
+  present on passing boots too; detector's heap strings show no
+  /proc/net/unix probe. Not a channel.
+- dl_iterate_phdr view in app processes: clean at onLoad AND post-dlclose
+  (debug-dumped from inside the module). Not a channel.
+- Module-count threshold theory ((N)=count of registered modules): dead —
+  1-module boots pass, 2-module boots failed BEFORE these fixes but now pass
+  with 2 modules loaded.
+- The card's "(2)" is most consistent with the two leftover ELF blocks
+  (§44 research: "exactly 2 anonymous-heap blocks") — eliminated by the
+  find_own_base fix rather than by any path change.
+
+### 56.5 Known unrelated breakage
+
+LSPosed manager bridge (lspd) segfaults at start since its reinstall via
+modules_update on this date ("Connection refused: connect lspbridge-*");
+reproduces with our redirects fully reverted, so it is not caused by the
+redirect stack. The LSPosed zygisk module + companion load fine and that is
+all the detector interacts with. Needs separate investigation (likely
+manager-app pairing state lost during remove/reinstall).

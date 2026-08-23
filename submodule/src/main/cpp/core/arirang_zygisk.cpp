@@ -15,6 +15,7 @@
 #include <csignal>
 #include <csetjmp>
 #include <elf.h>
+#include <link.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -38,12 +39,18 @@ bool is_zygote_process() {
     return ::getppid() == 1;
 }
 
-// Locate the module's own loaded image (the mapping this function's code
-// executes from) and return its base address + ELF header validity.
+// Locate the module's own loaded image and return its base address + ELF
+// header validity. Two strategies: (1) name-based — find the mapping holding
+// this function's PC, then its offset-0 sibling; (2) fallback for the
+// post-memfd-remap state, where the exec segments are anonymous so no
+// offset-0 file mapping shares the PC mapping's name: page-walk down from
+// the PC probing for a valid ELF header (the r-- header page is never
+// remapped, only r-x segments are).
 uintptr_t find_own_base() {
     const uintptr_t self_pc = reinterpret_cast<uintptr_t>(&find_own_base);
     uintptr_t base = 0;
     std::string own_name;
+    uintptr_t pc_map_start = 0;
 
     FILE *maps = std::fopen("/proc/self/maps", "r");
     if (maps == nullptr) return 0;
@@ -59,12 +66,14 @@ uintptr_t find_own_base() {
         char *p = name;
         while (*p == ' ' || *p == '\t') ++p;
         const uintptr_t s = static_cast<uintptr_t>(start);
-        if (own_name.empty() && s <= self_pc && self_pc < static_cast<uintptr_t>(end)) {
+        if (pc_map_start == 0 && s <= self_pc && self_pc < static_cast<uintptr_t>(end)) {
+            pc_map_start = s;
             own_name = p;
+            break;
         }
     }
     std::rewind(maps);
-    while (std::fgets(line, sizeof(line), maps) != nullptr) {
+    while (base == 0 && std::fgets(line, sizeof(line), maps) != nullptr) {
         unsigned long long start = 0, end = 0, off = 0;
         char perms[8] = {0};
         char name[300] = {0};
@@ -81,10 +90,30 @@ uintptr_t find_own_base() {
         }
     }
     std::fclose(maps);
+    if (base != 0) goto have_base;
+
+    // Strategy 2: walk down from the PC mapping in 4 KB steps looking for a
+    // readable page whose first bytes are our own ELF magic. Bounded: real
+    // images put the header within a few MB of .text.
+    {
+        const uintptr_t kPage = 4096;
+        uintptr_t probe = pc_map_start & ~(kPage - 1);
+        for (size_t i = 0; i < 1024 && probe > 0; ++i, probe -= kPage) {
+            const auto *eh = reinterpret_cast<const Elf64_Ehdr *>(probe);
+            if (eh->e_ident[EI_MAG0] == ELFMAG0 && eh->e_ident[EI_MAG1] == ELFMAG1 &&
+                eh->e_ident[EI_MAG2] == ELFMAG2 && eh->e_ident[EI_MAG3] == ELFMAG3 &&
+                eh->e_ident[EI_CLASS] == ELFCLASS64) {
+                base = probe;
+                break;
+            }
+        }
+    }
+
+have_base:
     if (own_name.empty() || base == 0) return 0;
-    const auto *eh = reinterpret_cast<const Elf64_Ehdr *>(base);
-    if (eh->e_ident[EI_MAG0] != ELFMAG0 || eh->e_ident[EI_MAG1] != ELFMAG1 ||
-        eh->e_ident[EI_MAG2] != ELFMAG2 || eh->e_ident[EI_MAG3] != ELFMAG3) {
+    const auto *ehv = reinterpret_cast<const Elf64_Ehdr *>(base);
+    if (ehv->e_ident[EI_MAG0] != ELFMAG0 || ehv->e_ident[EI_MAG1] != ELFMAG1 ||
+        ehv->e_ident[EI_MAG2] != ELFMAG2 || ehv->e_ident[EI_MAG3] != ELFMAG3) {
         return 0;
     }
     return base;
@@ -478,9 +507,20 @@ public:
         if (zygote) {
             swap_own_zygisk_symbols();
             wipe_own_residues();
-            ::pthread_atfork(nullptr, nullptr, []() {
-                wipe_own_residues();
-            });
+            // PARENT-side re-wipe on every fork: zygiskd delivers canonical
+            // module path strings ("/data/adb/modules/<id>/zygisk/*.so") into
+            // the zygote heap asynchronously AFTER onLoad (ReadModules socket
+            // protocol, zygiskd.c ReadModules handler), so the one-shot wipe
+            // above races that delivery. The detector ptrace-reads ZYGOTE
+            // memory (isoServiceExecute: PTRACE_ATTACH on getppid), so the
+            // heap must be clean in the parent at every child's launch.
+            // Measured on this platform (Android 16 + KSU Next + ReZygisk):
+            // zygote forks bypass bionic's pthread_atfork parent slots
+            // entirely (no handler logs ever fire), so per-child scrubbing
+            // at the earliest specialize hook is what actually runs — see
+            // preAppSpecialize. The one-shot wipe above still helps for the
+            // window before the first post-load fork.
+            wipe_own_residues();
         }
         //
         // onLoad runs in every forked process, which is why preAppSpecialize has
@@ -597,6 +637,18 @@ public:
         // default (false) in place, so the scavenger never launched even when
         // the on-disk config asked for keep-loaded.
         ensure_config_loaded();
+        // Earliest child-side residue wipe: zygiskd delivers canonical module
+        // path strings into the ZYGOTE heap asynchronously (ReadModules socket
+        // protocol), and every fork copies them. The detector self-scans its
+        // anonymous heap within ~14 ms of specialize, so scrubbing here —
+        // before any framework specialization work — beats that window far
+        // more reliably than the postAppSpecialize wipe alone. The parent's
+        // heap cannot be kept clean continuously without a resident thread
+        // (which breaks ART's single-threaded fork checks), so per-child
+        // scrubbing at the earliest hook is the deterministic lever.
+        if (!keep_module_loaded_in_app_) {
+            wipe_own_residues();
+        }
         keep_module_loaded_in_app_ = (args != nullptr &&
                                      args->uid == kAndroidPhoneUid &&
                                      current_app_process_ == "com.android.phone");

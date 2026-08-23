@@ -172,7 +172,8 @@ val moduleLibrarySources = listOf(
     "staging.sh",
     "vendor_bind.sh",
     "widevine.sh",
-    "zygisk_hide.sh"
+    "zygisk_hide.sh",
+    "rezygisk_redirect.sh"
 )
 val packagedModuleFiles = setOf(
     "module.prop",
@@ -185,6 +186,7 @@ val packagedModuleFiles = setOf(
     "lib/vendor_bind.sh",
     "lib/widevine.sh",
     "lib/zygisk_hide.sh",
+    "lib/rezygisk_redirect.sh",
     "zygisk/arm64-v8a.so",
     "lib/libarirang_drm_hook.so",
     "bin/arirang_injector"

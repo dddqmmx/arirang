@@ -60,3 +60,12 @@ allow su arirang_hook_file file { read open getattr execute map map_write }
 # WRITE) on the mapped pages; map_write alone cannot read or modify the file
 # (root-owned 0640, no read/open grant for app domains, private CoW copy).
 allow { untrusted_app platform_app priv_app } arirang_hook_file file { map_write }
+
+# ReZygisk injection-library redirect (lib/rezygisk_redirect.sh): the ptrace
+# injector's remote openat executes in the CHILD'S SELinux context (app and
+# isolated domains), so the redirected loader copy must be readable and
+# mappable there. Scoped to this single file type.
+type arirang_rtlib_file file_type
+typeattribute arirang_rtlib_file mlstrustedobject
+allow zygote arirang_rtlib_file file { read open getattr map execute }
+allow { untrusted_app isolated_app platform_app priv_app } arirang_rtlib_file file { read open getattr map }
