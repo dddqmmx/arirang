@@ -171,8 +171,7 @@ val moduleLibrarySources = listOf(
     "resetprop.sh",
     "staging.sh",
     "vendor_bind.sh",
-    "widevine.sh",
-    "zygisk_hide.sh"
+    "widevine.sh"
 )
 val packagedModuleFiles = setOf(
     "module.prop",
@@ -184,7 +183,6 @@ val packagedModuleFiles = setOf(
     "lib/staging.sh",
     "lib/vendor_bind.sh",
     "lib/widevine.sh",
-    "lib/zygisk_hide.sh",
     "zygisk/arm64-v8a.so",
     "lib/libarirang_drm_hook.so",
     "bin/arirang_injector"
@@ -251,76 +249,8 @@ val buildNative by tasks.registering(Exec::class) {
     }
 }
 
-// Build-time identity scrub of the Zygisk module library. Root detectors
-// (e.g. com.reveny.nativecheck) scan a process's mapped libraries for marker
-// substrings (arirang / nana7mi / zygisk / libmod1 ...) and report a mapped
-// library carrying them as an "injected" module. The exported zygisk entry
-// point names must survive (the framework dlsyms them), and the manager
-// profile-env name must survive (the manager app reads it); everything else
-// in the loaded image is zero-filled or length-preservingly renamed so the
-// deployed .so carries no recognizable marker. Source-side paths/tags are
-// already assembled from fragments (arirang_build_config.hpp.in).
-val scrubZygiskSo by tasks.registering {
-    dependsOn(buildNative)
-    doLast {
-        val so = nativeBuildDir.get().file("libarirang_zygisk.so").asFile
-        if (!so.exists()) throw GradleException("scrubZygiskSo: ${so} missing")
-        val bytes = so.readBytes()
-        fun indexOf(data: ByteArray, pat: String, from: Int): Int {
-            val pb = pat.toByteArray(Charsets.ISO_8859_1)
-            var i = from
-            outer@ while (i + pb.size <= data.size) {
-                for (j in pb.indices) if (data[i + j] != pb[j]) { i++; continue@outer }
-                return i
-            }
-            return -1
-        }
-        fun countOf(data: ByteArray, pat: String): List<IntRange> {
-            val out = mutableListOf<IntRange>()
-            var i = 0
-            while (true) {
-                val at = indexOf(data, pat, i)
-                if (at < 0) break
-                out += at until (at + pat.length)
-                i = at + 1
-            }
-            return out
-        }
-        val keepRuns = mutableListOf<IntRange>()
-        for (k in arrayOf("zygisk_module_entry", "zygisk_companion_entry", "ARIRANG_SUBMODULE_VERSION")) {
-            keepRuns += countOf(bytes, k)
-        }
-        val replacePairs = arrayOf("libarirang_zygisk.so" to "libvendor_hwc_util_a")
-        for ((from, to) in replacePairs) {
-            require(from.length == to.length) { "replacement length mismatch: $from -> $to" }
-            var i = 0
-            while (true) {
-                val at = indexOf(bytes, from, i)
-                if (at < 0) break
-                val tb = to.toByteArray(Charsets.ISO_8859_1)
-                for (j in tb.indices) bytes[at + j] = tb[j]
-                i = at + from.length
-            }
-        }
-        for (pattern in arrayOf("Zygisk", "zygisk", "Arirang", "arirang", "nana7mi", "libmod1", "libarirang", "submodule config")) {
-            var i = 0
-            while (true) {
-                val at = indexOf(bytes, pattern, i)
-                if (at < 0) break
-                val kept = keepRuns.any { r -> at < r.endInclusive + 1 && at + pattern.length - 1 >= r.first }
-                if (!kept) {
-                    for (j in at until at + pattern.length) bytes[j] = 0
-                }
-                i = at + 1
-            }
-        }
-        so.writeBytes(bytes)
-        println("scrubZygiskSo: patched ${so.absolutePath}")
-    }
-}
-
 val stageModule by tasks.registering(Sync::class) {
-    dependsOn(scrubZygiskSo)
+    dependsOn(buildNative)
     duplicatesStrategy = DuplicatesStrategy.FAIL
     dirPermissions { unix("rwxr-xr-x") }
 

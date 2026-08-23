@@ -269,7 +269,6 @@ bool apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
 
         // Sensor spoofing configuration.
         read_bool(j, "sensorConfigEnabled", parsed.sensor_config_enabled);
-        read_bool(j, "keepModuleLoadedInAllApps", parsed.keep_module_loaded_in_all_apps);
         read_bool(j, "sensorHideAll", parsed.sensor_hide_all);
         read_string(j, "sensorGlobalVendorReplacement", parsed.sensor_global_vendor_replacement,
                     kMaxRuleStringSize);
@@ -371,9 +370,7 @@ bool apply_json_config(SubmoduleConfig &config, const std::string &json_str) {
         " sensorOverrides=" + std::to_string(config.sensor_overrides.size()) +
         " sensorInjections=" + std::to_string(config.sensor_injections.size()) +
         " systemSettingEnabled=" + (config.system_setting_enabled ? "true" : "false") +
-        " timeZoneByPackage=" + std::to_string(config.time_zone_by_package.size()) +
-        " keepModuleLoadedInAllApps=" +
-        (config.keep_module_loaded_in_all_apps ? "true" : "false")
+        " timeZoneByPackage=" + std::to_string(config.time_zone_by_package.size())
     );
     return true;
 }
@@ -383,13 +380,11 @@ bool load_config_from_disk(SubmoduleConfig &config) {
     // encrypted storage becomes available after user unlock. Try DE first so
     // post-fs-data/service paths can work before unlock, then fall back to CE
     // for older installs or manual debug copies.
-    const std::string path_de = arirang::config_path_de();
-    const std::string path_ce = arirang::config_path_ce();
-    std::string json = read_file(path_de.c_str(), kMaxConfigSize);
-    std::string path = path_de;
+    std::string json = read_file(kConfigPathDe, kMaxConfigSize);
+    const char *path = kConfigPathDe;
     if (json.empty()) {
-        json = read_file(path_ce.c_str(), kMaxConfigSize);
-        path = path_ce;
+        json = read_file(kConfigPathCe, kMaxConfigSize);
+        path = kConfigPathCe;
     }
     if (json.empty()) {
         log_warn("submodule config disk reload found no config file");
@@ -448,8 +443,6 @@ std::string build_timezone_view(const std::string &raw) {
         out["timeZoneGlobal"] = j.value("timeZoneGlobal", std::string{});
         out["systemSettingConfigVersion"] =
             j.value("systemSettingConfigVersion", jlong{0});
-        out["keepModuleLoadedInAllApps"] =
-            j.value("keepModuleLoadedInAllApps", false);
         if (auto it = j.find("timeZoneByPackage");
             it != j.end() && it->is_object()) {
             Json map;
@@ -476,9 +469,9 @@ void companion_handler(int fd) {
     if (!companion_peer_is_authorized(fd, &peer)) return;
 
     try {
-        std::string content = read_file(arirang::config_path_de().c_str(), kMaxConfigSize);
+        std::string content = read_file(kConfigPathDe, kMaxConfigSize);
         if (content.empty()) {
-            content = read_file(arirang::config_path_ce().c_str(), kMaxConfigSize);
+            content = read_file(kConfigPathCe, kMaxConfigSize);
         }
 
         // Ordinary app processes get a trimmed view (timezone rules only) so

@@ -76,22 +76,9 @@ const char *path_basename(const char *path) {
 }
 
 bool is_trusted_sensor_library(const char *path) {
-    if (path == nullptr || path[0] != '/' || std::strstr(path, " (deleted)") != nullptr) {
+    if (path == nullptr || path[0] != '/' || std::strstr(path, " (deleted)") != nullptr ||
+        std::strstr(path, "/memfd:") != nullptr) {
         return false;
-    }
-    {
-        char memfd_pfx[8];
-        memfd_pfx[0] = static_cast<char>(47);
-        memfd_pfx[1] = static_cast<char>(109);
-        memfd_pfx[2] = static_cast<char>(101);
-        memfd_pfx[3] = static_cast<char>(109);
-        memfd_pfx[4] = static_cast<char>(102);
-        memfd_pfx[5] = static_cast<char>(100);
-        memfd_pfx[6] = static_cast<char>(58);
-        memfd_pfx[7] = 0;
-        if (std::strstr(path, memfd_pfx) != nullptr) {
-            return false;
-        }
     }
     const bool trusted_root = std::strncmp(path, "/system/lib64/", 14) == 0 ||
         std::strncmp(path, "/system_ext/lib64/", 18) == 0 ||

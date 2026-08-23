@@ -15,12 +15,12 @@
 namespace arirang {
 
 namespace {
-constexpr const char *kLogTag = "hwcomposer_vendor";
+constexpr const char *kLogTag = "ArirangZygisk";
 constexpr off_t kMaxLogFileSize = 1024 * 1024;
 constexpr size_t kMaxLogLineSize = 4096;
 
 const std::string &build_log_path() {
-    static const std::string path = arirang::config_path_de() + ".log";
+    static const std::string path = std::string(kConfigPathDe) + ".log";
     return path;
 }
 

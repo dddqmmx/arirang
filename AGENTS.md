@@ -75,7 +75,6 @@ There are **67 JVM unit tests** in `app/src/test/` (`ConfigImportExportTest`, `C
 - Native submodule runtime tags: `ArirangZygisk`, `arirang_service`, `arirang_post_fs_data`, `ArirangDrmHook`.
 - To verify the Widevine `deviceUniqueId` path is spoofed, open the self-check app and trigger `MediaDrm.getPropertyByteArray(PROPERTY_DEVICE_UNIQUE_ID)`; confirm logcat reports `spoofed deviceUniqueId byte[]`.
 - See `submodule/doc/drm_hook_research.md` for the current vtable-based DRM hook design and reference-device notes.
-- `submodule/doc/zygisk_detection_research.md` tracks the `com.reveny.nativecheck` "Detected Zygisk (2)" investigation: proven that the count tracks Arirang's `libmod1.so` mapped in system_server + com.android.phone, with a staged fix plan (path camouflage → memfd/relocation).
 
 ## CI
 

@@ -109,7 +109,6 @@ struct SubmoduleConfig {
 
     // Sensor spoofing configuration.
     bool sensor_config_enabled = false;
-    bool keep_module_loaded_in_all_apps = false;
     bool sensor_hide_all = false;
     std::string sensor_global_vendor_replacement;
     std::vector<std::string> sensor_vendor_keywords;

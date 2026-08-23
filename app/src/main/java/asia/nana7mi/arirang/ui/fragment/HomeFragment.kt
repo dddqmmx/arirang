@@ -41,6 +41,6 @@ class HomeFragment : Fragment() {
     }
 
     fun submoduleVersion(): String? {
-        return System.getenv("HWC_MODULE_VERSION")
+        return System.getenv("ARIRANG_SUBMODULE_VERSION")
     }
 }

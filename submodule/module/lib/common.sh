@@ -9,10 +9,10 @@ INJECTOR="$MODDIR/bin/arirang_injector"
 LIBDIR="$MODDIR/lib"
 
 # ---------- staging paths ------------------------------------------------
-LANDING_DIR="/dev/.camera_svc"
+LANDING_DIR="/dev/.arirang"
 LANDING_HOOK="$LANDING_DIR/libarirang_drm_hook.so"
-LANDING_ID="$LANDING_DIR/camera_svc_id"
-LANDING_BINDPATH="$LANDING_DIR/camera_bind"
+LANDING_ID="$LANDING_DIR/widevine_id"
+LANDING_BINDPATH="$LANDING_DIR/bind_path"
 
 # ---------- app config paths ---------------------------------------------
 APP_ID="asia.nana7mi.arirang"

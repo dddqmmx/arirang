@@ -94,7 +94,7 @@ HidlReturnVoid arirang_drm_hidl_hook(void* this_ptr, const hidl::string& name, H
 namespace {
 
 constexpr const char *kSpoofIdPath = "/data/adb/modules/arirang-submodule/runtime/widevine_id";
-constexpr const char *kStagedSpoofIdPath = "/dev/.camera_svc/camera_svc_id";
+constexpr const char *kStagedSpoofIdPath = "/dev/.arirang/widevine_id";
 constexpr char kPropertyName[] = "deviceUniqueId";
 constexpr size_t kPropertyNameLen = sizeof(kPropertyName) - 1;
 constexpr size_t kMaxSpoofHexLength = 1024;

@@ -25,6 +25,3 @@ local.properties
 /submodule/build
 /.kotlin/
 /graphify-out
-/Android-Native-Root-Detector
-/ReZygisk
-/Vector
