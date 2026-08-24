@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 import java.security.SecureRandom
 
 @Composable
@@ -108,9 +108,10 @@ internal fun WifiTextField(
         label = { Text(label) },
         trailingIcon = {
             if (onRandom != null) {
-                IconButton(onClick = onRandom) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
-                }
+                RandomizeIconButton(
+                    contentDescription = stringResource(R.string.unique_randomize),
+                    onClick = onRandom
+                )
             }
         },
         singleLine = true,

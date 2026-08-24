@@ -2,6 +2,7 @@ package asia.nana7mi.arirang.ui.screen.bluetooth
 
 import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.bluetooth.*
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 import asia.nana7mi.arirang.ui.component.common.ToggleSettingRow
 import asia.nana7mi.arirang.ui.component.common.ExpandableSectionCard
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothSearching
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,10 +72,15 @@ internal fun BluetoothConfigScreen(
         onSave = { saveCurrent() },
         onBack = onBack,
         actions = {
-            IconButton(onClick = {
-                config = BluetoothConfigPrefs.Config()
-            }) {
-                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.bluetooth_apply_defaults))
+            RandomizeIconButton(contentDescription = stringResource(R.string.unique_randomize_all)) {
+                config = config.copy(
+                    connectedDevices = config.connectedDevices.map { device ->
+                        device.copy(address = randomMacAddress())
+                    },
+                    scanResults = config.scanResults.map { device ->
+                        device.copy(address = randomMacAddress())
+                    }
+                )
             }
         }
     ) { padding ->

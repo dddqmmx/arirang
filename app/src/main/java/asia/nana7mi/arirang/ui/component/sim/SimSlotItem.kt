@@ -20,6 +20,7 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.SimInfo
 import asia.nana7mi.arirang.model.SimPreset
 import asia.nana7mi.arirang.model.SimPresetCatalog
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 import java.security.SecureRandom
 
 fun getSimPresets(): List<SimPreset> = SimPresetCatalog.ALL
@@ -330,9 +331,10 @@ fun SimField(
         placeholder = placeholder?.let { { Text(it) } },
         trailingIcon = {
             if (onRandom != null) {
-                IconButton(onClick = onRandom) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
-                }
+                RandomizeIconButton(
+                    contentDescription = stringResource(R.string.unique_randomize),
+                    onClick = onRandom
+                )
             }
         },
         modifier = modifier.fillMaxWidth(),

@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 
 @Composable
 internal fun IdentifierTextField(
@@ -53,9 +53,10 @@ internal fun IdentifierTextField(
         label = { Text(label) },
         trailingIcon = {
             if (onRandom != null) {
-                IconButton(onClick = onRandom) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.unique_randomize))
-                }
+                RandomizeIconButton(
+                    contentDescription = stringResource(R.string.unique_randomize),
+                    onClick = onRandom
+                )
             }
         },
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),

@@ -12,7 +12,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiFind
 import androidx.compose.material3.CardDefaults
@@ -41,6 +40,7 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.WifiConfigPrefs
 import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.common.ExpandableSectionCard
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 import asia.nana7mi.arirang.ui.component.common.ToggleSettingRow
 import asia.nana7mi.arirang.ui.component.wifi.*
 
@@ -70,7 +70,7 @@ internal fun WifiConfigScreen(
         onSave = { saveCurrent() },
         onBack = onBack,
         actions = {
-            IconButton(onClick = {
+            RandomizeIconButton(contentDescription = stringResource(R.string.unique_randomize_all)) {
                 val lan = randomLanAddresses()
                 config = config.copy(
                     currentBssid = randomBssid(),
@@ -88,11 +88,6 @@ internal fun WifiConfigScreen(
                             )
                         )
                     }
-                )
-            }) {
-                Icon(
-                    Icons.Default.Shuffle,
-                    contentDescription = stringResource(R.string.unique_randomize_all)
                 )
             }
         }

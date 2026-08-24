@@ -3,6 +3,7 @@ package asia.nana7mi.arirang.ui.screen.identifier
 import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
 import asia.nana7mi.arirang.ui.component.identifier.*
 import asia.nana7mi.arirang.ui.component.common.ConfigSectionCard
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,13 +20,11 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -113,7 +112,7 @@ internal fun UniqueIdentifierConfigScreen(
         onSave = { saveCurrent() },
         onBack = onBack,
         actions = {
-            IconButton(onClick = {
+            RandomizeIconButton(contentDescription = stringResource(R.string.unique_randomize_all)) {
                 config = config.copy(
                     androidId = UniqueIdentifierPrefs.randomAndroidId(),
                     gaid = UniqueIdentifierPrefs.randomGaid(),
@@ -130,8 +129,6 @@ internal fun UniqueIdentifierConfigScreen(
                 }
                 updateImeis()
                 revision++
-            }) {
-                Icon(Icons.Default.Shuffle, contentDescription = stringResource(R.string.unique_randomize_all))
             }
         },
         floatingActionButton = {

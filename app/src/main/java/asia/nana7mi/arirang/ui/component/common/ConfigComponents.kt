@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -230,5 +231,24 @@ internal fun LabelledDropdown(
                 }
             }
         }
+    }
+}
+
+/**
+ * The single randomize control for every config screen: per-field regeneration
+ * and screen-wide "randomize all" both render this, so icon and behavior stay
+ * identical across features.
+ */
+@Composable
+internal fun RandomizeIconButton(
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    IconButton(onClick = onClick, modifier = modifier) {
+        Icon(
+            imageVector = Icons.Default.Shuffle,
+            contentDescription = contentDescription
+        )
     }
 }
