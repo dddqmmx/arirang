@@ -41,6 +41,31 @@ class HomeFragment : Fragment() {
     }
 
     fun submoduleVersion(): String? {
-        return System.getenv("ARIRANG_SUBMODULE_VERSION")
+        System.getenv("ARIRANG_SUBMODULE_VERSION")?.let { return it }
+        // ART snapshots the process environment in the zygote before fork, so
+        // the marker the module sets during specialize never reaches Java's
+        // getenv. Fall back to the module-managed config file in our own
+        // device-protected storage: it exists only when the root-side
+        // submodule infrastructure has provisioned this app. Submodule and
+        // app are versioned together, so report our own versionName.
+        return try {
+            val dataDir = requireContext().applicationInfo.dataDir.removeSuffix("/")
+            // /data/user/0/<pkg> -> /data/user_de/0/<pkg>/files
+            val deFiles = if (dataDir.contains("/user/0/")) {
+                dataDir.replace("/user/0/", "/user_de/0/") + "/files"
+            } else {
+                requireContext().createDeviceProtectedStorageContext()
+                    .applicationInfo.dataDir + "/files"
+            }
+            val config = java.io.File(deFiles, "arirang-submodule/config.json")
+            if (config.exists() && config.length() > 0) {
+                requireContext().packageManager
+                    .getPackageInfo(requireContext().packageName, 0).versionName
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 }
