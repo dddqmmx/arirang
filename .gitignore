@@ -20,6 +20,9 @@ local.properties
 *.keystore
 /app/release/
 /android-source
+/Android-Native-Root-Detector
+/ReZygisk
+/Vector
 /app/build
 /selfcheck/build
 /submodule/build
