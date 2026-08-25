@@ -393,6 +393,7 @@
     <string name="advanced_settings_summary">アーキテクチャと低レベルのパフォーマンス調整</string>
     <string name="advanced_settings_title">詳細設定</string>
     <string name="backup_restore_title">バックアップと復元</string>
+    <string name="backup_restore_summary">設定ファイルをエクスポートまたはインポートします</string>
     <string name="export_config_title">設定をエクスポート</string>
     <string name="export_config_summary">アプリの設定ファイルを ZIP アーカイブにバックアップします</string>
     <string name="import_config_title">設定をインポート</string>

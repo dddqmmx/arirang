@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +35,7 @@ import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.AppPreferences
 import asia.nana7mi.arirang.data.datastore.HookLogSettings
 import asia.nana7mi.arirang.data.config.ConfigBackupManager
+import asia.nana7mi.arirang.ui.component.dialog.BackupRestoreDialog
 import asia.nana7mi.arirang.ui.component.dialog.HookLogDialog
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -123,6 +123,7 @@ fun SettingsScreen(
 
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showLogDialog by remember { mutableStateOf(false) }
+    var showBackupRestoreDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -141,6 +142,17 @@ fun SettingsScreen(
         }
 
         item {
+            SettingsSection(title = stringResource(R.string.ui_settings_title)) {
+                SettingCard(
+                    title = stringResource(R.string.title_activity_language_settings),
+                    summary = currentLanguage,
+                    icon = Icons.Default.Language,
+                    onClick = { showLanguageDialog = true }
+                )
+            }
+        }
+
+        item {
             SettingsSection(title = stringResource(R.string.global_settings_title)) {
                 SettingCard(
                     title = stringResource(R.string.advanced_settings_title),
@@ -154,33 +166,10 @@ fun SettingsScreen(
         item {
             SettingsSection(title = stringResource(R.string.backup_restore_title)) {
                 SettingCard(
-                    title = stringResource(R.string.export_config_title),
-                    summary = stringResource(R.string.export_config_summary),
-                    icon = Icons.Default.Save,
-                    onClick = {
-                        val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-                        val fileName = "arirang_config_${dateFormat.format(Date())}.zip"
-                        exportConfigLauncher.launch(fileName)
-                    }
-                )
-                SettingCard(
-                    title = stringResource(R.string.import_config_title),
-                    summary = stringResource(R.string.import_config_summary),
+                    title = stringResource(R.string.backup_restore_title),
+                    summary = stringResource(R.string.backup_restore_summary),
                     icon = Icons.Default.Restore,
-                    onClick = {
-                        importConfigLauncher.launch(arrayOf("application/zip"))
-                    }
-                )
-            }
-        }
-
-        item {
-            SettingsSection(title = stringResource(R.string.ui_settings_title)) {
-                SettingCard(
-                    title = stringResource(R.string.title_activity_language_settings),
-                    summary = currentLanguage,
-                    icon = Icons.Default.Language,
-                    onClick = { showLanguageDialog = true }
+                    onClick = { showBackupRestoreDialog = true }
                 )
             }
         }
@@ -215,6 +204,20 @@ fun SettingsScreen(
         HookLogDialog(
             modules = logModules,
             onDismiss = { showLogDialog = false }
+        )
+    }
+
+    if (showBackupRestoreDialog) {
+        BackupRestoreDialog(
+            onExport = {
+                val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                val fileName = "arirang_config_${dateFormat.format(Date())}.zip"
+                exportConfigLauncher.launch(fileName)
+            },
+            onImport = {
+                importConfigLauncher.launch(arrayOf("application/zip"))
+            },
+            onDismiss = { showBackupRestoreDialog = false }
         )
     }
 }
