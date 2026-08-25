@@ -165,53 +165,64 @@ internal fun BluetoothConfigScreen(
                     expanded = connectedExpanded,
                     onExpandedChange = { connectedExpanded = !connectedExpanded },
                     icon = Icons.Default.Bluetooth,
-                    trailingAction = {
-                        IconButton(onClick = {
-                            val next = BluetoothConfigPrefs.defaultDevice(config.connectedDevices.size, false)
-                            val nextIndex = config.connectedDevices.size
-                            config = config.copy(connectedDevices = config.connectedDevices + next)
-                            connectedExpanded = true
-                            connectedDeviceExpanded[nextIndex] = true
-                        }) {
-                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.bluetooth_add_connected_device))
+                    trailingAction = if (!config.unchangedConnectedDevices && !config.hideConnectedDevices) {
+                        {
+                            IconButton(onClick = {
+                                val next = BluetoothConfigPrefs.defaultDevice(config.connectedDevices.size, false)
+                                val nextIndex = config.connectedDevices.size
+                                config = config.copy(connectedDevices = config.connectedDevices + next)
+                                connectedExpanded = true
+                                connectedDeviceExpanded[nextIndex] = true
+                            }) {
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.bluetooth_add_connected_device))
+                            }
                         }
-                    }
+                    } else null
                 ) {
                     ToggleSettingRow(
-                        title = stringResource(R.string.bluetooth_hide_all_connected),
-                        summary = stringResource(R.string.bluetooth_hide_all_connected_summary),
-                        checked = config.hideConnectedDevices,
-                        onCheckedChange = { config = config.copy(hideConnectedDevices = it) }
+                        title = stringResource(R.string.bluetooth_unchanged_connected),
+                        summary = stringResource(R.string.bluetooth_unchanged_connected_summary),
+                        checked = config.unchangedConnectedDevices,
+                        onCheckedChange = { config = config.copy(unchangedConnectedDevices = it) }
                     )
 
-                    if (!config.hideConnectedDevices) {
-                        config.connectedDevices.forEachIndexed { index, device ->
-                            if (index > 0) HorizontalDivider()
-                            DeviceEditor(
-                                title = stringResource(R.string.bluetooth_connected_device_title, index + 1),
-                                removeContentDescription = stringResource(R.string.bluetooth_remove_connected_device),
-                                device = device,
-                                expanded = connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1),
-                                canRemove = true,
-                                onExpandedChange = {
-                                    connectedDeviceExpanded[index] = !(connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1))
-                                },
-                                onDeviceChange = { changed ->
-                                    config = config.copy(
-                                        connectedDevices = config.connectedDevices.toMutableList().also {
-                                            it[index] = changed
-                                        }
-                                    )
-                                },
-                                onRemove = {
-                                    config = config.copy(
-                                        connectedDevices = config.connectedDevices.filterIndexed { itemIndex, _ ->
-                                            itemIndex != index
-                                        }
-                                    )
-                                    connectedDeviceExpanded.remove(index)
-                                }
-                            )
+                    if (!config.unchangedConnectedDevices) {
+                        ToggleSettingRow(
+                            title = stringResource(R.string.bluetooth_hide_all_connected),
+                            summary = stringResource(R.string.bluetooth_hide_all_connected_summary),
+                            checked = config.hideConnectedDevices,
+                            onCheckedChange = { config = config.copy(hideConnectedDevices = it) }
+                        )
+
+                        if (!config.hideConnectedDevices) {
+                            config.connectedDevices.forEachIndexed { index, device ->
+                                if (index > 0) HorizontalDivider()
+                                DeviceEditor(
+                                    title = stringResource(R.string.bluetooth_connected_device_title, index + 1),
+                                    removeContentDescription = stringResource(R.string.bluetooth_remove_connected_device),
+                                    device = device,
+                                    expanded = connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1),
+                                    canRemove = true,
+                                    onExpandedChange = {
+                                        connectedDeviceExpanded[index] = !(connectedDeviceExpanded[index] ?: (config.connectedDevices.size == 1))
+                                    },
+                                    onDeviceChange = { changed ->
+                                        config = config.copy(
+                                            connectedDevices = config.connectedDevices.toMutableList().also {
+                                                it[index] = changed
+                                            }
+                                        )
+                                    },
+                                    onRemove = {
+                                        config = config.copy(
+                                            connectedDevices = config.connectedDevices.filterIndexed { itemIndex, _ ->
+                                                itemIndex != index
+                                            }
+                                        )
+                                        connectedDeviceExpanded.remove(index)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -223,53 +234,64 @@ internal fun BluetoothConfigScreen(
                     expanded = nearbyExpanded,
                     onExpandedChange = { nearbyExpanded = !nearbyExpanded },
                     icon = Icons.Default.BluetoothSearching,
-                    trailingAction = {
-                        IconButton(onClick = {
-                            val next = BluetoothConfigPrefs.defaultDevice(config.scanResults.size, true)
-                            val nextIndex = config.scanResults.size
-                            config = config.copy(scanResults = config.scanResults + next)
-                            nearbyExpanded = true
-                            scanResultExpanded[nextIndex] = true
-                        }) {
-                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.bluetooth_add_scan_result))
+                    trailingAction = if (!config.unchangedScanResults && !config.hideScanResults) {
+                        {
+                            IconButton(onClick = {
+                                val next = BluetoothConfigPrefs.defaultDevice(config.scanResults.size, true)
+                                val nextIndex = config.scanResults.size
+                                config = config.copy(scanResults = config.scanResults + next)
+                                nearbyExpanded = true
+                                scanResultExpanded[nextIndex] = true
+                            }) {
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.bluetooth_add_scan_result))
+                            }
                         }
-                    }
+                    } else null
                 ) {
                     ToggleSettingRow(
-                        title = stringResource(R.string.bluetooth_hide_all_scan_results),
-                        summary = stringResource(R.string.bluetooth_hide_all_scan_results_summary),
-                        checked = config.hideScanResults,
-                        onCheckedChange = { config = config.copy(hideScanResults = it) }
+                        title = stringResource(R.string.bluetooth_unchanged_scan_results),
+                        summary = stringResource(R.string.bluetooth_unchanged_scan_results_summary),
+                        checked = config.unchangedScanResults,
+                        onCheckedChange = { config = config.copy(unchangedScanResults = it) }
                     )
 
-                    if (!config.hideScanResults) {
-                        config.scanResults.forEachIndexed { index, device ->
-                            if (index > 0) HorizontalDivider()
-                            DeviceEditor(
-                                title = stringResource(R.string.bluetooth_scan_result_title, index + 1),
-                                removeContentDescription = stringResource(R.string.bluetooth_remove_scan_result),
-                                device = device,
-                                expanded = scanResultExpanded[index] ?: (config.scanResults.size == 1),
-                                canRemove = true,
-                                onExpandedChange = {
-                                    scanResultExpanded[index] = !(scanResultExpanded[index] ?: (config.scanResults.size == 1))
-                                },
-                                onDeviceChange = { changed ->
-                                    config = config.copy(
-                                        scanResults = config.scanResults.toMutableList().also {
-                                            it[index] = changed
-                                        }
-                                    )
-                                },
-                                onRemove = {
-                                    config = config.copy(
-                                        scanResults = config.scanResults.filterIndexed { itemIndex, _ ->
-                                            itemIndex != index
-                                        }
-                                    )
-                                    scanResultExpanded.remove(index)
-                                }
-                            )
+                    if (!config.unchangedScanResults) {
+                        ToggleSettingRow(
+                            title = stringResource(R.string.bluetooth_hide_all_scan_results),
+                            summary = stringResource(R.string.bluetooth_hide_all_scan_results_summary),
+                            checked = config.hideScanResults,
+                            onCheckedChange = { config = config.copy(hideScanResults = it) }
+                        )
+
+                        if (!config.hideScanResults) {
+                            config.scanResults.forEachIndexed { index, device ->
+                                if (index > 0) HorizontalDivider()
+                                DeviceEditor(
+                                    title = stringResource(R.string.bluetooth_scan_result_title, index + 1),
+                                    removeContentDescription = stringResource(R.string.bluetooth_remove_scan_result),
+                                    device = device,
+                                    expanded = scanResultExpanded[index] ?: (config.scanResults.size == 1),
+                                    canRemove = true,
+                                    onExpandedChange = {
+                                        scanResultExpanded[index] = !(scanResultExpanded[index] ?: (config.scanResults.size == 1))
+                                    },
+                                    onDeviceChange = { changed ->
+                                        config = config.copy(
+                                            scanResults = config.scanResults.toMutableList().also {
+                                                it[index] = changed
+                                            }
+                                        )
+                                    },
+                                    onRemove = {
+                                        config = config.copy(
+                                            scanResults = config.scanResults.filterIndexed { itemIndex, _ ->
+                                                itemIndex != index
+                                            }
+                                        )
+                                        scanResultExpanded.remove(index)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

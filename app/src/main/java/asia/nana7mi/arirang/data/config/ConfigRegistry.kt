@@ -100,7 +100,8 @@ object ConfigRegistry {
             currentSchemaVersion = WifiConfigSchema.SCHEMA_VERSION,
             realtimeAvailable = true,
             requiredFields = requiredFields(
-                "enabled", "currentSsid", "currentBssid", "hideScanResults", "scanResults"
+                "enabled", "unchangedCurrentWifi", "currentSsid", "currentBssid",
+                "unchangedScanResults", "hideScanResults", "scanResults"
             ),
             versionReader = WifiConfigPrefs::lastModified,
             snapshotReader = WifiConfigPrefs::buildHookSnapshot,
@@ -113,8 +114,8 @@ object ConfigRegistry {
             currentSchemaVersion = BluetoothConfigSchema.SCHEMA_VERSION,
             realtimeAvailable = true,
             requiredFields = requiredFields(
-                "enabled", "deviceName", "connectedDevices", "hideConnectedDevices",
-                "hideScanResults", "scanResults"
+                "enabled", "deviceName", "unchangedConnectedDevices", "connectedDevices",
+                "hideConnectedDevices", "unchangedScanResults", "hideScanResults", "scanResults"
             ),
             versionReader = BluetoothConfigPrefs::lastModified,
             snapshotReader = BluetoothConfigPrefs::buildHookSnapshot,

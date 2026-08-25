@@ -13,8 +13,10 @@ import org.json.JSONObject
 internal data class BluetoothHookConfig(
     val enabled: Boolean = false,
     val deviceName: String = "Arirang",
+    val unchangedConnectedDevices: Boolean = false,
     val connectedDevices: List<BluetoothDeviceProfile> = listOf(BluetoothDeviceProfile()),
     val hideConnectedDevices: Boolean = false,
+    val unchangedScanResults: Boolean = false,
     val hideScanResults: Boolean = false,
     val scanResults: List<BluetoothDeviceProfile> = listOf(
         BluetoothDeviceProfile(name = "Nearby-BT", address = "02:00:00:DD:EE:FF")
@@ -53,9 +55,11 @@ internal class BluetoothConfigStore {
                 enabled = schema.enabled,
                 deviceName = schema.deviceName
                     .takeIf { it.isNotBlank() } ?: "Arirang",
+                unchangedConnectedDevices = schema.unchangedConnectedDevices,
                 connectedDevices = schema.connectedDevices.map { BluetoothDeviceProfile(it.name, it.address) }
                     .filter { it.name.isNotBlank() && isValidBluetoothAddress(it.address) },
                 hideConnectedDevices = schema.hideConnectedDevices,
+                unchangedScanResults = schema.unchangedScanResults,
                 hideScanResults = schema.hideScanResults,
                 scanResults = schema.scanResults.map { BluetoothDeviceProfile(it.name, it.address) }
                     .filter { it.name.isNotBlank() && isValidBluetoothAddress(it.address) }
@@ -70,11 +74,19 @@ internal class BluetoothConfigStore {
             enabled = prefs.getBoolean(BluetoothConfigPrefs.KEY_ENABLED, false),
             deviceName = prefs.getString(BluetoothConfigPrefs.KEY_DEVICE_NAME, null)
                 ?.takeIf { it.isNotBlank() } ?: "Arirang",
+            unchangedConnectedDevices = prefs.getBoolean(
+                BluetoothConfigPrefs.KEY_UNCHANGED_CONNECTED_DEVICES,
+                false
+            ),
             connectedDevices = parseDevices(
                 prefs.getString(BluetoothConfigPrefs.KEY_CONNECTED_DEVICES, null)
             ),
             hideConnectedDevices = prefs.getBoolean(
                 BluetoothConfigPrefs.KEY_HIDE_CONNECTED_DEVICES,
+                false
+            ),
+            unchangedScanResults = prefs.getBoolean(
+                BluetoothConfigPrefs.KEY_UNCHANGED_SCAN_RESULTS,
                 false
             ),
             hideScanResults = prefs.getBoolean(BluetoothConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),

@@ -192,6 +192,10 @@
     <string name="wifi_remove_scan_result">Remove nearby Wi-Fi</string>
     <string name="wifi_scan_result_title">Nearby Wi-Fi %1$d</string>
     <string name="wifi_apply_defaults">Apply defaults</string>
+    <string name="wifi_unchanged_current">Do not modify current Wi-Fi</string>
+    <string name="wifi_unchanged_current_summary">Keep actual Wi-Fi connection info without modifying</string>
+    <string name="wifi_unchanged_scan_results">Do not modify nearby Wi-Fi</string>
+    <string name="wifi_unchanged_scan_results_summary">Keep actual Wi-Fi scan results without modifying</string>
 
     <string name="bluetooth_config_title">Bluetooth Information</string>
     <string name="bluetooth_hook_enabled">Enable hook</string>
@@ -213,6 +217,10 @@
     <string name="bluetooth_remove_scan_result">Remove nearby device</string>
     <string name="bluetooth_scan_result_title">Nearby Device %1$d</string>
     <string name="bluetooth_apply_defaults">Apply defaults</string>
+    <string name="bluetooth_unchanged_connected">Do not modify connected devices</string>
+    <string name="bluetooth_unchanged_connected_summary">Keep actual connected Bluetooth devices without modifying</string>
+    <string name="bluetooth_unchanged_scan_results">Do not modify nearby devices</string>
+    <string name="bluetooth_unchanged_scan_results_summary">Keep actual Bluetooth scan results without modifying</string>
 
     
     <string name="init_select_language">Select Language</string>

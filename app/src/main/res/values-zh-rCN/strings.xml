@@ -175,6 +175,10 @@
     <string name="wifi_remove_scan_result">删除周边 Wi-Fi</string>
     <string name="wifi_scan_result_title">周边 Wi-Fi %1$d</string>
     <string name="wifi_apply_defaults">应用默认值</string>
+    <string name="wifi_unchanged_current">不修改当前 Wi-Fi</string>
+    <string name="wifi_unchanged_current_summary">保持系统实际连接的 Wi-Fi 信息，不作修改</string>
+    <string name="wifi_unchanged_scan_results">不修改周边 Wi-Fi</string>
+    <string name="wifi_unchanged_scan_results_summary">保持系统扫描到的周边 Wi-Fi 列表，不作修改</string>
 
     <string name="bluetooth_config_title">蓝牙信息</string>
     <string name="bluetooth_hook_enabled">启用 Hook</string>
@@ -195,6 +199,10 @@
     <string name="bluetooth_remove_scan_result">删除周边设备</string>
     <string name="bluetooth_scan_result_title">周边设备 %1$d</string>
     <string name="bluetooth_apply_defaults">应用默认值</string>
+    <string name="bluetooth_unchanged_connected">不修改已连接设备</string>
+    <string name="bluetooth_unchanged_connected_summary">保持系统默认已连接设备列表，不作修改</string>
+    <string name="bluetooth_unchanged_scan_results">不修改周边设备</string>
+    <string name="bluetooth_unchanged_scan_results_summary">保持系统扫描到的周边设备，不作修改</string>
 
     
     <string name="init_select_language">选择语言</string>

@@ -47,7 +47,7 @@ internal class WifiConnectivityHooks(
         // Rewrite before capabilities are stored / later parceled to apps.
         HookBridge.hookAllMethods(capabilitiesClass, "setTransportInfo", beforeHookedMethod {
             val config = currentConfig()
-            if (!config.enabled) return@beforeHookedMethod
+            if (!config.enabled || config.unchangedCurrentWifi) return@beforeHookedMethod
             val wifiInfo = args.firstOrNull() as? WifiInfo ?: return@beforeHookedMethod
             if (isAlreadySpoofed(wifiInfo, config) || isRedactedWifiInfo(wifiInfo)) {
                 return@beforeHookedMethod
@@ -62,7 +62,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(capabilitiesClass, "getTransportInfo", afterHookedMethod {
             if (hasThrowable()) return@afterHookedMethod
             val config = currentConfig()
-            if (!config.enabled) return@afterHookedMethod
+            if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
             val wifiInfo = result as? WifiInfo ?: return@afterHookedMethod
             if (isAlreadySpoofed(wifiInfo, config) || isRedactedWifiInfo(wifiInfo)) {
                 return@afterHookedMethod
@@ -77,7 +77,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(capabilitiesClass, "getSsid", afterHookedMethod {
             if (hasThrowable()) return@afterHookedMethod
             val config = currentConfig()
-            if (!config.enabled) return@afterHookedMethod
+            if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
             val current = result as? String
             if (!isVisibleSsid(current) ||
                 current?.removeSurrounding("\"") == config.currentSsid
@@ -104,7 +104,7 @@ internal class WifiConnectivityHooks(
             HookBridge.hookAllMethods(specifierClass, methodName, afterHookedMethod {
                 if (hasThrowable()) return@afterHookedMethod
                 val config = currentConfig()
-                if (!config.enabled) return@afterHookedMethod
+                if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
                 when (methodName) {
                     "getSsid" -> {
                         val current = result as? String
@@ -134,7 +134,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(specifierClass, "toString", afterHookedMethod {
             if (hasThrowable()) return@afterHookedMethod
             val config = currentConfig()
-            if (!config.enabled) return@afterHookedMethod
+            if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
             val text = result as? String ?: return@afterHookedMethod
             if (!text.contains("SSID=")) return@afterHookedMethod
             result = text
@@ -148,7 +148,7 @@ internal class WifiConnectivityHooks(
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val config = currentConfig()
-                    if (!config.enabled) return
+                    if (!config.enabled || config.unchangedCurrentWifi) return
                     val specifier = param.thisObject ?: return
                     val originalSsid = runCatching {
                         HookBridge.getObjectField(specifier, "mSsid") as? String
@@ -207,7 +207,7 @@ internal class WifiConnectivityHooks(
 
         HookBridge.hookAllMethods(networkInfoClass, "setExtraInfo", beforeHookedMethod {
             val config = currentConfig()
-            if (!config.enabled) return@beforeHookedMethod
+            if (!config.enabled || config.unchangedCurrentWifi) return@beforeHookedMethod
             val networkInfo = thisObject as? NetworkInfo ?: return@beforeHookedMethod
             if (networkInfo.type != TYPE_WIFI) return@beforeHookedMethod
             val current = args.firstOrNull() as? String
@@ -223,7 +223,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(networkInfoClass, "getExtraInfo", afterHookedMethod {
             if (hasThrowable()) return@afterHookedMethod
             val config = currentConfig()
-            if (!config.enabled) return@afterHookedMethod
+            if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
             val networkInfo = thisObject as? NetworkInfo ?: return@afterHookedMethod
             if (networkInfo.type != TYPE_WIFI) return@afterHookedMethod
             val current = result as? String
@@ -252,7 +252,7 @@ internal class WifiConnectivityHooks(
                 // The sibling hooks (mSsid/mBssid) already read raw fields.
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val config = currentConfig()
-                    if (!config.enabled) return
+                    if (!config.enabled || config.unchangedCurrentWifi) return
                     val networkInfo = param.thisObject as? NetworkInfo ?: return
                     if (networkInfo.type != TYPE_WIFI) return
                     val current = runCatching {
@@ -304,7 +304,7 @@ internal class WifiConnectivityHooks(
             object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val config = currentConfig()
-                    if (!config.enabled) return
+                    if (!config.enabled || config.unchangedCurrentWifi) return
                     val wifiInfo = param.thisObject ?: return
                     if (isAlreadySpoofed(wifiInfo, config) || isRedactedWifiInfo(wifiInfo)) return
                     val snapshot = captureIdentity(wifiInfo) ?: return

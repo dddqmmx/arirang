@@ -12,12 +12,14 @@ import org.json.JSONObject
 
 internal data class WifiHookConfig(
     val enabled: Boolean = false,
+    val unchangedCurrentWifi: Boolean = false,
     val currentSsid: String = WifiConfigPrefs.DEFAULT_CURRENT_SSID,
     val currentBssid: String = WifiConfigPrefs.DEFAULT_CURRENT_BSSID,
     val ipAddress: String = WifiConfigPrefs.DEFAULT_IP_ADDRESS,
     val gateway: String = WifiConfigPrefs.DEFAULT_GATEWAY,
     val dns1: String = WifiConfigPrefs.DEFAULT_DNS1,
     val dns2: String = WifiConfigPrefs.DEFAULT_DNS2,
+    val unchangedScanResults: Boolean = false,
     val hideScanResults: Boolean = false,
     val scanResults: List<WifiScanNetwork> = listOf(WifiScanNetwork())
 )
@@ -54,6 +56,7 @@ internal class WifiConfigStore {
             val schema = WifiConfigSchema.fromJson(snapshot)
             WifiHookConfig(
                 enabled = schema.enabled,
+                unchangedCurrentWifi = schema.unchangedCurrentWifi,
                 currentSsid = schema.currentSsid
                     .takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
                 currentBssid = schema.currentBssid
@@ -66,6 +69,7 @@ internal class WifiConfigStore {
                     .takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS1,
                 dns2 = schema.dns2
                     .takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS2,
+                unchangedScanResults = schema.unchangedScanResults,
                 hideScanResults = schema.hideScanResults,
                 scanResults = schema.scanResults.map { WifiScanNetwork(it.ssid, it.bssid) }
                     .filter { it.ssid.isNotBlank() && isValidMacAddress(it.bssid) }
@@ -78,6 +82,10 @@ internal class WifiConfigStore {
     private fun readStored(prefs: XSharedPreferences): WifiHookConfig {
         return WifiHookConfig(
             enabled = prefs.getBoolean(WifiConfigPrefs.KEY_ENABLED, false),
+            unchangedCurrentWifi = prefs.getBoolean(
+                WifiConfigPrefs.KEY_UNCHANGED_CURRENT_WIFI,
+                false
+            ),
             currentSsid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_SSID, null)
                 ?.takeIf { it.isNotBlank() } ?: WifiConfigPrefs.DEFAULT_CURRENT_SSID,
             currentBssid = prefs.getString(WifiConfigPrefs.KEY_CURRENT_BSSID, null)
@@ -90,6 +98,10 @@ internal class WifiConfigStore {
                 ?.takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS1,
             dns2 = prefs.getString(WifiConfigPrefs.KEY_DNS2, null)
                 ?.takeIf(WifiConfigPrefs::isValidIpv4) ?: WifiConfigPrefs.DEFAULT_DNS2,
+            unchangedScanResults = prefs.getBoolean(
+                WifiConfigPrefs.KEY_UNCHANGED_SCAN_RESULTS,
+                false
+            ),
             hideScanResults = prefs.getBoolean(WifiConfigPrefs.KEY_HIDE_SCAN_RESULTS, false),
             scanResults = parseScanResults(
                 prefs.getString(WifiConfigPrefs.KEY_SCAN_RESULTS, null),

@@ -14,12 +14,14 @@ object WifiConfigPrefs {
 
     const val KEY_ENABLED = "enabled"
     const val KEY_LAST_MODIFIED = "last_modified"
+    const val KEY_UNCHANGED_CURRENT_WIFI = "unchanged_current_wifi"
     const val KEY_CURRENT_SSID = "current_ssid"
     const val KEY_CURRENT_BSSID = "current_bssid"
     const val KEY_IP_ADDRESS = "ip_address"
     const val KEY_GATEWAY = "gateway"
     const val KEY_DNS1 = "dns1"
     const val KEY_DNS2 = "dns2"
+    const val KEY_UNCHANGED_SCAN_RESULTS = "unchanged_scan_results"
     const val KEY_HIDE_SCAN_RESULTS = "hide_scan_results"
     const val KEY_SCAN_RESULTS = "scan_results"
     const val KEY_SCAN_SSID = "scan_ssid"
@@ -43,12 +45,14 @@ object WifiConfigPrefs {
 
     data class Config(
         val enabled: Boolean = false,
+        val unchangedCurrentWifi: Boolean = false,
         val currentSsid: String = DEFAULT_CURRENT_SSID,
         val currentBssid: String = DEFAULT_CURRENT_BSSID,
         val ipAddress: String = DEFAULT_IP_ADDRESS,
         val gateway: String = DEFAULT_GATEWAY,
         val dns1: String = DEFAULT_DNS1,
         val dns2: String = DEFAULT_DNS2,
+        val unchangedScanResults: Boolean = false,
         val hideScanResults: Boolean = false,
         val scanResults: List<ScanNetwork> = listOf(ScanNetwork())
     )
@@ -60,6 +64,7 @@ object WifiConfigPrefs {
         val scanResults = parseScanResults(prefs.getString(KEY_SCAN_RESULTS, null))
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
+            unchangedCurrentWifi = prefs.getBoolean(KEY_UNCHANGED_CURRENT_WIFI, false),
             currentSsid = prefs.getString(KEY_CURRENT_SSID, null)?.takeIf { it.isNotBlank() }
                 ?: DEFAULT_CURRENT_SSID,
             currentBssid = prefs.getString(KEY_CURRENT_BSSID, null)?.takeIf { it.isNotBlank() }
@@ -72,6 +77,7 @@ object WifiConfigPrefs {
                 ?: DEFAULT_DNS1,
             dns2 = prefs.getString(KEY_DNS2, null)?.takeIf { isValidIpv4(it) }
                 ?: DEFAULT_DNS2,
+            unchangedScanResults = prefs.getBoolean(KEY_UNCHANGED_SCAN_RESULTS, false),
             hideScanResults = prefs.getBoolean(KEY_HIDE_SCAN_RESULTS, false),
             scanResults = scanResults
         )
@@ -81,12 +87,14 @@ object WifiConfigPrefs {
         prefs(context).edit(commit = true) {
             putBoolean(KEY_ENABLED, config.enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
+            putBoolean(KEY_UNCHANGED_CURRENT_WIFI, config.unchangedCurrentWifi)
             putString(KEY_CURRENT_SSID, config.currentSsid)
             putString(KEY_CURRENT_BSSID, config.currentBssid)
             putString(KEY_IP_ADDRESS, config.ipAddress)
             putString(KEY_GATEWAY, config.gateway)
             putString(KEY_DNS1, config.dns1)
             putString(KEY_DNS2, config.dns2)
+            putBoolean(KEY_UNCHANGED_SCAN_RESULTS, config.unchangedScanResults)
             putBoolean(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
             putString(KEY_SCAN_RESULTS, gson.toJson(config.scanResults))
         }
@@ -98,6 +106,7 @@ object WifiConfigPrefs {
             context,
             Config(
                 enabled = schema.enabled,
+                unchangedCurrentWifi = schema.unchangedCurrentWifi,
                 currentSsid = schema.currentSsid.trim().take(MAX_SSID_LENGTH)
                     .ifBlank { DEFAULT_CURRENT_SSID },
                 currentBssid = schema.currentBssid.normalizedMacOr(DEFAULT_CURRENT_BSSID),
@@ -105,6 +114,7 @@ object WifiConfigPrefs {
                 gateway = schema.gateway.trim().takeIf { isValidIpv4(it) } ?: DEFAULT_GATEWAY,
                 dns1 = schema.dns1.trim().takeIf { isValidIpv4(it) } ?: DEFAULT_DNS1,
                 dns2 = schema.dns2.trim().takeIf { isValidIpv4(it) } ?: DEFAULT_DNS2,
+                unchangedScanResults = schema.unchangedScanResults,
                 hideScanResults = schema.hideScanResults,
                 scanResults = schema.scanResults.take(MAX_NETWORKS).mapNotNull { network ->
                     val ssid = network.ssid.trim().take(MAX_SSID_LENGTH)
@@ -123,12 +133,14 @@ object WifiConfigPrefs {
         val config = loadConfig(context)
         return WifiConfigSchema(
             enabled = config.enabled,
+            unchangedCurrentWifi = config.unchangedCurrentWifi,
             currentSsid = config.currentSsid,
             currentBssid = config.currentBssid,
             ipAddress = config.ipAddress,
             gateway = config.gateway,
             dns1 = config.dns1,
             dns2 = config.dns2,
+            unchangedScanResults = config.unchangedScanResults,
             hideScanResults = config.hideScanResults,
             scanResults = config.scanResults.map { s -> WifiScanNetworkSchema(ssid = s.ssid, bssid = s.bssid) },
             lastModified = lastModified(context)

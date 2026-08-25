@@ -46,7 +46,7 @@ internal class BluetoothAdapterHooks(
                     HookBridge.hookMethod(method, afterHookedMethod {
                         if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@afterHookedMethod
+                        if (!config.enabled || config.unchangedConnectedDevices) return@afterHookedMethod
                         val devices = if (config.hideConnectedDevices) {
                             emptyList()
                         } else {
@@ -65,7 +65,7 @@ internal class BluetoothAdapterHooks(
                         if (hasThrowable()) return@afterHookedMethod
                         if (result == null) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled || config.hideConnectedDevices) return@afterHookedMethod
+                        if (!config.enabled || config.unchangedConnectedDevices || config.hideConnectedDevices) return@afterHookedMethod
                         val device = args[0] as? BluetoothDevice ?: return@afterHookedMethod
                         val address = runCatching { device.address }.getOrNull() ?: return@afterHookedMethod
                         val spoofed = config.connectedDevices.firstOrNull {
@@ -135,7 +135,7 @@ internal class BluetoothAdapterHooks(
                     HookBridge.hookMethod(method, afterHookedMethod {
                         if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@afterHookedMethod
+                        if (!config.enabled || config.unchangedConnectedDevices) return@afterHookedMethod
                         val devices = if (config.hideConnectedDevices) {
                             emptyList()
                         } else {

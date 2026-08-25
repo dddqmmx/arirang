@@ -118,14 +118,18 @@ class ConfigImportExportTest {
     fun wifiSnapshot_hasScanResultsArray() {
         val snapshot = buildWifiSnapshot(
             enabled = true,
+            unchangedCurrent = false,
             currentSsid = "MyWiFi",
             currentBssid = "02:00:00:AA:BB:CC",
+            unchangedScan = false,
             hideScanResults = false,
             scanResultsJson = """[{"ssid":"Neighbor1","bssid":"02:00:00:DD:EE:FF"}]"""
         )
         assertEquals(true, snapshot.get("enabled"))
+        assertEquals(false, snapshot.get("unchanged_current_wifi"))
         assertEquals("MyWiFi", snapshot.getString("current_ssid"))
         assertEquals("02:00:00:AA:BB:CC", snapshot.getString("current_bssid"))
+        assertEquals(false, snapshot.get("unchanged_scan_results"))
         assertEquals(false, snapshot.get("hide_scan_results"))
     }
 
@@ -134,14 +138,18 @@ class ConfigImportExportTest {
         val snapshot = buildBluetoothSnapshot(
             enabled = false,
             deviceName = "Arirang-BT",
+            unchangedConnected = true,
             hideConnected = true,
+            unchangedScan = false,
             hideScan = true,
             connectedDevicesJson = """[{"name":"Device1","address":"AA:BB:CC:DD:EE:FF"}]""",
             scanResultsJson = "[]"
         )
         assertEquals(false, snapshot.get("enabled"))
         assertEquals("Arirang-BT", snapshot.getString("device_name"))
+        assertEquals(true, snapshot.get("unchanged_connected_devices"))
         assertEquals(true, snapshot.get("hide_connected_devices"))
+        assertEquals(false, snapshot.get("unchanged_scan_results"))
         assertEquals(true, snapshot.get("hide_scan_results"))
     }
 
@@ -320,16 +328,21 @@ class ConfigImportExportTest {
     fun snapshotRoundTrip_wifiConfig_dataPreserved() {
         val original = buildWifiSnapshot(
             enabled = true,
+            unchangedCurrent = true,
             currentSsid = "WiFi-Name",
             currentBssid = "AA:BB:CC:DD:EE:FF",
+            unchangedScan = false,
             hideScanResults = false,
             scanResultsJson = """[{"ssid":"S1","bssid":"11:22:33:44:55:66"}]"""
         )
         val restored = JSONObject(original.toString())
 
         assertEquals(original.getBoolean("enabled"), restored.getBoolean("enabled"))
+        assertEquals(original.getBoolean("unchanged_current_wifi"), restored.getBoolean("unchanged_current_wifi"))
         assertEquals(original.getString("current_ssid"), restored.getString("current_ssid"))
         assertEquals(original.getString("current_bssid"), restored.getString("current_bssid"))
+        assertEquals(original.getBoolean("unchanged_scan_results"), restored.getBoolean("unchanged_scan_results"))
+        assertEquals(original.getBoolean("hide_scan_results"), restored.getBoolean("hide_scan_results"))
     }
 
     @Test
@@ -337,7 +350,9 @@ class ConfigImportExportTest {
         val original = buildBluetoothSnapshot(
             enabled = false,
             deviceName = "BT-Device",
+            unchangedConnected = true,
             hideConnected = true,
+            unchangedScan = false,
             hideScan = true,
             connectedDevicesJson = """[{"name":"Dev","address":"00:11:22:33:44:55"}]""",
             scanResultsJson = "[]"
@@ -346,7 +361,9 @@ class ConfigImportExportTest {
 
         assertEquals(original.getBoolean("enabled"), restored.getBoolean("enabled"))
         assertEquals(original.getString("device_name"), restored.getString("device_name"))
+        assertEquals(original.getBoolean("unchanged_connected_devices"), restored.getBoolean("unchanged_connected_devices"))
         assertEquals(original.getBoolean("hide_connected_devices"), restored.getBoolean("hide_connected_devices"))
+        assertEquals(original.getBoolean("unchanged_scan_results"), restored.getBoolean("unchanged_scan_results"))
         assertEquals(original.getBoolean("hide_scan_results"), restored.getBoolean("hide_scan_results"))
     }
 
@@ -503,16 +520,20 @@ class ConfigImportExportTest {
 
     private fun buildWifiSnapshot(
         enabled: Boolean,
+        unchangedCurrent: Boolean = false,
         currentSsid: String,
         currentBssid: String,
+        unchangedScan: Boolean = false,
         hideScanResults: Boolean,
         scanResultsJson: String
     ): JSONObject {
         val json = JSONObject()
         json.put("enabled", enabled)
         json.put("last_modified", 4000000L)
+        json.put("unchanged_current_wifi", unchangedCurrent)
         json.put("current_ssid", currentSsid)
         json.put("current_bssid", currentBssid)
+        json.put("unchanged_scan_results", unchangedScan)
         json.put("hide_scan_results", hideScanResults)
         json.put("scan_results", JSONArray(scanResultsJson))
         return json
@@ -521,7 +542,9 @@ class ConfigImportExportTest {
     private fun buildBluetoothSnapshot(
         enabled: Boolean,
         deviceName: String,
+        unchangedConnected: Boolean = false,
         hideConnected: Boolean,
+        unchangedScan: Boolean = false,
         hideScan: Boolean,
         connectedDevicesJson: String,
         scanResultsJson: String
@@ -530,8 +553,10 @@ class ConfigImportExportTest {
         json.put("enabled", enabled)
         json.put("last_modified", 5000000L)
         json.put("device_name", deviceName)
+        json.put("unchanged_connected_devices", unchangedConnected)
         json.put("connected_devices", JSONArray(connectedDevicesJson))
         json.put("hide_connected_devices", hideConnected)
+        json.put("unchanged_scan_results", unchangedScan)
         json.put("hide_scan_results", hideScan)
         json.put("scan_results", JSONArray(scanResultsJson))
         return json
@@ -621,12 +646,12 @@ class ConfigImportExportTest {
             .put("wifiConfigVersion", 1L)
             .put(
                 "wifiConfigSnapshot",
-                """{"enabled":true,"last_modified":1,"current_ssid":"MyWiFi","current_bssid":"02:00:00:11:45:14","hide_scan_results":false,"scan_results":[{"ssid":"Neighbor","bssid":"02:00:00:DD:EE:FF"}]}"""
+                """{"enabled":true,"last_modified":1,"unchanged_current_wifi":false,"current_ssid":"MyWiFi","current_bssid":"02:00:00:11:45:14","unchanged_scan_results":false,"hide_scan_results":false,"scan_results":[{"ssid":"Neighbor","bssid":"02:00:00:DD:EE:FF"}]}"""
             )
             .put("bluetoothConfigVersion", 1L)
             .put(
                 "bluetoothConfigSnapshot",
-                """{"enabled":false,"last_modified":1,"device_name":"Arirang","connected_devices":[{"name":"Device1","address":"AA:BB:CC:DD:EE:FF"}],"hide_connected_devices":false,"hide_scan_results":false,"scan_results":[{"name":"Nearby","address":"02:00:00:DD:EE:FF"}]}"""
+                """{"enabled":false,"last_modified":1,"device_name":"Arirang","unchanged_connected_devices":false,"connected_devices":[{"name":"Device1","address":"AA:BB:CC:DD:EE:FF"}],"hide_connected_devices":false,"unchanged_scan_results":false,"hide_scan_results":false,"scan_results":[{"name":"Nearby","address":"02:00:00:DD:EE:FF"}]}"""
             )
             .put("locationConfigVersion", 1L)
             .put(

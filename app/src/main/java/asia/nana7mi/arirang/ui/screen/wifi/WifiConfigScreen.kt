@@ -145,63 +145,72 @@ internal fun WifiConfigScreen(
                     onExpandedChange = { currentExpanded = !currentExpanded },
                     icon = Icons.Default.Wifi
                 ) {
-                    WifiTextField(
-                        label = stringResource(R.string.wifi_field_current_ssid),
-                        value = config.currentSsid,
-                        onValueChange = { config = config.copy(currentSsid = it) }
+                    ToggleSettingRow(
+                        title = stringResource(R.string.wifi_unchanged_current),
+                        summary = stringResource(R.string.wifi_unchanged_current_summary),
+                        checked = config.unchangedCurrentWifi,
+                        onCheckedChange = { config = config.copy(unchangedCurrentWifi = it) }
                     )
-                    WifiTextField(
-                        label = stringResource(R.string.wifi_field_current_bssid),
-                        value = config.currentBssid,
-                        onValueChange = { config = config.copy(currentBssid = it) },
-                        onRandom = { config = config.copy(currentBssid = randomBssid()) }
-                    )
-                    WifiTextField(
-                        label = stringResource(R.string.wifi_field_ip_address),
-                        value = config.ipAddress,
-                        onValueChange = { config = config.copy(ipAddress = it) },
-                        onRandom = {
-                            val lan = randomLanAddresses()
-                            config = config.copy(
-                                ipAddress = lan.ipAddress,
-                                gateway = lan.gateway,
-                                dns1 = lan.dns1,
-                                dns2 = lan.dns2
-                            )
-                        }
-                    )
-                    WifiTextField(
-                        label = stringResource(R.string.wifi_field_gateway),
-                        value = config.gateway,
-                        onValueChange = { config = config.copy(gateway = it) },
-                        onRandom = {
-                            val lan = randomLanAddresses()
-                            config = config.copy(
-                                ipAddress = lan.ipAddress,
-                                gateway = lan.gateway,
-                                dns1 = lan.dns1,
-                                dns2 = lan.dns2
-                            )
-                        }
-                    )
-                    WifiTextField(
-                        label = stringResource(R.string.wifi_field_dns1),
-                        value = config.dns1,
-                        onValueChange = { config = config.copy(dns1 = it) },
-                        onRandom = {
-                            val dns = randomDnsPair()
-                            config = config.copy(dns1 = dns.first, dns2 = dns.second)
-                        }
-                    )
-                    WifiTextField(
-                        label = stringResource(R.string.wifi_field_dns2),
-                        value = config.dns2,
-                        onValueChange = { config = config.copy(dns2 = it) },
-                        onRandom = {
-                            val dns = randomDnsPair()
-                            config = config.copy(dns1 = dns.first, dns2 = dns.second)
-                        }
-                    )
+
+                    if (!config.unchangedCurrentWifi) {
+                        WifiTextField(
+                            label = stringResource(R.string.wifi_field_current_ssid),
+                            value = config.currentSsid,
+                            onValueChange = { config = config.copy(currentSsid = it) }
+                        )
+                        WifiTextField(
+                            label = stringResource(R.string.wifi_field_current_bssid),
+                            value = config.currentBssid,
+                            onValueChange = { config = config.copy(currentBssid = it) },
+                            onRandom = { config = config.copy(currentBssid = randomBssid()) }
+                        )
+                        WifiTextField(
+                            label = stringResource(R.string.wifi_field_ip_address),
+                            value = config.ipAddress,
+                            onValueChange = { config = config.copy(ipAddress = it) },
+                            onRandom = {
+                                val lan = randomLanAddresses()
+                                config = config.copy(
+                                    ipAddress = lan.ipAddress,
+                                    gateway = lan.gateway,
+                                    dns1 = lan.dns1,
+                                    dns2 = lan.dns2
+                                )
+                            }
+                        )
+                        WifiTextField(
+                            label = stringResource(R.string.wifi_field_gateway),
+                            value = config.gateway,
+                            onValueChange = { config = config.copy(gateway = it) },
+                            onRandom = {
+                                val lan = randomLanAddresses()
+                                config = config.copy(
+                                    ipAddress = lan.ipAddress,
+                                    gateway = lan.gateway,
+                                    dns1 = lan.dns1,
+                                    dns2 = lan.dns2
+                                )
+                            }
+                        )
+                        WifiTextField(
+                            label = stringResource(R.string.wifi_field_dns1),
+                            value = config.dns1,
+                            onValueChange = { config = config.copy(dns1 = it) },
+                            onRandom = {
+                                val dns = randomDnsPair()
+                                config = config.copy(dns1 = dns.first, dns2 = dns.second)
+                            }
+                        )
+                        WifiTextField(
+                            label = stringResource(R.string.wifi_field_dns2),
+                            value = config.dns2,
+                            onValueChange = { config = config.copy(dns2 = it) },
+                            onRandom = {
+                                val dns = randomDnsPair()
+                                config = config.copy(dns1 = dns.first, dns2 = dns.second)
+                            }
+                        )
+                    }
                 }
             }
 
@@ -211,52 +220,63 @@ internal fun WifiConfigScreen(
                     expanded = nearbyExpanded,
                     onExpandedChange = { nearbyExpanded = !nearbyExpanded },
                     icon = Icons.Default.WifiFind,
-                    trailingAction = {
-                        IconButton(onClick = {
-                            val next = WifiConfigPrefs.defaultScanNetwork(config.scanResults.size)
-                            val nextIndex = config.scanResults.size
-                            config = config.copy(scanResults = config.scanResults + next)
-                            nearbyExpanded = true
-                            scanNetworkExpanded[nextIndex] = true
-                        }) {
-                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.wifi_add_scan_result))
+                    trailingAction = if (!config.unchangedScanResults && !config.hideScanResults) {
+                        {
+                            IconButton(onClick = {
+                                val next = WifiConfigPrefs.defaultScanNetwork(config.scanResults.size)
+                                val nextIndex = config.scanResults.size
+                                config = config.copy(scanResults = config.scanResults + next)
+                                nearbyExpanded = true
+                                scanNetworkExpanded[nextIndex] = true
+                            }) {
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.wifi_add_scan_result))
+                            }
                         }
-                    }
+                    } else null
                 ) {
                     ToggleSettingRow(
-                        title = stringResource(R.string.wifi_hide_all_scan_results),
-                        summary = stringResource(R.string.wifi_hide_all_scan_results_summary),
-                        checked = config.hideScanResults,
-                        onCheckedChange = { config = config.copy(hideScanResults = it) }
+                        title = stringResource(R.string.wifi_unchanged_scan_results),
+                        summary = stringResource(R.string.wifi_unchanged_scan_results_summary),
+                        checked = config.unchangedScanResults,
+                        onCheckedChange = { config = config.copy(unchangedScanResults = it) }
                     )
 
-                    if (!config.hideScanResults) {
-                        config.scanResults.forEachIndexed { index, network ->
-                            if (index > 0) HorizontalDivider()
-                            ScanNetworkEditor(
-                                index = index,
-                                network = network,
-                                expanded = scanNetworkExpanded[index] ?: true,
-                                canRemove = true,
-                                onExpandedChange = {
-                                    scanNetworkExpanded[index] = !(scanNetworkExpanded[index] ?: true)
-                                },
-                                onNetworkChange = { changed ->
-                                    config = config.copy(
-                                        scanResults = config.scanResults.toMutableList().also {
-                                            it[index] = changed
-                                        }
-                                    )
-                                },
-                                onRemove = {
-                                    config = config.copy(
-                                        scanResults = config.scanResults.filterIndexed { itemIndex, _ ->
-                                            itemIndex != index
-                                        }
-                                    )
-                                    scanNetworkExpanded.remove(index)
-                                }
-                            )
+                    if (!config.unchangedScanResults) {
+                        ToggleSettingRow(
+                            title = stringResource(R.string.wifi_hide_all_scan_results),
+                            summary = stringResource(R.string.wifi_hide_all_scan_results_summary),
+                            checked = config.hideScanResults,
+                            onCheckedChange = { config = config.copy(hideScanResults = it) }
+                        )
+
+                        if (!config.hideScanResults) {
+                            config.scanResults.forEachIndexed { index, network ->
+                                if (index > 0) HorizontalDivider()
+                                ScanNetworkEditor(
+                                    index = index,
+                                    network = network,
+                                    expanded = scanNetworkExpanded[index] ?: true,
+                                    canRemove = true,
+                                    onExpandedChange = {
+                                        scanNetworkExpanded[index] = !(scanNetworkExpanded[index] ?: true)
+                                    },
+                                    onNetworkChange = { changed ->
+                                        config = config.copy(
+                                            scanResults = config.scanResults.toMutableList().also {
+                                                it[index] = changed
+                                            }
+                                        )
+                                    },
+                                    onRemove = {
+                                        config = config.copy(
+                                            scanResults = config.scanResults.filterIndexed { itemIndex, _ ->
+                                                itemIndex != index
+                                            }
+                                        )
+                                        scanNetworkExpanded.remove(index)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

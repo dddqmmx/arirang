@@ -102,7 +102,7 @@ internal class WifiServiceHooks(
                 HookBridge.hookMethod(method, afterHookedMethod {
                     if (hasThrowable()) return@afterHookedMethod
                     val config = currentConfig()
-                    if (!config.enabled) return@afterHookedMethod
+                    if (!config.enabled || config.unchangedScanResults) return@afterHookedMethod
                     method.wrapScanResults(spoofedScanResults(config))?.let { result = it }
                     HookLog.d(HookLog.Module.WIFI, "spoof ScanRequestProxy.getScanResults via ${method.signature()}")
                 })
@@ -144,7 +144,7 @@ internal class WifiServiceHooks(
                         if (hasThrowable()) return@afterHookedMethod
                         if (isRedactedWifiInfo(result)) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@afterHookedMethod
+                        if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
                         spoofedWifiInfo(config, result)?.let { result = it }
                         HookLog.d(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
                     })
@@ -156,7 +156,7 @@ internal class WifiServiceHooks(
                         if (hasThrowable()) return@afterHookedMethod
                         if (!containsVisibleScanResults(result)) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@afterHookedMethod
+                        if (!config.enabled || config.unchangedScanResults) return@afterHookedMethod
                         method.wrapScanResults(spoofedScanResults(config))?.let { result = it }
                         HookLog.d(HookLog.Module.WIFI, "spoof getScanResults via ${method.signature()}")
                     })
@@ -167,7 +167,7 @@ internal class WifiServiceHooks(
                     HookBridge.hookMethod(method, afterHookedMethod {
                         if (hasThrowable()) return@afterHookedMethod
                         val config = currentConfig()
-                        if (!config.enabled) return@afterHookedMethod
+                        if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
                         result = spoofedDhcpInfo(config)
                         HookLog.d(HookLog.Module.WIFI, "spoof getDhcpInfo via ${method.signature()}")
                     })

@@ -152,12 +152,14 @@ class ConfigSchemaTest {
     fun wifiConfigSchema_roundTrip_preservesAllData() {
         val original = WifiConfigSchema(
             enabled = true,
+            unchangedCurrentWifi = true,
             currentSsid = "MyWiFi",
             currentBssid = "02:00:00:AA:BB:CC",
             ipAddress = "10.0.0.42",
             gateway = "10.0.0.1",
             dns1 = "10.0.0.1",
             dns2 = "1.1.1.1",
+            unchangedScanResults = false,
             hideScanResults = false,
             scanResults = listOf(
                 WifiScanNetworkSchema("Neighbor1", "02:00:00:DD:EE:FF"),
@@ -169,12 +171,14 @@ class ConfigSchemaTest {
         val restored = WifiConfigSchema.fromJson(json)
 
         assertEquals(original.enabled, restored.enabled)
+        assertEquals(true, restored.unchangedCurrentWifi)
         assertEquals("MyWiFi", restored.currentSsid)
         assertEquals("02:00:00:AA:BB:CC", restored.currentBssid)
         assertEquals("10.0.0.42", restored.ipAddress)
         assertEquals("10.0.0.1", restored.gateway)
         assertEquals("10.0.0.1", restored.dns1)
         assertEquals("1.1.1.1", restored.dns2)
+        assertEquals(false, restored.unchangedScanResults)
         assertEquals(false, restored.hideScanResults)
         assertEquals(2, restored.scanResults.size)
         assertEquals("Neighbor1", restored.scanResults[0].ssid)
@@ -194,10 +198,12 @@ class ConfigSchemaTest {
         val original = BluetoothConfigSchema(
             enabled = true,
             deviceName = "Arirang-BT",
+            unchangedConnectedDevices = true,
             connectedDevices = listOf(
                 BluetoothDeviceSchema("Device1", "AA:BB:CC:DD:EE:FF")
             ),
             hideConnectedDevices = false,
+            unchangedScanResults = false,
             hideScanResults = true,
             scanResults = listOf(
                 BluetoothDeviceSchema("Nearby", "02:00:00:11:22:33")
@@ -209,10 +215,12 @@ class ConfigSchemaTest {
 
         assertEquals(original.enabled, restored.enabled)
         assertEquals("Arirang-BT", restored.deviceName)
+        assertEquals(true, restored.unchangedConnectedDevices)
         assertEquals(1, restored.connectedDevices.size)
         assertEquals("Device1", restored.connectedDevices[0].name)
         assertEquals("AA:BB:CC:DD:EE:FF", restored.connectedDevices[0].address)
         assertEquals(false, restored.hideConnectedDevices)
+        assertEquals(false, restored.unchangedScanResults)
         assertEquals(true, restored.hideScanResults)
         assertEquals(1, restored.scanResults.size)
         assertEquals("Nearby", restored.scanResults[0].name)
@@ -727,5 +735,22 @@ class ConfigSchemaTest {
                     systemSetting.contains("\"$field\"")
                 )
             }
+
+        val wifi = WifiConfigSchema().toJson()
+        listOf(
+            "schemaVersion", "lastModified", "enabled", "unchangedCurrentWifi",
+            "currentSsid", "currentBssid", "unchangedScanResults", "hideScanResults", "scanResults"
+        ).forEach { field ->
+            assertTrue("WifiConfigSchema is missing '$field'", wifi.contains("\"$field\""))
+        }
+
+        val bluetooth = BluetoothConfigSchema().toJson()
+        listOf(
+            "schemaVersion", "lastModified", "enabled", "deviceName",
+            "unchangedConnectedDevices", "connectedDevices", "hideConnectedDevices",
+            "unchangedScanResults", "hideScanResults", "scanResults"
+        ).forEach { field ->
+            assertTrue("BluetoothConfigSchema is missing '$field'", bluetooth.contains("\"$field\""))
+        }
     }
 }

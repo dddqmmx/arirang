@@ -33,7 +33,7 @@ internal class BluetoothScanHooks(
                 ) {
                     HookBridge.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
-                        if (!config.enabled) return@beforeHookedMethod
+                        if (!config.enabled || config.unchangedScanResults) return@beforeHookedMethod
                         if (config.hideScanResults) {
                             result = null
                             return@beforeHookedMethod
@@ -53,7 +53,7 @@ internal class BluetoothScanHooks(
                 ) {
                     HookBridge.hookMethod(method, beforeHookedMethod {
                         val config = currentConfig()
-                        if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
+                        if (!config.enabled || config.unchangedScanResults || !config.hideScanResults) return@beforeHookedMethod
                         result = null
                     })
                 }
@@ -76,7 +76,7 @@ internal class BluetoothScanHooks(
             ) {
                 HookBridge.hookMethod(method, beforeHookedMethod {
                     val config = currentConfig()
-                    if (!config.enabled || !config.hideScanResults) return@beforeHookedMethod
+                    if (!config.enabled || config.unchangedScanResults || !config.hideScanResults) return@beforeHookedMethod
                     result = null
                 })
             }

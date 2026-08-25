@@ -7,8 +7,10 @@ import com.google.gson.reflect.TypeToken
 data class BluetoothConfigSchema(
     @SerializedName("enabled") val enabled: Boolean = false,
     @SerializedName("deviceName") val deviceName: String = "Arirang",
+    @SerializedName("unchangedConnectedDevices") val unchangedConnectedDevices: Boolean = false,
     @SerializedName("connectedDevices") val connectedDevices: List<BluetoothDeviceSchema> = emptyList(),
     @SerializedName("hideConnectedDevices") val hideConnectedDevices: Boolean = false,
+    @SerializedName("unchangedScanResults") val unchangedScanResults: Boolean = false,
     @SerializedName("hideScanResults") val hideScanResults: Boolean = false,
     @SerializedName("scanResults") val scanResults: List<BluetoothDeviceSchema> = emptyList(),
     override val schemaVersion: Int = SCHEMA_VERSION,
@@ -32,10 +34,12 @@ data class BluetoothConfigSchema(
             return BluetoothConfigSchema(
                 enabled = root.get("enabled")?.asBoolean ?: DEFAULTS.enabled,
                 deviceName = root.get("deviceName")?.asString ?: DEFAULTS.deviceName,
+                unchangedConnectedDevices = root.get("unchangedConnectedDevices")?.asBoolean ?: DEFAULTS.unchangedConnectedDevices,
                 connectedDevices = root.get("connectedDevices")?.let {
                     gson.fromJson(it, object : TypeToken<List<BluetoothDeviceSchema>>() {}.type)
                 } ?: emptyList(),
                 hideConnectedDevices = root.get("hideConnectedDevices")?.asBoolean ?: false,
+                unchangedScanResults = root.get("unchangedScanResults")?.asBoolean ?: DEFAULTS.unchangedScanResults,
                 hideScanResults = root.get("hideScanResults")?.asBoolean ?: false,
                 scanResults = root.get("scanResults")?.let {
                     gson.fromJson(it, object : TypeToken<List<BluetoothDeviceSchema>>() {}.type)
@@ -50,8 +54,10 @@ data class BluetoothConfigSchema(
         val obj = baseJson()
         obj.addProperty("enabled", enabled)
         obj.addProperty("deviceName", deviceName)
+        obj.addProperty("unchangedConnectedDevices", unchangedConnectedDevices)
         obj.add("connectedDevices", GSON.toJsonTree(connectedDevices))
         obj.addProperty("hideConnectedDevices", hideConnectedDevices)
+        obj.addProperty("unchangedScanResults", unchangedScanResults)
         obj.addProperty("hideScanResults", hideScanResults)
         obj.add("scanResults", GSON.toJsonTree(scanResults))
         return GSON.toJson(obj)

@@ -173,6 +173,10 @@
     <string name="wifi_remove_scan_result">周辺 Wi-Fi を削除</string>
     <string name="wifi_scan_result_title">周辺 Wi-Fi %1$d</string>
     <string name="wifi_apply_defaults">既定値を適用</string>
+    <string name="wifi_unchanged_current">現在の Wi-Fi を変更しない</string>
+    <string name="wifi_unchanged_current_summary">実際に接続している Wi-Fi 情報をそのまま維持し、変更しません</string>
+    <string name="wifi_unchanged_scan_results">周辺 Wi-Fi を変更しない</string>
+    <string name="wifi_unchanged_scan_results_summary">実際にスキャンされた周辺 Wi-Fi リストをそのまま維持し、変更しません</string>
 
     <string name="bluetooth_config_title">Bluetooth 情報</string>
     <string name="bluetooth_hook_enabled">Hook を有効化</string>
@@ -194,6 +198,10 @@
     <string name="bluetooth_remove_scan_result">周辺デバイスを削除</string>
     <string name="bluetooth_scan_result_title">周辺デバイス %1$d</string>
     <string name="bluetooth_apply_defaults">既定値を適用</string>
+    <string name="bluetooth_unchanged_connected">接続済みデバイスを変更しない</string>
+    <string name="bluetooth_unchanged_connected_summary">実際の接続済み Bluetooth デバイスをそのまま維持し、変更しません</string>
+    <string name="bluetooth_unchanged_scan_results">周辺デバイスを変更しない</string>
+    <string name="bluetooth_unchanged_scan_results_summary">実際にスキャンされた周辺デバイスをそのまま維持し、変更しません</string>
 
     
     <string name="init_select_language">言語を選択</string>

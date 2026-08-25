@@ -15,8 +15,10 @@ object BluetoothConfigPrefs {
     const val KEY_ENABLED = "enabled"
     const val KEY_LAST_MODIFIED = "last_modified"
     const val KEY_DEVICE_NAME = "device_name"
+    const val KEY_UNCHANGED_CONNECTED_DEVICES = "unchanged_connected_devices"
     const val KEY_CONNECTED_DEVICES = "connected_devices"
     const val KEY_HIDE_CONNECTED_DEVICES = "hide_connected_devices"
+    const val KEY_UNCHANGED_SCAN_RESULTS = "unchanged_scan_results"
     const val KEY_HIDE_SCAN_RESULTS = "hide_scan_results"
     const val KEY_SCAN_RESULTS = "scan_results"
 
@@ -33,8 +35,10 @@ object BluetoothConfigPrefs {
     data class Config(
         val enabled: Boolean = false,
         val deviceName: String = "Arirang",
+        val unchangedConnectedDevices: Boolean = false,
         val connectedDevices: List<Device> = listOf(Device()),
         val hideConnectedDevices: Boolean = false,
+        val unchangedScanResults: Boolean = false,
         val hideScanResults: Boolean = false,
         val scanResults: List<Device> = listOf(Device(name = "Nearby-BT", address = "02:00:00:DD:EE:FF"))
     )
@@ -46,8 +50,10 @@ object BluetoothConfigPrefs {
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             deviceName = prefs.getString(KEY_DEVICE_NAME, "Arirang") ?: "Arirang",
+            unchangedConnectedDevices = prefs.getBoolean(KEY_UNCHANGED_CONNECTED_DEVICES, false),
             connectedDevices = connectedDevices,
             hideConnectedDevices = prefs.getBoolean(KEY_HIDE_CONNECTED_DEVICES, false),
+            unchangedScanResults = prefs.getBoolean(KEY_UNCHANGED_SCAN_RESULTS, false),
             hideScanResults = prefs.getBoolean(KEY_HIDE_SCAN_RESULTS, false),
             scanResults = scanResults
         )
@@ -58,8 +64,10 @@ object BluetoothConfigPrefs {
             putBoolean(KEY_ENABLED, config.enabled)
             putLong(KEY_LAST_MODIFIED, Date().time)
             putString(KEY_DEVICE_NAME, config.deviceName)
+            putBoolean(KEY_UNCHANGED_CONNECTED_DEVICES, config.unchangedConnectedDevices)
             putString(KEY_CONNECTED_DEVICES, gson.toJson(config.connectedDevices))
             putBoolean(KEY_HIDE_CONNECTED_DEVICES, config.hideConnectedDevices)
+            putBoolean(KEY_UNCHANGED_SCAN_RESULTS, config.unchangedScanResults)
             putBoolean(KEY_HIDE_SCAN_RESULTS, config.hideScanResults)
             putString(KEY_SCAN_RESULTS, gson.toJson(config.scanResults))
         }
@@ -78,8 +86,10 @@ object BluetoothConfigPrefs {
             Config(
                 enabled = schema.enabled,
                 deviceName = schema.deviceName.trim().take(MAX_DEVICE_NAME_LENGTH),
+                unchangedConnectedDevices = schema.unchangedConnectedDevices,
                 connectedDevices = importDevices(schema.connectedDevices),
                 hideConnectedDevices = schema.hideConnectedDevices,
+                unchangedScanResults = schema.unchangedScanResults,
                 hideScanResults = schema.hideScanResults,
                 scanResults = importDevices(schema.scanResults)
             )
@@ -95,10 +105,12 @@ object BluetoothConfigPrefs {
         return BluetoothConfigSchema(
             enabled = config.enabled,
             deviceName = config.deviceName,
+            unchangedConnectedDevices = config.unchangedConnectedDevices,
             connectedDevices = config.connectedDevices.map { d ->
                 BluetoothDeviceSchema(name = d.name, address = d.address)
             },
             hideConnectedDevices = config.hideConnectedDevices,
+            unchangedScanResults = config.unchangedScanResults,
             hideScanResults = config.hideScanResults,
             scanResults = config.scanResults.map { d ->
                 BluetoothDeviceSchema(name = d.name, address = d.address)
