@@ -3,7 +3,7 @@ package asia.nana7mi.arirang.hook.bluetooth
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 
 /**
  * Rewrites the local Bluetooth identity and Bluetooth stack results from inside
@@ -19,14 +19,14 @@ class FuckBluetooth : BaseHookModule(
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         runCatching {
             HookLog.i(
                 HookLog.Module.BLUETOOTH,
-                "installing Bluetooth hooks for package: ${lpparam.packageName}, process: ${lpparam.processName}"
+                "installing Bluetooth hooks for package: ${param.packageName}, process: ${param.processName}"
             )
 
-            val classLoader = lpparam.classLoader
+            val classLoader = param.classLoader
             adapterHooks.hookAdapterService(classLoader)
             adapterHooks.hookAdapterProperties(classLoader)
             scanHooks.hookScanController(classLoader)
@@ -34,7 +34,7 @@ class FuckBluetooth : BaseHookModule(
         }.onFailure {
             HookLog.e(
                 HookLog.Module.BLUETOOTH,
-                "Bluetooth privacy hook failed for ${lpparam.packageName}",
+                "Bluetooth privacy hook failed for ${param.packageName}",
                 it
             )
         }

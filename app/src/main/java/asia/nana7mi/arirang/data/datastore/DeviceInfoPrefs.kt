@@ -6,7 +6,7 @@ import asia.nana7mi.arirang.model.DevicePresetCatalog
 import org.json.JSONObject
 
 object DeviceInfoPrefs {
-    private const val PREFS_NAME = "device_info_prefs"
+    const val PREFS_NAME = "device_info_prefs"
     private val DEFAULT_PRESET = DevicePresetCatalog.defaultPreset()
 
     private const val KEY_ENABLED = "enabled"

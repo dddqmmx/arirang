@@ -1,9 +1,13 @@
 package asia.nana7mi.arirang.hook.core
 
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+data class HookPackageParam(
+    val packageName: String,
+    val classLoader: ClassLoader,
+    val processName: String = packageName
+)
 
 interface HookModule {
     fun matches(packageName: String): Boolean
-    fun onHook(lpparam : XC_LoadPackage.LoadPackageParam)
+    fun onHook(param: HookPackageParam)
     fun isEnabled(): Boolean
 }

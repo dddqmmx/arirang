@@ -137,18 +137,6 @@ internal class PackageListHookConfig(private val prefsName: String) {
     }
 
     private fun loadFromPrefs() {
-        if (!pref.file.canRead()) {
-            if (state.timestamp != PREFS_UNREADABLE_TIMESTAMP) {
-                HookLog.d(
-                    HookLog.Module.PACKAGE_LIST,
-                    "config snapshot empty and XSharedPreferences file is not readable"
-                )
-                state = State(timestamp = PREFS_UNREADABLE_TIMESTAMP)
-            }
-            return
-        }
-
-        pref.reload()
         val newTimestamp = pref.getLong(KEY_LAST_MODIFIED_LEGACY, INITIAL_TIMESTAMP)
         if (newTimestamp == state.timestamp) return
 

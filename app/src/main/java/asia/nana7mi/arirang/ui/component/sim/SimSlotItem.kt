@@ -25,8 +25,6 @@ import java.security.SecureRandom
 
 fun getSimPresets(): List<SimPreset> = SimPresetCatalog.ALL
 
-private val iccidRandom = SecureRandom()
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimSlotItem(
@@ -289,7 +287,7 @@ fun SimSlotItem(
                         value = simInfo.iccId ?: "",
                         onValueChange = { onSimInfoChange(simInfo.copy(iccId = it.filter(Char::isDigit))) },
                         keyboardType = KeyboardType.Number,
-                        onRandom = { onSimInfoChange(simInfo.copy(iccId = randomIccid(simInfo))) }
+                        onRandom = { onSimInfoChange(simInfo.copy(iccId = SimPresetCatalog.randomIccid(simInfo.countryIso))) }
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -305,7 +303,8 @@ fun SimSlotItem(
                             value = simInfo.number ?: "",
                             onValueChange = { onSimInfoChange(simInfo.copy(number = it)) },
                             modifier = Modifier.weight(1f),
-                            keyboardType = KeyboardType.Phone
+                            keyboardType = KeyboardType.Phone,
+                            onRandom = { onSimInfoChange(simInfo.copy(number = SimPresetCatalog.randomPhoneNumber(simInfo.countryIso))) }
                         )
                     }
                 }
@@ -342,35 +341,6 @@ fun SimField(
         singleLine = true,
         shape = RoundedCornerShape(8.dp)
     )
-}
-
-private fun randomIccid(simInfo: SimInfo): String {
-    val issuer = when (simInfo.countryIso?.lowercase()) {
-        "kp" -> "89850"
-        "ru" -> "89701"
-        else -> "89860"
-    }
-    val bodyLength = 18
-    val body = buildString(bodyLength) {
-        append(issuer)
-        while (length < bodyLength) {
-            append(iccidRandom.nextInt(10))
-        }
-    }
-    return body + luhnCheckDigit(body)
-}
-
-private fun luhnCheckDigit(body: String): Int {
-    val sum = body.reversed().mapIndexed { index, char ->
-        val digit = char.digitToIntOrNull() ?: 0
-        if (index % 2 == 0) {
-            val doubled = digit * 2
-            if (doubled > 9) doubled - 9 else doubled
-        } else {
-            digit
-        }
-    }.sum()
-    return (10 - (sum % 10)) % 10
 }
 
 @Composable

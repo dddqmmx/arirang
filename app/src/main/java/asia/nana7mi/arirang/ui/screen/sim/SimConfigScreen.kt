@@ -1,10 +1,5 @@
 package asia.nana7mi.arirang.ui.screen.sim
 
-import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
-import asia.nana7mi.arirang.ui.component.sim.*
-import android.Manifest
-import android.content.pm.PackageManager
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -13,13 +8,15 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.model.SimInfo
+import asia.nana7mi.arirang.model.SimPresetCatalog
+import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
+import asia.nana7mi.arirang.ui.component.common.RandomizeIconButton
 import asia.nana7mi.arirang.ui.component.dialog.InfoDialog
+import asia.nana7mi.arirang.ui.component.sim.ConfigHeader
 import asia.nana7mi.arirang.ui.component.sim.SimSlotItem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,9 +28,8 @@ internal fun SimConfigScreen(
     initialHideSim: Boolean,
     initialSimList: List<SimInfo>,
     slotLimit: Int,
-    onImportSystemSims: () -> List<SimInfo>,
-    onRequestPhoneStatePermission: () -> Unit,
-    onCreateDefaultSim: (Int) -> SimInfo
+    onCreateDefaultSim: (Int) -> SimInfo = { index -> SimPresetCatalog.randomSimInfo(index) },
+    onRandomSim: (Int) -> SimInfo = { index -> SimPresetCatalog.randomSimInfo(index) }
 ) {
     var enabled by remember { mutableStateOf(initialEnabled) }
     var hideSim by remember { mutableStateOf(initialHideSim) }
@@ -43,8 +39,6 @@ internal fun SimConfigScreen(
     var savedHideSim by remember { mutableStateOf(initialHideSim) }
     var savedSimList by remember { mutableStateOf(initialSimList.take(maxSlots)) }
     var showSlotLimitDialog by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val noActiveSimMessage = stringResource(R.string.sim_import_no_active)
     val hasChanges = enabled != savedEnabled || hideSim != savedHideSim || simList.toList() != savedSimList
 
     fun saveCurrent(): Boolean {
@@ -63,21 +57,20 @@ internal fun SimConfigScreen(
         onBack = onBack,
         actions = {
             if (!hideSim) {
-                IconButton(onClick = {
-                    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
-                        val systemSims = onImportSystemSims()
-                        if (systemSims.isNotEmpty()) {
-                            simList.clear()
-                            simList.addAll(systemSims.take(maxSlots))
+                RandomizeIconButton(
+                    contentDescription = stringResource(R.string.unique_randomize_all),
+                    onClick = {
+                        if (simList.isEmpty()) {
+                            simList.add(onRandomSim(0))
                         } else {
-                            Toast.makeText(context, noActiveSimMessage, Toast.LENGTH_SHORT).show()
+                            val randomized = simList.mapIndexed { index, _ ->
+                                onRandomSim(index)
+                            }
+                            simList.clear()
+                            simList.addAll(randomized)
                         }
-                    } else {
-                        onRequestPhoneStatePermission()
                     }
-                }) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.sim_import_desc))
-                }
+                )
             }
         },
         floatingActionButton = {

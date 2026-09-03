@@ -6,7 +6,8 @@ import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.HookCallback
+import asia.nana7mi.arirang.hook.core.MethodHookParam
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -145,7 +146,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(
             specifierClass,
             "writeToParcel",
-            object : XC_MethodHook() {
+            object : HookCallback() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val config = currentConfig()
                     if (!config.enabled || config.unchangedCurrentWifi) return
@@ -239,7 +240,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(
             networkInfoClass,
             "writeToParcel",
-            object : XC_MethodHook() {
+            object : HookCallback() {
                 // Read and write mExtraInfo directly rather than through
                 // getExtraInfo/setExtraInfo. getExtraInfo is hooked a few lines
                 // above to return the spoofed SSID, so calling it here returned
@@ -301,7 +302,7 @@ internal class WifiConnectivityHooks(
         HookBridge.hookAllMethods(
             wifiInfoClass,
             "writeToParcel",
-            object : XC_MethodHook() {
+            object : HookCallback() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val config = currentConfig()
                     if (!config.enabled || config.unchangedCurrentWifi) return

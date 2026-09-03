@@ -9,7 +9,7 @@ import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 
 private const val GMS_PACKAGE = "com.google.android.gms"
 
@@ -23,10 +23,10 @@ class FuckGms : BaseHookModule(targetPackages = setOf(GMS_PACKAGE)) {
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        hookApplicationContext(lpparam.classLoader)
+    override fun onHook(param: HookPackageParam) {
+        hookApplicationContext(param.classLoader)
         hookBinderInterfaceAttachment()
-        appSetHooks.hookCallbackBinderProxy(lpparam.classLoader)
+        appSetHooks.hookCallbackBinderProxy(param.classLoader)
         HookLog.i(HookLog.Module.GMS, "GMS identifier hook installed")
     }
 

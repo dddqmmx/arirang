@@ -1,6 +1,7 @@
 [versions]
 agp = "9.3.2"
-api = "82"
+libxposedApi = "102.0.0"
+libxposedService = "102.0.0"
 coreSplashscreen = "1.2.0"
 datastorePreferences = "1.2.1"
 googleGson = "2.14.0"
@@ -31,7 +32,8 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
-api = { module = "de.robv.android.xposed:api", version.ref = "api" }
+libxposed-api = { module = "io.github.libxposed:api", version.ref = "libxposedApi" }
+libxposed-service = { module = "io.github.libxposed:service", version.ref = "libxposedService" }
 google-gson = { module = "com.google.code.gson:gson", version.ref = "googleGson" }
 json = { module = "org.json:json", version.ref = "json" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

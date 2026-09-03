@@ -17,7 +17,7 @@ import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.network.VpnHookConfigFile
 import asia.nana7mi.arirang.hook.util.CallerPackages
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
 // through the normal Settings.Secure path instead of per-app hooks.
@@ -81,10 +81,10 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
     override fun isEnabled(): Boolean {
         return true
     }
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val classLoader = lpparam.classLoader
+    override fun onHook(param: HookPackageParam) {
+        val classLoader = param.classLoader
 
-        HookLog.i(HookLog.Module.SETTINGS, "Installing settings hook for ${lpparam.packageName}")
+        HookLog.i(HookLog.Module.SETTINGS, "Installing settings hook for ${param.packageName}")
 
         try {
             val lmsClass = HookBridge.findClassIfExists(
@@ -93,7 +93,7 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
             )?: return
             hookCall(lmsClass)
         } catch (t: Throwable) {
-            HookLog.e(HookLog.Module.SETTINGS, "hook failed for ${lpparam.packageName}", t)
+            HookLog.e(HookLog.Module.SETTINGS, "hook failed for ${param.packageName}", t)
         }
     }
 

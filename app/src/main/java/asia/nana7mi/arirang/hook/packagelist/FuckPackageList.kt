@@ -12,8 +12,9 @@ import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookCallback
+import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.core.MethodHookParam
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,9 +26,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         return config.enabled
     }
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         runCatching {
-            val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", lpparam.classLoader)
+            val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", param.classLoader)
                 ?: throw ClassNotFoundException("ServiceManager not found")
 
             // Find addService method
@@ -50,7 +51,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
 
             HookLog.i(HookLog.Module.PACKAGE_LIST, "ServiceManager hook installed successfully")
 
-            hookPmsInternals(lpparam.classLoader)
+            hookPmsInternals(param.classLoader)
         }.onFailure {
             HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to install ServiceManager hook", it)
         }
@@ -132,7 +133,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     }
 
     /** before-hook for `shouldFilterApplication*`: force `true` when the target must stay hidden. */
-    private fun XC_MethodHook.MethodHookParam.hideTargetForCaller() {
+    private fun MethodHookParam.hideTargetForCaller() {
         if (isInternalCall.get() == true) return
         val callingUid = args.getOrNull(1) as? Int ?: return
         if (callingUid.appId() < 10000) return
@@ -150,7 +151,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     }
 
     /** after-hook for `getPackageStates()`: strip hidden packages from the returned registry map. */
-    private fun XC_MethodHook.MethodHookParam.filterPackageStatesMap() {
+    private fun MethodHookParam.filterPackageStatesMap() {
         if (isInternalCall.get() == true) return
         val callingUid = Binder.getCallingUid()
         if (callingUid.appId() < 10000) return
@@ -197,8 +198,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
      * re-issue the `getPackagesForUid` reflection round-trip. The cache is keyed
      * by UID, capped in size, and invalidated whenever the config reloads.
      */
-    private fun resolveCallingPackages(pmObject: Any, uid: Int): Set<String> {
-        if (uid <= 0) return emptySet()
+    private fun resolveCallingPackages(pmObject: Any?, uid: Int): Set<String> {
+        if (pmObject == null || uid <= 0) return emptySet()
         val version = config.version
         if (cachedConfigVersion != version) {
             cachedConfigVersion = version
@@ -248,7 +249,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         methodName: String,
         vararg parameterTypesAndCallback: Any
     ) {
-        val callback = parameterTypesAndCallback.last() as XC_MethodHook
+        val callback = parameterTypesAndCallback.last() as HookCallback
         val parameterTypes = parameterTypesAndCallback.take(parameterTypesAndCallback.size - 1)
             .map { it as Class<*> }
             .toTypedArray()
@@ -490,8 +491,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         )
     }
 
-    private fun getPackagesForUid(pmObject: Any, uid: Int): Set<String> {
-        if (uid <= 0) return emptySet()
+    private fun getPackagesForUid(pmObject: Any?, uid: Int): Set<String> {
+        if (pmObject == null || uid <= 0) return emptySet()
         return withInternalCall {
             runCatching {
                 (HookBridge.callMethod(pmObject, "getPackagesForUid", uid) as? Array<*>)
@@ -503,7 +504,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     }
 
     private fun filterParceledListSlice(
-        param: XC_MethodHook.MethodHookParam,
+        param: MethodHookParam,
         methodName: String,
         getPackageName: (Any) -> String?
     ) {

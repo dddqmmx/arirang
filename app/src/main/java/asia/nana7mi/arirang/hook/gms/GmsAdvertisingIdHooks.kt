@@ -5,7 +5,7 @@ import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.MethodHookParam
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -50,7 +50,7 @@ internal class GmsAdvertisingIdHooks(
         }
     }
 
-    private fun spoofAdvertisingIdIfMatched(param: XC_MethodHook.MethodHookParam) {
+    private fun spoofAdvertisingIdIfMatched(param: MethodHookParam) {
         val code = param.args.getOrNull(0) as? Int ?: return
         if (code != ADS_IDENTIFIER_GET_ID_TRANSACTION) return
 

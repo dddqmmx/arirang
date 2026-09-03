@@ -6,12 +6,12 @@ import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import asia.nana7mi.arirang.hook.core.hookedMethod
 import asia.nana7mi.arirang.hook.util.asIntOrNull
 import asia.nana7mi.arirang.hook.util.firstIntOrNull
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.MethodHookParam
 
 internal class SimSystemPropertyHooks(
     private val configStore: SimHookConfigStore,
     private val currentConfig: () -> SimHookConfig,
-    private val profileForTelephonyManager: (XC_MethodHook.MethodHookParam) -> SimProfile?,
+    private val profileForTelephonyManager: (MethodHookParam) -> SimProfile?,
     private val profileForSlot: (slotIndex: Int?, allowFallback: Boolean) -> SimProfile?
 ) {
     fun hookTelephonyPropertyWriters(classLoader: ClassLoader) {
@@ -167,7 +167,7 @@ internal class SimSystemPropertyHooks(
     private fun hookSetterValue(
         telephonyManagerClass: Class<*>,
         methodName: String,
-        valueProvider: (XC_MethodHook.MethodHookParam) -> String?
+        valueProvider: (MethodHookParam) -> String?
     ) {
         if (telephonyManagerClass.declaredMethods.none { it.name == methodName }) return
 

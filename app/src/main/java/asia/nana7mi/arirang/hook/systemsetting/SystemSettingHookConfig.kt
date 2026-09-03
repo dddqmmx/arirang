@@ -6,7 +6,7 @@ import asia.nana7mi.arirang.data.datastore.schema.SystemSettingConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XSharedPreferences
+import android.content.SharedPreferences
 import org.json.JSONObject
 
 /**
@@ -54,7 +54,7 @@ internal object SystemSettingHookConfigFile {
         HookLog.w(HookLog.Module.CORE, "failed to parse system setting snapshot: ${it.message}")
     }.getOrNull()
 
-    private fun readStored(prefs: XSharedPreferences): SystemSettingPrefs.Config {
+    private fun readStored(prefs: SharedPreferences): SystemSettingPrefs.Config {
         return SystemSettingPrefs.Config(
             enabled = prefs.getBoolean(SystemSettingPrefs.KEY_ENABLED, false),
             timeZoneId = prefs.getString(SystemSettingPrefs.KEY_TIME_ZONE_ID, null).orEmpty(),

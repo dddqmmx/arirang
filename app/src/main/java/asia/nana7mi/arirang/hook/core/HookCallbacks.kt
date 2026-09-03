@@ -1,26 +1,63 @@
 package asia.nana7mi.arirang.hook.core
 
-import de.robv.android.xposed.XC_MethodHook
+import java.lang.reflect.Executable
 
-/*
- * Builders for the three XC_MethodHook shapes this project uses.
- *
- * These are top-level rather than members of [BaseHookModule] because hook code
- * is split between HookModule entrypoints (`Fuck*`) and plain installer
- * collaborators (`*Hooks`, `*Factory`). Only the former could reach `protected`
- * members, so every collaborator previously had to re-declare a private copy or
- * hand-roll `object : XC_MethodHook()` — eight classes did, and FuckClipboard
- * ended up using both styles in one file.
- *
- * Being top-level, they are reached by import from anywhere, and the lambda
- * labels (`return@afterHookedMethod`) read the same at every call site.
+/**
+ * Parameter passed to hook callbacks.
  */
+class MethodHookParam(
+    val executable: Executable,
+    val thisObject: Any?,
+    val args: Array<Any?>,
+    var returnEarly: Boolean = false
+) {
+    var result: Any? = null
+        set(value) {
+            field = value
+            returnEarly = true
+        }
+
+    var throwable: Throwable? = null
+        set(value) {
+            field = value
+            returnEarly = true
+        }
+
+    private var extra: MutableMap<String, Any?>? = null
+
+    fun setObjectExtra(key: String, value: Any?) {
+        if (extra == null) extra = mutableMapOf()
+        if (value == null) {
+            extra?.remove(key)
+        } else {
+            extra?.put(key, value)
+        }
+    }
+
+    fun getObjectExtra(key: String): Any? = extra?.get(key)
+
+    fun hasThrowable(): Boolean = throwable != null
+}
+
+/**
+ * Base callback for method/constructor hooks.
+ */
+abstract class HookCallback(val priority: Int = PRIORITY_DEFAULT) {
+    open fun beforeHookedMethod(param: MethodHookParam) {}
+    open fun afterHookedMethod(param: MethodHookParam) {}
+
+    companion object {
+        const val PRIORITY_DEFAULT = 50
+        const val PRIORITY_LOWEST = -10000
+        const val PRIORITY_HIGHEST = 10000
+    }
+}
 
 /** Runs [block] before the hooked method; assign `result` to short-circuit it. */
 fun beforeHookedMethod(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
-    block: XC_MethodHook.MethodHookParam.() -> Unit
-): XC_MethodHook = object : XC_MethodHook(priority) {
+    priority: Int = HookCallback.PRIORITY_DEFAULT,
+    block: MethodHookParam.() -> Unit
+): HookCallback = object : HookCallback(priority) {
     override fun beforeHookedMethod(param: MethodHookParam) {
         param.block()
     }
@@ -28,9 +65,9 @@ fun beforeHookedMethod(
 
 /** Runs [block] after the hooked method; read or rewrite `result` there. */
 fun afterHookedMethod(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
-    block: XC_MethodHook.MethodHookParam.() -> Unit
-): XC_MethodHook = object : XC_MethodHook(priority) {
+    priority: Int = HookCallback.PRIORITY_DEFAULT,
+    block: MethodHookParam.() -> Unit
+): HookCallback = object : HookCallback(priority) {
     override fun afterHookedMethod(param: MethodHookParam) {
         param.block()
     }
@@ -38,10 +75,10 @@ fun afterHookedMethod(
 
 /** Runs [before] and/or [after] around the hooked method. */
 fun hookedMethod(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
-    before: (XC_MethodHook.MethodHookParam.() -> Unit)? = null,
-    after: (XC_MethodHook.MethodHookParam.() -> Unit)? = null
-): XC_MethodHook = object : XC_MethodHook(priority) {
+    priority: Int = HookCallback.PRIORITY_DEFAULT,
+    before: (MethodHookParam.() -> Unit)? = null,
+    after: (MethodHookParam.() -> Unit)? = null
+): HookCallback = object : HookCallback(priority) {
     override fun beforeHookedMethod(param: MethodHookParam) {
         before?.invoke(param)
     }

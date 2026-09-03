@@ -1,9 +1,13 @@
 # Keep Xposed module classes
 -keep class asia.nana7mi.arirang.hook.** { *; }
 
-# Keep Xposed API classes
--keep class de.robv.android.xposed.** { *; }
--keepnames class de.robv.android.xposed.** { *; }
+# libxposed rules
+-dontwarn io.github.libxposed.annotation.**
+-adaptresourcefilecontents META-INF/xposed/java_init.list
+-keep,allowoptimization,allowobfuscation public class * extends io.github.libxposed.api.XposedModule {
+    public <init>(...);
+}
+-keep class io.github.libxposed.** { *; }
 
 # XposedActivation resolves this class and its isXposedActivation method by name
 # (hook/activation/XposedActivation.kt), so it must survive shrinking. Every other

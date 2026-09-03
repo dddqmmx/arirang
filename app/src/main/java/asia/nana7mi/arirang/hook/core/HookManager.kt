@@ -1,6 +1,5 @@
 package asia.nana7mi.arirang.hook.core
 
-
 import asia.nana7mi.arirang.data.datastore.GlobalConfigPrefs
 import asia.nana7mi.arirang.hook.activation.XposedActivation
 import asia.nana7mi.arirang.hook.bluetooth.FuckBluetooth
@@ -15,10 +14,12 @@ import asia.nana7mi.arirang.hook.sim.FuckSim
 import asia.nana7mi.arirang.hook.system.SystemServerHook
 import asia.nana7mi.arirang.hook.systemsetting.FuckAppLocale
 import asia.nana7mi.arirang.hook.wifi.FuckWifi
-import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
+import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
+import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 
-class HookManager : IXposedHookLoadPackage {
+class HookManager : XposedModule() {
     private val modules = listOf(
         SystemServerHook(),
         FuckClipboard(),
@@ -35,29 +36,60 @@ class HookManager : IXposedHookLoadPackage {
         XposedActivation()
     )
 
-    override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        /*
-         * DESIGN PRINCIPLE: Arirang is a system-level privacy model.
-         *
-         * We aim to intercept and rewrite data at the source (system_server, phone process)
-         * rather than injecting hooks into arbitrary third-party applications. This ensures
-         * maximum performance and compatibility while maintaining a clean application
-         * runtime environment.
-         */
-        val prefs = HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
-        val restrictHotSwitching = prefs.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false)
+    override fun onModuleLoaded(param: ModuleLoadedParam) {
+        super.onModuleLoaded(param)
+        HookBridge.init(this)
+        HookLog.i(HookLog.Module.CORE, "libxposed module loaded in ${param.processName}, api=$apiVersion")
+    }
 
-        HookLog.d(HookLog.Module.CORE, "handleLoadPackage(${lpparam.packageName}) restrictHotSwitching=$restrictHotSwitching")
+    override fun onSystemServerStarting(param: SystemServerStartingParam) {
+        super.onSystemServerStarting(param)
+        HookBridge.init(this)
+        dispatchPackageLoaded(
+            HookPackageParam(
+                packageName = "android",
+                classLoader = param.classLoader,
+                processName = "system_server"
+            )
+        )
+    }
+
+    override fun onPackageReady(param: PackageReadyParam) {
+        super.onPackageReady(param)
+        HookBridge.init(this)
+        dispatchPackageLoaded(
+            HookPackageParam(
+                packageName = param.packageName,
+                classLoader = param.classLoader,
+                processName = param.applicationInfo.processName
+            )
+        )
+    }
+
+    private fun dispatchPackageLoaded(pkgParam: HookPackageParam) {
+        val prefs = runCatching {
+            HookConfigFile.xSharedPreferences(GlobalConfigPrefs.PREFS_NAME)
+        }.getOrNull()
+        val restrictHotSwitching = prefs?.getBoolean(GlobalConfigPrefs.KEY_RESTRICT_HOT_SWITCHING, false) ?: false
+
+        HookLog.d(
+            HookLog.Module.CORE,
+            "dispatchPackageLoaded(${pkgParam.packageName}) restrictHotSwitching=$restrictHotSwitching"
+        )
         modules
-            .filter { it.matches(lpparam.packageName) }
+            .filter { it.matches(pkgParam.packageName) }
             .filter { module ->
                 !restrictHotSwitching || module.requiresRuntimeConfigInstall() || module.isEnabled()
             }
             .forEach { module ->
                 runCatching {
-                    module.onHook(lpparam)
+                    module.onHook(pkgParam)
                 }.onFailure {
-                    HookLog.e(HookLog.Module.CORE, "module ${module.javaClass.simpleName} failed for ${lpparam.packageName}", it)
+                    HookLog.e(
+                        HookLog.Module.CORE,
+                        "module ${module.javaClass.simpleName} failed for ${pkgParam.packageName}",
+                        it
+                    )
                 }
             }
     }

@@ -118,7 +118,8 @@ private fun rewriteNestedTelephonyObject(
     }
 }
 
-internal fun rewriteCommonOperatorFields(instance: Any, profile: SimProfile) {
+internal fun rewriteCommonOperatorFields(instance: Any?, profile: SimProfile) {
+    if (instance == null) return
     setFieldValueIfExists(instance, "mMcc", profile.mcc.toIntOrNull() ?: 0)
     setFieldValueIfExists(instance, "mMnc", profile.mnc.toIntOrNull() ?: 0)
     setFieldValueIfExists(instance, "mMcc", profile.mcc)

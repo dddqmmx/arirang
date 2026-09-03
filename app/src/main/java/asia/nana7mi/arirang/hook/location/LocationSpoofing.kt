@@ -32,7 +32,8 @@ internal fun fakeLocation(
     return location
 }
 
-internal fun rewriteLocationResult(locationResult: Any, profile: LocationProfile): Boolean {
+internal fun rewriteLocationResult(locationResult: Any?, profile: LocationProfile): Boolean {
+    if (locationResult == null) return false
     runCatching { HookBridge.callMethod(locationResult, "getLocations") }
         .getOrNull()
         ?.takeIf { it.containsLocation() }

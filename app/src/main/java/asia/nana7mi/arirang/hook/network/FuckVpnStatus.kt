@@ -11,7 +11,7 @@ import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import asia.nana7mi.arirang.hook.util.CallerPackages
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -33,7 +33,7 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
 
     private val config = VpnHookConfigFile.create()
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         // ConnectivityService may not be loaded yet when this module is injected
         // at system_server startup, and findClassIfExists never triggers a load.
         // Catch the service registration instead: the framework ServiceManager
@@ -43,11 +43,11 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         installConnectivityHooks(
             HookBridge.findClassIfExists(
                 "com.android.server.ConnectivityService",
-                lpparam.classLoader
+                param.classLoader
             )
         )
 
-        val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", lpparam.classLoader)
+        val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", param.classLoader)
             ?: run {
                 HookLog.w(HookLog.Module.CORE, "ServiceManager not found; VPN spoofing deferred indefinitely")
                 return

@@ -5,7 +5,7 @@ import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.schema.LocationConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.LocationProfileSchema
-import de.robv.android.xposed.XSharedPreferences
+import android.content.SharedPreferences
 import org.json.JSONObject
 
 internal data class LocationHookConfig(
@@ -61,7 +61,7 @@ internal object LocationHookConfigParser {
         satellites = satellites.coerceIn(0, 64)
     )
 
-    fun readStored(prefs: XSharedPreferences): LocationHookConfig {
+    fun readStored(prefs: SharedPreferences): LocationHookConfig {
         return LocationHookConfig(
             enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
             defaultProfile = LocationProfile(

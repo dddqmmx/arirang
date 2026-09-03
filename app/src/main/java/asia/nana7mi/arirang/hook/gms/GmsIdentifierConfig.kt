@@ -7,7 +7,7 @@ import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XSharedPreferences
+import android.content.SharedPreferences
 
 internal data class GmsIdentifierConfig(
     val enabled: Boolean = false,
@@ -58,8 +58,7 @@ internal class GmsIdentifierConfigStore(
         }.getOrNull()
     }
 
-    private fun readStored(prefs: XSharedPreferences): GmsIdentifierConfig? {
-        if (!prefs.file.canRead()) return null
+    private fun readStored(prefs: SharedPreferences): GmsIdentifierConfig? {
         if (!prefs.getBoolean(KEY_ENABLED, false)) return GmsIdentifierConfig()
         return GmsIdentifierConfig(
             enabled = true,

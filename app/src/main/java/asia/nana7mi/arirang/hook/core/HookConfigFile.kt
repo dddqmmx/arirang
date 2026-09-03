@@ -1,9 +1,9 @@
 package asia.nana7mi.arirang.hook.core
 
 import android.annotation.SuppressLint
+import android.content.SharedPreferences
 import android.util.Xml
 import asia.nana7mi.arirang.BuildConfig
-import de.robv.android.xposed.XSharedPreferences
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -15,7 +15,7 @@ class HookConfigFile<T>(
     refreshIntervalMs: Long,
     private val readRealtimeSnapshot: (force: Boolean) -> String?,
     private val parseRealtimeSnapshot: (String) -> T?,
-    private val readStoredConfig: (XSharedPreferences) -> T?
+    private val readStoredConfig: (SharedPreferences) -> T?
 ) {
     private val realtimeConfig = RealtimeHookConfig(
         defaultValue = defaultValue,
@@ -31,7 +31,7 @@ class HookConfigFile<T>(
         return realtimeConfig.current(force)
     }
 
-    fun readXSharedPreferences(): XSharedPreferences {
+    fun readXSharedPreferences(): SharedPreferences {
         return xSharedPreferences(prefsName)
     }
 
@@ -44,11 +44,8 @@ class HookConfigFile<T>(
     }
 
     companion object {
-        fun xSharedPreferences(prefsName: String): XSharedPreferences {
-            return XSharedPreferences(BuildConfig.APPLICATION_ID, prefsName).apply {
-                makeWorldReadable()
-                reload()
-            }
+        fun xSharedPreferences(prefsName: String): SharedPreferences {
+            return HookBridge.getRemotePreferences(prefsName)
         }
 
         fun readSharedPrefsValues(
@@ -112,8 +109,6 @@ class HookConfigFile<T>(
 
         @SuppressLint("SdCardPath")
         private fun sharedPrefsFiles(prefsName: String): List<File> {
-            // Hooked processes cannot rely on this app's Context; probe the app private
-            // shared_prefs locations directly as an XSharedPreferences fallback.
             return listOf(
                 File("/data/user/0/${BuildConfig.APPLICATION_ID}/shared_prefs/$prefsName.xml"),
                 File("/data/data/${BuildConfig.APPLICATION_ID}/shared_prefs/$prefsName.xml")

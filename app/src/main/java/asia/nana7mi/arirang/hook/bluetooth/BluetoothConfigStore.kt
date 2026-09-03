@@ -6,7 +6,7 @@ import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XSharedPreferences
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -69,7 +69,7 @@ internal class BluetoothConfigStore {
         }.getOrNull()
     }
 
-    private fun readStored(prefs: XSharedPreferences): BluetoothHookConfig {
+    private fun readStored(prefs: SharedPreferences): BluetoothHookConfig {
         return BluetoothHookConfig(
             enabled = prefs.getBoolean(BluetoothConfigPrefs.KEY_ENABLED, false),
             deviceName = prefs.getString(BluetoothConfigPrefs.KEY_DEVICE_NAME, null)

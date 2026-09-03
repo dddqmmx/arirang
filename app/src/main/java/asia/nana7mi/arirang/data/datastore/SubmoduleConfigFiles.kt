@@ -146,6 +146,7 @@ object SubmoduleConfigFiles {
 
         val configFileCe = ceConfigFile(context)
         writeConfigPair(configFileCe, configFileDe, json)
+        runCatching { asia.nana7mi.arirang.data.sync.RemotePreferencesSyncManager.syncAll(context) }
     }
 
     /**

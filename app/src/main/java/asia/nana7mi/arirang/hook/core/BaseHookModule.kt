@@ -4,9 +4,6 @@ import asia.nana7mi.arirang.BuildConfig
 
 /**
  * Package-matching policy for a [HookModule].
- *
- * The XC_MethodHook builders that used to live here are now top-level functions
- * in [HookCallbacks], so installer collaborators can use them too.
  */
 abstract class BaseHookModule(
     private val targetPackages: Set<String> = emptySet(),

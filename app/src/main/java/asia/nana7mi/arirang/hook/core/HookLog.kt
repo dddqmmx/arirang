@@ -141,13 +141,10 @@ object HookLog {
         }
 
         return runCatching {
-            HookConfigFile.xSharedPreferences(HookLogSettings.PREFS_NAME).takeIf {
-                it.file.canRead()
-            }?.let { prefs ->
-                JSONObject().apply {
-                    Module.entries.forEach { module ->
-                        put(module.key, prefs.getBoolean(HookLogSettings.prefKey(module.key), module.defaultEnabled))
-                    }
+            val prefs = HookConfigFile.xSharedPreferences(HookLogSettings.PREFS_NAME)
+            JSONObject().apply {
+                Module.entries.forEach { module ->
+                    put(module.key, prefs.getBoolean(HookLogSettings.prefKey(module.key), module.defaultEnabled))
                 }
             }
         }.getOrNull()

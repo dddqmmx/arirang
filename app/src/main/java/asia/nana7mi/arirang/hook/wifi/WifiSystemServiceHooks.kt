@@ -58,7 +58,8 @@ internal class WifiSystemServiceHooks(
             .forEach { method ->
                 HookBridge.hookMethod(method, afterHookedMethod {
                     HookLog.i(HookLog.Module.WIFI, "WifiService.onStart observed; resolving WifiServiceImpl")
-                    serviceHooks.hookWifiServiceInstance(thisObject)
+                    val target = thisObject ?: return@afterHookedMethod
+                    serviceHooks.hookWifiServiceInstance(target)
                 })
             }
     }

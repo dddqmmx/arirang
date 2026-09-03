@@ -6,7 +6,7 @@ import asia.nana7mi.arirang.data.datastore.schema.WifiConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XSharedPreferences
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -79,7 +79,7 @@ internal class WifiConfigStore {
         }.getOrNull()
     }
 
-    private fun readStored(prefs: XSharedPreferences): WifiHookConfig {
+    private fun readStored(prefs: SharedPreferences): WifiHookConfig {
         return WifiHookConfig(
             enabled = prefs.getBoolean(WifiConfigPrefs.KEY_ENABLED, false),
             unchangedCurrentWifi = prefs.getBoolean(

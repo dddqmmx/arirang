@@ -22,7 +22,7 @@ import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import asia.nana7mi.arirang.hook.core.hookedMethod
 import asia.nana7mi.arirang.hook.util.getFieldValue
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 import java.lang.ref.WeakReference
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -97,36 +97,36 @@ class FuckLocation : BaseHookModule(
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         runCatching {
-            when (lpparam.packageName) {
+            when (param.packageName) {
                 "android" -> {
-                    hookLocationManagerService(lpparam.classLoader)
-                    hookProviderManager(lpparam.classLoader)
-                    hookAndroidFusedProvider(lpparam.classLoader)
-                    hookGnssReports(lpparam.classLoader)
-                    hookFrameworkLocationResult(lpparam.classLoader)
+                    hookLocationManagerService(param.classLoader)
+                    hookProviderManager(param.classLoader)
+                    hookAndroidFusedProvider(param.classLoader)
+                    hookGnssReports(param.classLoader)
+                    hookFrameworkLocationResult(param.classLoader)
                 }
                 "com.android.location.fused" -> {
-                    hookAndroidFusedProvider(lpparam.classLoader)
-                    hookFrameworkLocationResult(lpparam.classLoader)
+                    hookAndroidFusedProvider(param.classLoader)
+                    hookFrameworkLocationResult(param.classLoader)
                 }
                 "com.google.android.gms" -> {
-                    hookApplicationContext(lpparam.classLoader)
-                    hookGmsReceiverBinding(lpparam.classLoader)
+                    hookApplicationContext(param.classLoader)
+                    hookGmsReceiverBinding(param.classLoader)
                     hookLocationAccessors()
-                    hookFrameworkLocationManagerClient(lpparam.classLoader)
-                    hookFrameworkLocationResult(lpparam.classLoader)
-                    hookGoogleFusedClient(lpparam.classLoader)
-                    hookGoogleLocationResult(lpparam.classLoader)
-                    hookGoogleTasks(lpparam.classLoader)
-                    hookGoogleLocationCallbacks(lpparam.classLoader)
-                    hookGmsInternalLocationService(lpparam.classLoader)
+                    hookFrameworkLocationManagerClient(param.classLoader)
+                    hookFrameworkLocationResult(param.classLoader)
+                    hookGoogleFusedClient(param.classLoader)
+                    hookGoogleLocationResult(param.classLoader)
+                    hookGoogleTasks(param.classLoader)
+                    hookGoogleLocationCallbacks(param.classLoader)
+                    hookGmsInternalLocationService(param.classLoader)
                 }
             }
-            HookLog.i(HookLog.Module.LOCATION, "location hook installed for ${lpparam.packageName}")
+            HookLog.i(HookLog.Module.LOCATION, "location hook installed for ${param.packageName}")
         }.onFailure {
-            HookLog.e(HookLog.Module.LOCATION, "location hook failed for ${lpparam.packageName}", it)
+            HookLog.e(HookLog.Module.LOCATION, "location hook failed for ${param.packageName}", it)
         }
     }
 
@@ -295,11 +295,12 @@ class FuckLocation : BaseHookModule(
     }
 
     private fun scheduleProactiveUpdateDelivery(
-        target: Any,
+        target: Any?,
         profile: LocationProfile,
         provider: String,
         packageName: String?
     ) {
+        if (target == null) return
         val binder = (target as? IInterface)?.asBinder()
         val targetRef = WeakReference(target)
         val cl = target.javaClass.classLoader

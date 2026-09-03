@@ -16,7 +16,7 @@ import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 
 class SystemServerHook : BaseHookModule(matchSystem = true) {
     private data class BluetoothNameConfig(val enabled: Boolean = false, val name: String? = null)
@@ -53,9 +53,9 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
         }
     )
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         try {
-            val amsClass = HookBridge.findClass("com.android.server.am.ActivityManagerService", lpparam.classLoader)
+            val amsClass = HookBridge.findClass("com.android.server.am.ActivityManagerService", param.classLoader)
             
             // Search for systemReady method that takes a Runnable as its first parameter
             // Newer Android versions (14+) often have systemReady(Runnable, TimingsTraceAndSlog)
@@ -108,10 +108,10 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
             // findClass(..., lpparam.classLoader) fails ("class not found"). We instead wait for
             // BluetoothService to publish its "bluetooth_manager" binder via
             // ServiceManager.addService and take the APEX classloader from that binder.
-            hookBluetoothManagerWhenPublished(lpparam.classLoader)
+            hookBluetoothManagerWhenPublished(param.classLoader)
 
             // Hook SystemProperties for Java-level property spoofing
-            val systemPropertiesClass = HookBridge.findClass("android.os.SystemProperties", lpparam.classLoader)
+            val systemPropertiesClass = HookBridge.findClass("android.os.SystemProperties", param.classLoader)
             hookSystemProperties(systemPropertiesClass)
 
         } catch (t: Throwable) {

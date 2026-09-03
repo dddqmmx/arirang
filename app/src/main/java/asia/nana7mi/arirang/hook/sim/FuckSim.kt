@@ -13,8 +13,8 @@ import asia.nana7mi.arirang.hook.core.hookedMethod
 import asia.nana7mi.arirang.hook.util.asIntOrNull
 import asia.nana7mi.arirang.hook.util.firstIntOrNull
 import asia.nana7mi.arirang.hook.util.getFieldValue
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.core.MethodHookParam
 import java.lang.reflect.Array as ReflectArray
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -56,17 +56,17 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     override fun isEnabled(): Boolean = hookConfig.enabled
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         runCatching {
-            configStore.preferHookNotifyConfig = lpparam.packageName == "android" || lpparam.packageName == "com.android.phone"
+            configStore.preferHookNotifyConfig = param.packageName == "android" || param.packageName == "com.android.phone"
             val config = hookConfig
-            when (lpparam.packageName) {
+            when (param.packageName) {
                 "android" -> {
-                    hookSystemServerSurfaces(lpparam.classLoader)
+                    hookSystemServerSurfaces(param.classLoader)
                     HookLog.i(HookLog.Module.SIM, "system_server hook installed enabled=${config.enabled}")
                 }
                 "com.android.phone" -> {
-                    hookPhoneProcessSurfaces(lpparam.classLoader)
+                    hookPhoneProcessSurfaces(param.classLoader)
                     HookLog.i(HookLog.Module.SIM, "phone process hook installed enabled=${config.enabled}")
                 }
             }
@@ -488,8 +488,9 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 HookBridge.hookMethod(method, hookedMethod(
                     before = {
                         val config = hookConfig
+                        val target = thisObject ?: return@hookedMethod
                         if (config.enabled) {
-                            rewriter(thisObject, config.primaryProfile)
+                            rewriter(target, config.primaryProfile)
                         }
                     },
                     after = {
@@ -557,7 +558,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         result: Any?,
         method: Method,
         classLoader: ClassLoader?,
-        param: XC_MethodHook.MethodHookParam
+        param: MethodHookParam
     ): Any? {
         return when (result) {
             is Iterable<*> -> buildSubscriptionInfoList(result.filterNotNull(), classLoader)
@@ -583,7 +584,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private fun rewriteSingle(
         result: Any?,
         method: Method,
-        param: XC_MethodHook.MethodHookParam,
+        param: MethodHookParam,
         classLoader: ClassLoader?
     ): Any? {
         val profile = profileForSubscriptionQuery(method.name, param.args)
@@ -785,7 +786,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methodName: String,
         externalClientsOnly: Boolean = false,
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
-        valueProvider: (XC_MethodHook.MethodHookParam, Method) -> Any?
+        valueProvider: (MethodHookParam, Method) -> Any?
     ) {
         val methods = targetClass.declaredMethods.filter { it.name == methodName }
         if (methods.isEmpty()) return
@@ -817,7 +818,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
      * Only SecurityException is preserved. Other failures (no SIM, null phone
      * object) are still masked with the spoofed value, as before.
      */
-    private fun XC_MethodHook.MethodHookParam.callerWasRefused(): Boolean =
+    private fun MethodHookParam.callerWasRefused(): Boolean =
         throwable is SecurityException
 
     private fun coerceHookResult(value: Any?, originalResult: Any?): Any? {
@@ -850,7 +851,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
-        resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
+        resultProvider: (MethodHookParam, Method) -> String?
     ) {
         val targetClass = HookBridge.findClassIfExists(className, classLoader) ?: return
         hookAllExistingStringMethods(targetClass, methodNames, externalClientsOnly, shouldHandle, resultProvider)
@@ -861,7 +862,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methodNames: Collection<String>,
         externalClientsOnly: Boolean = false,
         shouldHandle: (SimHookConfig) -> Boolean = { it.enabled },
-        resultProvider: (XC_MethodHook.MethodHookParam, Method) -> String?
+        resultProvider: (MethodHookParam, Method) -> String?
     ) {
         methodNames.forEach { methodName ->
             val methods = targetClass.declaredMethods
@@ -890,7 +891,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         }
     }
 
-    private fun phoneNumberForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+    private fun phoneNumberForCall(param: MethodHookParam, method: Method): String? {
         val firstInt = param.args.firstIntOrNull()
         // Unlike IMEI/TAC, every int-keyed phone-number overload keys by subId,
         // never by slot, so there is no slot derivation here.
@@ -917,7 +918,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private data class SimCallTarget(val profile: SimProfile?, val slotIndex: Int?)
 
     private fun slotTargetForCall(
-        param: XC_MethodHook.MethodHookParam,
+        param: MethodHookParam,
         method: Method
     ): SimCallTarget {
         val firstInt = param.args.firstIntOrNull()
@@ -937,12 +938,12 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         return SimCallTarget(profile, slotIndex)
     }
 
-    private fun imeiForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+    private fun imeiForCall(param: MethodHookParam, method: Method): String? {
         val (profile, slotIndex) = slotTargetForCall(param, method)
         return hookConfig.uniqueIdentifiers.imeiForSlot(slotIndex, profile?.imei)
     }
 
-    private fun typeAllocationCodeForCall(param: XC_MethodHook.MethodHookParam, method: Method): String? {
+    private fun typeAllocationCodeForCall(param: MethodHookParam, method: Method): String? {
         val (profile, slotIndex) = slotTargetForCall(param, method)
         val firstInt = param.args.firstIntOrNull()
         val config = hookConfig
@@ -962,7 +963,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         return take(2) + "***" + takeLast(2)
     }
 
-    private fun profileForTelephonyManager(param: XC_MethodHook.MethodHookParam): SimProfile? {
+    private fun profileForTelephonyManager(param: MethodHookParam): SimProfile? {
         val subId = getIntFieldIfExists(param.thisObject, "mSubId")
         if (subId != null && subId > 0) {
             return profileForSubId(subId, allowFallback = false)

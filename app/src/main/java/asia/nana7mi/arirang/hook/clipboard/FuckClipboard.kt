@@ -10,7 +10,7 @@ import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -44,16 +44,16 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
         }
     }
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         runCatching {
-            val clipboardService = HookBridge.findClass("com.android.server.clipboard.ClipboardService", lpparam.classLoader)
+            val clipboardService = HookBridge.findClass("com.android.server.clipboard.ClipboardService", param.classLoader)
             val clipboardImpl = HookBridge.findClassIfExists(
                 "com.android.server.clipboard.ClipboardService\$ClipboardImpl",
-                lpparam.classLoader
+                param.classLoader
             )
             // 进行剪切板读取事件的拦截
             hookClipboard(clipboardImpl ?: clipboardService)
-            hookAnrExemption(lpparam.classLoader)
+            hookAnrExemption(param.classLoader)
             HookLog.i(HookLog.Module.CLIPBOARD, "hooked")
         }.onFailure {
             HookLog.e(HookLog.Module.CLIPBOARD, "hook failed", it)
@@ -99,10 +99,11 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
     private fun hookAnrExemption(classLoader: ClassLoader) {
         val hookCallback = beforeHookedMethod {
             val uid = runCatching {
-                if (thisObject.javaClass.simpleName == "ProcessRecord") {
-                    HookBridge.getIntField(thisObject, "uid")
+                val target = thisObject ?: return@runCatching null
+                if (target.javaClass.simpleName == "ProcessRecord") {
+                    HookBridge.getIntField(target, "uid")
                 } else {
-                    HookBridge.getIntField(thisObject, "mUid")
+                    HookBridge.getIntField(target, "mUid")
                 }
             }.getOrNull()
 

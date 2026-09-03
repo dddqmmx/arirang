@@ -3,7 +3,7 @@ package asia.nana7mi.arirang.hook.wifi
 import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 
 /**
  * Rewrites current Wi-Fi identity and nearby Wi-Fi scan results at the Wi-Fi
@@ -20,18 +20,18 @@ class FuckWifi : BaseHookModule(
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
+    override fun onHook(param: HookPackageParam) {
         runCatching {
             HookLog.i(
                 HookLog.Module.WIFI,
-                "installing Wi-Fi hooks for ${lpparam.packageName} classLoader=${lpparam.classLoader}"
+                "installing Wi-Fi hooks for ${param.packageName} classLoader=${param.classLoader}"
             )
-            serviceHooks.hookWifiService(lpparam.classLoader)
-            systemServiceHooks.hookWifiSystemServiceManager(lpparam.classLoader)
-            connectivityHooks.hookConnectivitySurfaces(lpparam.classLoader)
-            HookLog.i(HookLog.Module.WIFI, "Wi-Fi privacy hook installed for ${lpparam.packageName}")
+            serviceHooks.hookWifiService(param.classLoader)
+            systemServiceHooks.hookWifiSystemServiceManager(param.classLoader)
+            connectivityHooks.hookConnectivitySurfaces(param.classLoader)
+            HookLog.i(HookLog.Module.WIFI, "Wi-Fi privacy hook installed for ${param.packageName}")
         }.onFailure {
-            HookLog.e(HookLog.Module.WIFI, "Wi-Fi privacy hook failed for ${lpparam.packageName}", it)
+            HookLog.e(HookLog.Module.WIFI, "Wi-Fi privacy hook failed for ${param.packageName}", it)
         }
     }
 

@@ -4,7 +4,7 @@ import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.OutputStream
@@ -27,34 +27,31 @@ class FuckProcess : BaseHookModule(matchSystem = true) {
 
     override fun isEnabled(): Boolean = true // Always active if module is loaded, rely on underlying SystemProperties
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (lpparam.packageName == "android") return // Don't hook system_server ProcessBuilder
+    override fun onHook(param: HookPackageParam) {
+        if (param.packageName == "android") return // Don't hook system_server ProcessBuilder
 
         runCatching {
-            val processBuilderClass = HookBridge.findClass("java.lang.ProcessBuilder", lpparam.classLoader)
+            val processBuilderClass = HookBridge.findClass("java.lang.ProcessBuilder", param.classLoader)
             
             HookBridge.hookAllMethods(processBuilderClass, "start", beforeHookedMethod {
                 val pb = this.thisObject as ProcessBuilder
                 val cmd = pb.command()
                 
                 if (cmd.isNotEmpty() && (cmd[0] == "getprop" || cmd[0] == "/system/bin/getprop")) {
-                    val key = cmd.getOrNull(1)
-                    if (key != null) {
-                        // Let's call the Java SystemProperties.get() which is ALREADY SPOOFED by our native zygisk module.
-                        val spoofedValue = runCatching {
-                            val spClass = HookBridge.findClass("android.os.SystemProperties", lpparam.classLoader)
-                            HookBridge.callStaticMethod(spClass, "get", key, "") as String
-                        }.getOrDefault("")
-
-                        HookLog.d(HookLog.Module.CORE, "Spoofed getprop execution")
+                    val propName = if (cmd.size > 1) cmd[1] else null
+                    if (propName != null) {
+                        val spClass = HookBridge.findClass("android.os.SystemProperties", param.classLoader)
+                        val spoofedValue = HookBridge.callStaticMethod(spClass, "get", propName, "") as String
+                        
+                        HookLog.d(HookLog.Module.CORE, "FuckProcess intercepted getprop: $propName -> $spoofedValue")
 
                         this.result = MockProcess(spoofedValue + "\n")
                     }
                 }
             })
-            HookLog.i(HookLog.Module.CORE, "FuckProcess installed for ${lpparam.packageName}")
+            HookLog.i(HookLog.Module.CORE, "FuckProcess installed for ${param.packageName}")
         }.onFailure {
-            HookLog.e(HookLog.Module.CORE, "FuckProcess failed for ${lpparam.packageName}", it)
+            HookLog.e(HookLog.Module.CORE, "FuckProcess failed for ${param.packageName}", it)
         }
     }
 

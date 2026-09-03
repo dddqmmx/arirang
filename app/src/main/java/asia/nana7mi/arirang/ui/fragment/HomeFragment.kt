@@ -37,7 +37,7 @@ class HomeFragment : Fragment() {
     }
 
     fun isXposedActivation(): Boolean {
-        return false
+        return asia.nana7mi.arirang.data.sync.RemotePreferencesSyncManager.isServiceConnected
     }
 
     fun submoduleVersion(): String? {

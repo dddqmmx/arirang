@@ -9,7 +9,8 @@ import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.beforeHookedMethod
 import com.google.android.gms.appset.zzc as AppSetIdResult
 import com.google.android.gms.common.api.Status
-import de.robv.android.xposed.XC_MethodHook
+import asia.nana7mi.arirang.hook.core.HookCallback
+import asia.nana7mi.arirang.hook.core.MethodHookParam
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -30,7 +31,7 @@ internal class GmsAppSetHooks(
             Parcel::class.java,
             Parcel::class.java,
             Int::class.javaPrimitiveType,
-            object : XC_MethodHook() {
+            object : HookCallback() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val code = param.args.getOrNull(0) as? Int ?: return
                     if (code != APP_SET_CALLBACK_TRANSACTION) return

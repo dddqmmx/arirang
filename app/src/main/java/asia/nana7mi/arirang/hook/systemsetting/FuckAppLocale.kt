@@ -7,8 +7,8 @@ import asia.nana7mi.arirang.hook.core.BaseHookModule
 import asia.nana7mi.arirang.hook.core.HookBridge
 import asia.nana7mi.arirang.hook.core.HookLog
 import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.callbacks.XC_LoadPackage
+import asia.nana7mi.arirang.hook.core.HookCallback
+import asia.nana7mi.arirang.hook.core.HookPackageParam
 
 /**
  * Reports a configured per-application locale from system_server.
@@ -36,8 +36,8 @@ class FuckAppLocale : BaseHookModule(matchSystem = true) {
 
     private val config = SystemSettingHookConfigFile.create()
 
-    override fun onHook(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val classLoader = lpparam.classLoader
+    override fun onHook(param: HookPackageParam) {
+        val classLoader = param.classLoader
         var installed = 0
 
         installed += hookPackageConfigPersister(classLoader)
@@ -134,7 +134,7 @@ class FuckAppLocale : BaseHookModule(matchSystem = true) {
         return count
     }
 
-    private fun localeQueryHook(): XC_MethodHook = afterHookedMethod {
+    private fun localeQueryHook(): HookCallback = afterHookedMethod {
         if (hasThrowable()) return@afterHookedMethod
         val packageName = args.firstOrNull() as? String ?: return@afterHookedMethod
         val locales = resolveLocales(packageName) ?: return@afterHookedMethod

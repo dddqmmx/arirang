@@ -6,7 +6,7 @@ import asia.nana7mi.arirang.data.datastore.schema.VpnStatusConfigSchema
 import asia.nana7mi.arirang.hook.core.ArirangClient
 import asia.nana7mi.arirang.hook.core.HookConfigFile
 import asia.nana7mi.arirang.hook.core.HookLog
-import de.robv.android.xposed.XSharedPreferences
+import android.content.SharedPreferences
 import org.json.JSONArray
 
 internal data class VpnHookConfig(
@@ -71,7 +71,7 @@ internal object VpnHookConfigFile {
         HookLog.w(HookLog.Module.CORE, "failed to parse VPN status snapshot: ${it.message}")
     }.getOrNull()
 
-    private fun readStored(prefs: XSharedPreferences): VpnHookConfig {
+    private fun readStored(prefs: SharedPreferences): VpnHookConfig {
         val defaults = VpnHookConfig()
         return VpnHookConfig(
             enabled = prefs.getBoolean(VpnStatusPrefs.KEY_ENABLED, defaults.enabled),
