@@ -82,6 +82,7 @@ cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
   -DARIRANG_APPLICATION_ID=asia.nana7mi.arirang \
   -DARIRANG_SUBMODULE_CONFIG_DIR=arirang-submodule \
   -DARIRANG_SUBMODULE_CONFIG_FILE=config.json \
+  -DARIRANG_MODULE_VERSION=0.5.0-experimental \
   -G Ninja
 cmake --build "$BUILD_DIR"
 

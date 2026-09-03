@@ -8,5 +8,5 @@ plugins {
 extra["arirangApplicationId"] = "asia.nana7mi.arirang"
 extra["arirangSubmoduleConfigDir"] = "arirang-submodule"
 extra["arirangSubmoduleConfigFile"] = "config.json"
-extra["arirangSubmoduleVersion"] = "0.4.1-experimental"
-extra["arirangSubmoduleVersionCode"] = "3"
+extra["arirangSubmoduleVersion"] = "0.5.0-experimental"
+extra["arirangSubmoduleVersionCode"] = "4"
