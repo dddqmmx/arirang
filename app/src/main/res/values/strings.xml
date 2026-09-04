@@ -52,7 +52,7 @@
     <string name="grant_permission">Grant</string>
     <string name="not_now">Not Now</string>
     <string name="keep_original_setting">Do Not Grant</string>
-    <string name="package_list_config_title">App List Access Permission</string>
+    <string name="package_list_config_title">App List Filtering</string>
     <string name="sim_config_title">SIM Info Configuration</string>
     <string name="sim_scope_title">SIM Modification Scope</string>
     <string name="device_info_config_title">Device Info Configuration</string>

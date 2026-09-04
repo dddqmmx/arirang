@@ -47,7 +47,7 @@
     <string name="grant_permission">許可</string>
     <string name="not_now">今はしない</string>
     <string name="keep_original_setting">許可しない</string>
-    <string name="package_list_config_title">アプリリスト読み取り権限</string>
+    <string name="package_list_config_title">アプリリストフィルター</string>
     <string name="sim_config_title">SIMデータ設定</string>
     <string name="sim_scope_title">SIM改ざんの影響範囲</string>
     <string name="device_info_config_title">端末情報設定</string>
