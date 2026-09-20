@@ -42,7 +42,7 @@ if(NOT ARIRANG_MODULE_VERSION MATCHES "^[A-Za-z0-9][A-Za-z0-9._-]*$")
     message(FATAL_ERROR "ARIRANG_MODULE_VERSION is not a safe version string")
 endif()
 foreach(component ARIRANG_SUBMODULE_CONFIG_DIR ARIRANG_SUBMODULE_CONFIG_FILE)
-    string(LENGTH "${${comzponent}}" component_length)
+    string(LENGTH "${${component}}" component_length)
     if(component_length GREATER 128 OR
        NOT "${${component}}" MATCHES "^[A-Za-z0-9][A-Za-z0-9._-]*$" OR
        "${${component}}" STREQUAL "." OR "${${component}}" STREQUAL "..")

@@ -57,7 +57,21 @@ object HookBridge {
                     thisObject = chain.thisObject,
                     args = chain.args.toTypedArray()
                 )
-                callback.beforeHookedMethod(param)
+
+                // Legacy-Xposed callback isolation: a Throwable thrown by a hook
+                // callback is logged and swallowed rather than propagating out of
+                // the interceptor into the hooked framework method (per the libxposed
+                // Hooker contract, interceptor exceptions otherwise reach the original
+                // caller — e.g. into ActivityManagerService in system_server, turning
+                // a module bug into a device crash). A failed before-callback runs the
+                // original method as if the hook was not installed; a failed
+                // after-callback keeps whatever result the original produced.
+                try {
+                    callback.beforeHookedMethod(param)
+                } catch (t: Throwable) {
+                    logCallbackFailure("beforeHookedMethod", origin, t)
+                    param.discardEarlyExit()
+                }
                 if (param.returnEarly) {
                     if (param.throwable != null) throw param.throwable!!
                     return@intercept param.result
@@ -69,10 +83,23 @@ object HookBridge {
                     param.throwable = t
                 }
 
-                callback.afterHookedMethod(param)
+                // A failed after-callback keeps the param as it stands: the
+                // original method already ran, so its result (or exception, or
+                // whatever an earlier write left) must survive the callback's
+                // own failure — legacy Xposed behaves the same way.
+                try {
+                    callback.afterHookedMethod(param)
+                } catch (t: Throwable) {
+                    logCallbackFailure("afterHookedMethod", origin, t)
+                }
                 if (param.throwable != null) throw param.throwable!!
                 param.result
             }
+    }
+
+    private fun logCallbackFailure(phase: String, origin: Member, t: Throwable) {
+        logError("hook callback $phase failed for ${origin.declaringClass.name}.${origin.name}; " +
+            "continuing with the original method behavior: ${t.stackTraceToString()}")
     }
 
     fun hookAllMethods(
@@ -165,6 +192,15 @@ object HookBridge {
             xp.log(Log.INFO, "Arirang", message)
         } else {
             Log.i("Arirang", message)
+        }
+    }
+
+    fun logError(message: String) {
+        val xp = xposed
+        if (xp != null) {
+            xp.log(Log.ERROR, "Arirang", message)
+        } else {
+            Log.e("Arirang", message)
         }
     }
 

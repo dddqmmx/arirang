@@ -11,17 +11,45 @@ class MethodHookParam(
     val args: Array<Any?>,
     var returnEarly: Boolean = false
 ) {
-    var result: Any? = null
+    private var _result: Any? = null
+    private var _throwable: Throwable? = null
+
+    /**
+     * The value returned from the hooked method instead of its own result.
+     * Setting it clears [throwable], mirroring legacy Xposed's `setResult`:
+     * a replacement value suppresses an exception, and vice versa.
+     */
+    var result: Any?
+        get() = _result
         set(value) {
-            field = value
+            _result = value
+            _throwable = null
             returnEarly = true
         }
 
-    var throwable: Throwable? = null
+    /**
+     * The exception thrown from the hooked method instead of returning.
+     * Setting it clears [result], mirroring legacy Xposed's `setThrowable`.
+     */
+    var throwable: Throwable?
+        get() = _throwable
         set(value) {
-            field = value
+            _throwable = value
+            _result = null
             returnEarly = true
         }
+
+    /**
+     * Drops any early-exit intent, as if the callback never assigned [result]
+     * or [throwable]. HookBridge calls this when a callback failed by throwing,
+     * so a half-applied decision from the failing callback cannot leak through
+     * (legacy Xposed resets result and returnEarly the same way after logging).
+     */
+    fun discardEarlyExit() {
+        _result = null
+        _throwable = null
+        returnEarly = false
+    }
 
     private var extra: MutableMap<String, Any?>? = null
 
@@ -36,7 +64,7 @@ class MethodHookParam(
 
     fun getObjectExtra(key: String): Any? = extra?.get(key)
 
-    fun hasThrowable(): Boolean = throwable != null
+    fun hasThrowable(): Boolean = _throwable != null
 }
 
 /**

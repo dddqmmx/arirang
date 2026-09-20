@@ -31,8 +31,18 @@ std::string resolve_timezone_for_package(const SubmoduleConfig &config,
                                          const std::string &package_name);
 
 // Applies the per-process timezone illusion so this process's default time zone
-// becomes [timezone_id], then clears the Java/ICU default cache. Returns true on
-// success. Safe to call at postAppSpecialize for ordinary apps only.
+// becomes [timezone_id], then clears the Java/ICU default cache.
+//
+// Returns true only on a clean install (patched value, read-only private
+// mapping, cleared Java default caches). Returns false when nothing was
+// installed: the process keeps the real time zone. Failure is deliberate and
+// fail-closed — there is no Java-only fallback, because seeding
+// TimeZone.setDefault alone cannot produce a consistent illusion: the property
+// stays real, handleBindApplication's own setDefault(null) reverts the java.util
+// half, and the ICU half freezes on the spoofed zone, leaving a torn state that
+// is a stronger fingerprint than consistently failing (research doc §12.1/§12.4).
+//
+// Safe to call at postAppSpecialize for ordinary apps only.
 bool install_timezone_illusion(JNIEnv *env, const std::string &timezone_id);
 
 } // namespace arirang
