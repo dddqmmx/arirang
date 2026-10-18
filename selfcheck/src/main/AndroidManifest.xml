@@ -28,7 +28,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Arirang">
         <activity
-            android:name=".ui.activity.SelfCheckActivity"
+            android:name=".ui.SelfCheckActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

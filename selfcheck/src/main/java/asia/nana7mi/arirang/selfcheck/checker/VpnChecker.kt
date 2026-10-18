@@ -15,11 +15,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 
-class VpnChecker : SelfChecker {
+class VpnChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_vpn_title
-    override val navChipId: Int = R.id.navVpnChip
+    override val navLabelRes: Int = R.string.self_check_nav_vpn
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         try {
             val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
             

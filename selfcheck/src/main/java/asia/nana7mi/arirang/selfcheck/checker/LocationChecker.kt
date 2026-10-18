@@ -32,12 +32,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-class LocationChecker : SelfChecker {
+class LocationChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_location_title
-    override val navChipId: Int = R.id.navLocationChip
+    override val navLabelRes: Int = R.string.self_check_nav_location
 
     @SuppressLint("MissingPermission")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return@withContext CheckResult(
                 CheckState.BLOCKED,

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The chrome of the self check, and the two hosts the section list fills in: the navigation chip
+  group and the card container. The cards and chips themselves are built from
+  asia.nana7mi.arirang.selfcheck.checker.CheckRegistry — see SectionListView — so this file names
+  no check and holds no section.
+-->
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -7,7 +13,7 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:fitsSystemWindows="true"
-    tools:context=".ui.activity.SelfCheckActivity">
+    tools:context=".ui.SelfCheckActivity">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -35,142 +41,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 app:singleLine="true"
-                app:singleSelection="true">
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navUniqueChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="@string/self_check_nav_unique" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navBuildChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_build" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navPropsChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_props" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navTimeZoneChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_timezone" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navLocaleChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_locale" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navRawFilesChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_rawfiles" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navTelephonyChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_telephony" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navSimChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_sim" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navDrmChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_drm" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navSettingsChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_settings" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navSensorsChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_sensors" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navSensorPrecisionChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_sensor_precision" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navAppsChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_apps" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navLocationChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_location" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navWifiChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_wifi" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navAccountsChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_accounts" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navNetworkChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_network" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navVpnChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_vpn" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/navBluetoothChip"
-                    style="@style/Widget.Material3.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/self_check_nav_bluetooth" />
-            </com.google.android.material.chip.ChipGroup>
+                app:singleSelection="true" />
         </HorizontalScrollView>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -231,138 +102,11 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <include
-                android:id="@+id/uniqueSection"
-                layout="@layout/item_self_check_section"
+            <LinearLayout
+                android:id="@+id/selfCheckSections"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp" />
-
-            <include
-                android:id="@+id/buildSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/propsSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/timeZoneSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/localeSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/rawFilesSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/telephonySection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/simSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/drmSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/settingsSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/sensorsSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/sensorPrecisionSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/appsSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/locationSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/wifiSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/accountsSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/networkSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/vpnSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
-
-            <include
-                android:id="@+id/bluetoothSection"
-                layout="@layout/item_self_check_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" />
+                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

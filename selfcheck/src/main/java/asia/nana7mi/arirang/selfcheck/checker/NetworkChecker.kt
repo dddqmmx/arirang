@@ -10,11 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
 
-class NetworkChecker : SelfChecker {
+class NetworkChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_network_title
-    override val navChipId: Int = R.id.navNetworkChip
+    override val navLabelRes: Int = R.string.self_check_nav_network
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             val values = interfaces.take(10).mapNotNull { item ->

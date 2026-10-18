@@ -16,6 +16,7 @@
     <string name="self_check_summary_title">Current Visibility</string>
     <string name="self_check_summary_idle">Run a check to see what regular apps can currently read from this device</string>
     <string name="self_check_summary_running">Checking visible device information...</string>
+    <string name="self_check_summary_running_progress">Checking… %1$d of %2$d answered</string>
     <string name="self_check_summary_result">%1$d items are visible, %2$d items appear blocked or unavailable</string>
     <string name="self_check_summary_result_leak">%1$d items are visible, %2$d items appear blocked, and %3$d items leak real data through raw channels that bypass spoofing</string>
     <string name="self_check_run">Run Self Check</string>
@@ -44,6 +45,8 @@
     <string name="self_check_status_visible">Visible to this app</string>
     <string name="self_check_status_not_visible">Not visible</string>
     <string name="self_check_status_not_supported">Not supported</string>
+    <string name="self_check_status_failed">Check failed</string>
+    <string name="self_check_no_result">The check ended without reporting a result</string>
     <string name="self_check_status_consistent">Consistent across channels</string>
     <string name="self_check_status_leaked">Bypass leak detected</string>
     <string name="self_check_channel_mismatch">⚠ MISMATCH</string>
@@ -65,10 +68,11 @@
     <string name="self_check_sensor_precision_original">Original precision (no reduction detected)</string>
     <string name="self_check_sensor_precision_reduced">Precision reduced to %1$d decimal place(s)</string>
     <string name="self_check_sensor_precision_config_mismatch">Config expects level %1$d but data shows %2$d decimal places</string>
+    <string name="self_check_sensor_precision_worst">Worst case: %1$d decimal place(s)</string>
+    <string name="self_check_sensor_precision_configured">Configured level: %1$d</string>
     <string name="self_check_sensor_precision_data_label">Sample data (accelerometer):</string>
-    <string name="self_check_sensor_precision_monitor_start">Start Live Monitor</string>
-    <string name="self_check_sensor_precision_monitor_stop">Stop Live Monitor</string>
-    <string name="self_check_sensor_precision_monitoring">Monitoring…</string>
+    <string name="self_check_monitor_start">Start Live Monitor</string>
+    <string name="self_check_monitor_stop">Stop Live Monitor</string>
     <string name="self_check_apps_title">Installed Apps</string>
     <string name="self_check_location_title">Location</string>
     <string name="self_check_wifi_title">Wi-Fi Information</string>

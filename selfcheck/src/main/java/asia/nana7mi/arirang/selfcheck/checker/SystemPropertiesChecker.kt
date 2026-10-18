@@ -12,11 +12,11 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.maskMiddle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SystemPropertiesChecker : SelfChecker {
+class SystemPropertiesChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_props_title
-    override val navChipId: Int = R.id.navPropsChip
+    override val navLabelRes: Int = R.string.self_check_nav_props
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val lines = mutableListOf<String>()
         var leaked = false
 

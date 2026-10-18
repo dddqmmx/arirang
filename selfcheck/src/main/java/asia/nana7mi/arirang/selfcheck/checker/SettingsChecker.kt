@@ -11,12 +11,12 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.visibleListResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SettingsChecker : SelfChecker {
+class SettingsChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_settings_title
-    override val navChipId: Int = R.id.navSettingsChip
+    override val navLabelRes: Int = R.string.self_check_nav_settings
 
     @SuppressLint("HardwareIds")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val lines = mutableListOf<String>()
 
         CheckDefinitions.SETTINGS_GLOBAL_KEYS.forEach { key ->

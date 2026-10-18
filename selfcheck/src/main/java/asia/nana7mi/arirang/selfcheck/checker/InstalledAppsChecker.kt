@@ -16,11 +16,11 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 
-class InstalledAppsChecker : SelfChecker {
+class InstalledAppsChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_apps_title
-    override val navChipId: Int = R.id.navAppsChip
+    override val navLabelRes: Int = R.string.self_check_nav_apps
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         try {
             val pm = context.packageManager
             val selfPkg = context.packageName

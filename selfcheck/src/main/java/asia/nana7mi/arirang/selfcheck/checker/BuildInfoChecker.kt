@@ -10,12 +10,12 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.visibleListResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class BuildInfoChecker : SelfChecker {
+class BuildInfoChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_build_title
-    override val navChipId: Int = R.id.navBuildChip
+    override val navLabelRes: Int = R.string.self_check_nav_build
 
     @SuppressLint("HardwareIds")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val fields = listOfNotNull(
             "Brand" to Build.BRAND,
             "Manufacturer" to Build.MANUFACTURER,

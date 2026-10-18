@@ -30,12 +30,12 @@ import java.net.NetworkInterface
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-class UniqueIdentifiersChecker : SelfChecker {
+class UniqueIdentifiersChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_unique_title
-    override val navChipId: Int = R.id.navUniqueChip
+    override val navLabelRes: Int = R.string.self_check_nav_unique
 
     @SuppressLint("HardwareIds", "MissingPermission")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val values = mutableListOf<String>()
         val notes = mutableListOf<String>()
 

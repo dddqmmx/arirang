@@ -6,6 +6,7 @@
     <string name="self_check_summary_title">現在の可視性</string>
     <string name="self_check_summary_idle">チェックを実行して、通常のアプリがこの端末から現在読み取れる情報を確認します</string>
     <string name="self_check_summary_running">可視状態の端末情報を確認しています...</string>
+    <string name="self_check_summary_running_progress">確認中… %1$d/%2$d 件完了</string>
     <string name="self_check_summary_result">%1$d 項目が可視、%2$d 項目はブロック済みまたは利用不可のようです</string>
     <string name="self_check_summary_result_leak">%1$d 項目が可視、%2$d 項目はブロック済み、さらに %3$d 項目がスプーフィングを回避する生チャネルから実データを漏洩しています</string>
     <string name="self_check_run">セルフチェックを実行</string>
@@ -26,6 +27,8 @@
     <string name="self_check_status_visible">このアプリから可視</string>
     <string name="self_check_status_not_visible">可視ではありません</string>
     <string name="self_check_status_not_supported">非対応</string>
+    <string name="self_check_status_failed">チェックに失敗しました</string>
+    <string name="self_check_no_result">チェックは結果を返さずに終了しました</string>
     <string name="self_check_permission_needed">権限が必要です</string>
     <string name="self_check_unique_title">一意識別子</string>
     <string name="self_check_build_title">ビルド情報</string>
@@ -107,10 +110,11 @@
     <string name="self_check_sensor_precision_original">元の精度（精度低下は検出されませんでした）</string>
     <string name="self_check_sensor_precision_reduced">精度が小数点以下 %1$d 桁に低下しました</string>
     <string name="self_check_sensor_precision_config_mismatch">設定はレベル %1$d を期待していますが、データは小数点以下 %2$d 桁を示しています</string>
+    <string name="self_check_sensor_precision_worst">最悪値: 小数点以下 %1$d 桁</string>
+    <string name="self_check_sensor_precision_configured">設定レベル: %1$d</string>
     <string name="self_check_sensor_precision_data_label">サンプルデータ（加速度計）：</string>
-    <string name="self_check_sensor_precision_monitor_start">リアルタイム監視を開始</string>
-    <string name="self_check_sensor_precision_monitor_stop">リアルタイム監視を停止</string>
-    <string name="self_check_sensor_precision_monitoring">監視中…</string>
+    <string name="self_check_monitor_start">リアルタイム監視を開始</string>
+    <string name="self_check_monitor_stop">リアルタイム監視を停止</string>
     <string name="self_check_props_hidden">読み取り可能なシステムプロパティはありません</string>
     <string name="self_check_timezone_hidden">タイムゾーンを読み取れませんでした</string>
     <string name="self_check_timezone_java">java.util.TimeZone.getDefault=%1$s</string>

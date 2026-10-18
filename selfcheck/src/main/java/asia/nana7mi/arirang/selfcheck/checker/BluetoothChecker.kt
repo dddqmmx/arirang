@@ -13,12 +13,12 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.readableMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class BluetoothChecker : SelfChecker {
+class BluetoothChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_bluetooth_title
-    override val navChipId: Int = R.id.navBluetoothChip
+    override val navLabelRes: Int = R.string.self_check_nav_bluetooth
 
     @SuppressLint("MissingPermission")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             return@withContext CheckResult(
                 CheckState.BLOCKED,

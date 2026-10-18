@@ -24,11 +24,11 @@ import java.util.Locale
  * spoofed they must all report the real zone. Either way, a mismatch between
  * channels is the observable leak this check surfaces.
  */
-class TimeZoneChecker : SelfChecker {
+class TimeZoneChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_timezone_title
-    override val navChipId: Int = R.id.navTimeZoneChip
+    override val navLabelRes: Int = R.string.self_check_nav_timezone
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val lines = mutableListOf<String>()
         var leaked = false
 

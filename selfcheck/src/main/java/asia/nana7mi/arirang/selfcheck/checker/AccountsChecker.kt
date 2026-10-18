@@ -12,11 +12,11 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.readableMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class AccountsChecker : SelfChecker {
+class AccountsChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_accounts_title
-    override val navChipId: Int = R.id.navAccountsChip
+    override val navLabelRes: Int = R.string.self_check_nav_accounts
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.GET_ACCOUNTS) != PackageManager.PERMISSION_GRANTED) {
             return@withContext CheckResult(
                 CheckState.BLOCKED,

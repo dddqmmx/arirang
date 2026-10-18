@@ -11,11 +11,11 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.maskMiddle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class DrmChecker : SelfChecker {
+class DrmChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_drm_title
-    override val navChipId: Int = R.id.navDrmChip
+    override val navLabelRes: Int = R.string.self_check_nav_drm
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val lines = mutableListOf<String>()
         var leaked = false
 

@@ -10,11 +10,11 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.readableMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SensorsChecker : SelfChecker {
+class SensorsChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_sensors_title
-    override val navChipId: Int = R.id.navSensorsChip
+    override val navLabelRes: Int = R.string.self_check_nav_sensors
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         try {
             val sensorManager = context.getSystemService(SensorManager::class.java)
             val sensors = sensorManager?.getSensorList(Sensor.TYPE_ALL).orEmpty()

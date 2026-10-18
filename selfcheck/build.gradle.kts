@@ -40,6 +40,14 @@ configure<ApplicationExtension> {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // The runner and the report are Android-free; their tests read strings off a stubbed
+            // android.jar and never touch a device.
+            isReturnDefaultValues = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -78,8 +86,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.material)
     implementation(libs.play.services.location)
     implementation(libs.play.services.ads.identifier)
     implementation(libs.play.services.appset)
+
+    testImplementation(libs.junit)
 }

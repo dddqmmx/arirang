@@ -18,12 +18,12 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.readableMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class WifiChecker : SelfChecker {
+class WifiChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_wifi_title
-    override val navChipId: Int = R.id.navWifiChip
+    override val navLabelRes: Int = R.string.self_check_nav_wifi
 
     @SuppressLint("MissingPermission")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return@withContext CheckResult(
                 CheckState.BLOCKED,

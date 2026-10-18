@@ -24,11 +24,11 @@ import java.util.Locale
  * observable leak this check surfaces (e.g. Configuration was never applied
  * while LocaleManager still returns the spoofed query result).
  */
-class LocaleChecker : SelfChecker {
+class LocaleChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_locale_title
-    override val navChipId: Int = R.id.navLocaleChip
+    override val navLabelRes: Int = R.string.self_check_nav_locale
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val lines = mutableListOf<String>()
         var leaked = false
 

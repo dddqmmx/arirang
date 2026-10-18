@@ -17,12 +17,12 @@ import asia.nana7mi.arirang.selfcheck.util.CheckUtils.readableMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SimChecker : SelfChecker {
+class SimChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_sim_title
-    override val navChipId: Int = R.id.navSimChip
+    override val navLabelRes: Int = R.string.self_check_nav_sim
 
     @SuppressLint("MissingPermission")
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             return@withContext CheckResult(
                 CheckState.BLOCKED,

@@ -11,11 +11,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
-class RawKernelFilesChecker : SelfChecker {
+class RawKernelFilesChecker : SnapshotCheck() {
     override val titleRes: Int = R.string.self_check_rawfiles_title
-    override val navChipId: Int = R.id.navRawFilesChip
+    override val navLabelRes: Int = R.string.self_check_nav_rawfiles
 
-    override suspend fun check(context: Context): CheckResult = withContext(Dispatchers.IO) {
+    override suspend fun read(context: Context): CheckResult = withContext(Dispatchers.IO) {
         val lines = mutableListOf<String>()
         var leaked = false
 
