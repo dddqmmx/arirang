@@ -6,6 +6,7 @@ import asia.nana7mi.arirang.data.datastore.schema.PackageListAppRuleSchema
 import asia.nana7mi.arirang.data.datastore.schema.PackageListConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.PackageListTemplateSchema
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import java.util.Date
 
@@ -36,18 +37,18 @@ object PackageVisibilityPrefs {
     }
 
     data class Template(
-        val id: String,
-        val name: String,
-        val parentId: String? = null,
-        val visiblePackages: Set<String> = emptySet(),
-        val listMode: TemplateListMode = TemplateListMode.WHITELIST
+        @SerializedName("id") val id: String = "",
+        @SerializedName("name") val name: String = "",
+        @SerializedName("parentId") val parentId: String? = null,
+        @SerializedName("visiblePackages") val visiblePackages: Set<String> = emptySet(),
+        @SerializedName("listMode") val listMode: TemplateListMode = TemplateListMode.WHITELIST
     )
 
     data class AppRule(
-        val packageName: String,
-        val mode: DisplayMode = DisplayMode.DEFAULT,
-        val templateId: String? = null,
-        val visiblePackages: Set<String> = emptySet()
+        @SerializedName("packageName") val packageName: String = "",
+        @SerializedName("mode") val mode: DisplayMode = DisplayMode.DEFAULT,
+        @SerializedName("templateId") val templateId: String? = null,
+        @SerializedName("visiblePackages") val visiblePackages: Set<String> = emptySet()
     )
 
     data class Config(
@@ -251,7 +252,11 @@ object PackageVisibilityPrefs {
             .getString(KEY_TEMPLATES, null)
             ?: return emptyList()
         val type = object : TypeToken<List<Template>>() {}.type
-        return runCatching { gson.fromJson<List<Template>>(json, type) }.getOrDefault(emptyList())
+        return runCatching { gson.fromJson<List<Template>>(json, type) }
+            .getOrDefault(emptyList())
+            ?.filterNotNull()
+            ?.filter { (it.id as String?).isNullOrBlank().not() }
+            .orEmpty()
     }
 
     fun saveTemplates(context: Context, templates: List<Template>) {
@@ -263,7 +268,11 @@ object PackageVisibilityPrefs {
             .getString(KEY_APP_RULES, null)
             ?: return emptyList()
         val type = object : TypeToken<List<AppRule>>() {}.type
-        return runCatching { gson.fromJson<List<AppRule>>(json, type) }.getOrDefault(emptyList())
+        return runCatching { gson.fromJson<List<AppRule>>(json, type) }
+            .getOrDefault(emptyList())
+            ?.filterNotNull()
+            ?.filter { (it.packageName as String?).isNullOrBlank().not() }
+            .orEmpty()
     }
 
     fun saveAppRules(context: Context, rules: List<AppRule>) {

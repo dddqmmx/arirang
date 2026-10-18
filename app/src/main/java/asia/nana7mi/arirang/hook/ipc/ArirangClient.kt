@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.hook.core
+package asia.nana7mi.arirang.hook.ipc
 
 
 import android.annotation.SuppressLint
@@ -18,6 +18,8 @@ import asia.nana7mi.arirang.BuildConfig
 import asia.nana7mi.arirang.hook.IArirangService
 import asia.nana7mi.arirang.hook.IClipboardDecisionCallback
 import asia.nana7mi.arirang.hook.IConfigSnapshotCallback
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
 import asia.nana7mi.arirang.service.ArirangService
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch

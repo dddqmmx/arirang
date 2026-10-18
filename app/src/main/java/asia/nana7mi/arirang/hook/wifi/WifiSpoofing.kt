@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.wifi
 
-import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 
 import android.net.DhcpInfo
 import android.net.wifi.ScanResult

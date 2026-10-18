@@ -1,11 +1,10 @@
 package asia.nana7mi.arirang.hook.gms
 
 import android.os.Parcel
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.MethodHookParam
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.xposed.MethodHookParam
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -40,10 +39,8 @@ internal class GmsAdvertisingIdHooks(
 
         methods.forEach { method ->
             method.isAccessible = true
-            HookBridge.hookMethod(method, afterHookedMethod {
-                if (hasThrowable()) return@afterHookedMethod
-                val gaid = currentConfig().gaid.takeIf { it.isNotBlank() } ?: return@afterHookedMethod
-                result = gaid
+            HookBridge.hookMethod(method, UniqueIdentifierConfig.gaid.after { config ->
+                result = config.gaid
                 HookLog.i(HookLog.Module.GMS, "GAID spoofed from ${ownerClass.name}.${method.name}()")
             })
             HookLog.i(HookLog.Module.GMS, "hooked GMS Advertising ID getter ${ownerClass.name}.${method.name}()")

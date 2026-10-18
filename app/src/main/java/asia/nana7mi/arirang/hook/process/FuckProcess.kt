@@ -1,10 +1,10 @@
 package asia.nana7mi.arirang.hook.process
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.OutputStream

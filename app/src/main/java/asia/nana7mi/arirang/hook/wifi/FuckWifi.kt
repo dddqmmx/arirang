@@ -1,9 +1,8 @@
 package asia.nana7mi.arirang.hook.wifi
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 
 /**
  * Rewrites current Wi-Fi identity and nearby Wi-Fi scan results at the Wi-Fi
@@ -13,10 +12,9 @@ import asia.nana7mi.arirang.hook.core.HookPackageParam
 class FuckWifi : BaseHookModule(
     targetPackages = setOf("android", "com.android.wifi")
 ) {
-    private val configStore = WifiConfigStore()
-    private val serviceHooks = WifiServiceHooks(::currentConfig)
+    private val serviceHooks = WifiServiceHooks()
     private val systemServiceHooks = WifiSystemServiceHooks(serviceHooks)
-    private val connectivityHooks = WifiConnectivityHooks(::currentConfig)
+    private val connectivityHooks = WifiConnectivityHooks()
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
@@ -35,7 +33,5 @@ class FuckWifi : BaseHookModule(
         }
     }
 
-    private fun currentConfig(): WifiHookConfig {
-        return configStore.current()
-    }
+    private fun currentConfig(): WifiHookConfig = WifiConfig.current()
 }

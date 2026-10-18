@@ -56,6 +56,14 @@ configure<ApplicationExtension>  {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    testOptions {
+        unitTests {
+            // The hook package is Android-only code; its pure parts (config decoding and
+            // arbitration) are unit-tested against stubbed android.jar methods.
+            isReturnDefaultValues = true
+        }
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = false

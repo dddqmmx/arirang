@@ -6,6 +6,7 @@ import androidx.core.content.edit
 import asia.nana7mi.arirang.data.datastore.schema.WifiConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.WifiScanNetworkSchema
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import java.util.Date
 
@@ -39,8 +40,8 @@ object WifiConfigPrefs {
     private val gson = Gson()
 
     data class ScanNetwork(
-        val ssid: String = DEFAULT_SCAN_SSID,
-        val bssid: String = DEFAULT_SCAN_BSSID
+        @SerializedName("ssid") val ssid: String = DEFAULT_SCAN_SSID,
+        @SerializedName("bssid") val bssid: String = DEFAULT_SCAN_BSSID
     )
 
     data class Config(
@@ -163,8 +164,9 @@ object WifiConfigPrefs {
         val type = object : TypeToken<List<ScanNetwork>>() {}.type
         return runCatching { gson.fromJson<List<ScanNetwork>>(json, type) }
             .getOrNull()
+            ?.filterNotNull()
+            ?.filter { (it.ssid as String?).isNullOrBlank().not() || (it.bssid as String?).isNullOrBlank().not() }
             .orEmpty()
-            .filter { it.ssid.isNotBlank() || it.bssid.isNotBlank() }
     }
 
     private fun String.normalizedMacOr(fallback: String): String = normalizedMacOrNull() ?: fallback

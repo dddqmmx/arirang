@@ -84,6 +84,16 @@ internal data class SimHookConfig(
     val countryIsoPropertyValue: String = countryIsoList.joinToString(",")
     val operatorNumericPropertyValue: String = operatorNumericList.joinToString(",")
     val alphaPropertyValue: String = alphaList.joinToString(",")
+
+    companion object {
+        /** The value before any source has answered: off, with no overrides. */
+        fun disabled() = SimHookConfig(
+            enabled = false,
+            hideSim = false,
+            profilesBySlot = SimHookDefaults.PROFILES_BY_SLOT,
+            uniqueIdentifiers = UniqueIdentifierHookConfig()
+        )
+    }
 }
 
 internal data class UniqueIdentifierHookConfig(

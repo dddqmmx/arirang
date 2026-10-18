@@ -125,13 +125,13 @@ internal fun PackageListConfigScreen(onBack: () -> Unit) {
     val defaultOptions = buildList {
         add(allVisibleLabel)
         add(allHiddenLabel)
-        addAll(config.templates.map { it.name })
+        addAll(config.templates.mapNotNull { it.name.takeIf { name -> name.isNotBlank() } })
         add(newTemplateLabel)
     }
     val defaultSelectedLabel = when (config.defaultMode) {
         DisplayMode.ALL_HIDDEN -> allHiddenLabel
         DisplayMode.TEMPLATE ->
-            config.templates.firstOrNull { it.id == config.defaultTemplateId }?.name ?: allVisibleLabel
+            config.templates.firstOrNull { it.id.isNotBlank() && it.id == config.defaultTemplateId }?.name ?: allVisibleLabel
         else -> allVisibleLabel
     }
 

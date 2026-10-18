@@ -1,7 +1,8 @@
 package asia.nana7mi.arirang.hook.location
 
 import android.os.Binder
-import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.caller.Callers
 
 /**
  * Decides which [LocationProfile] applies to a hooked call.
@@ -46,7 +47,7 @@ internal class LocationProfileResolver(
         val callingUid = Binder.getCallingUid()
         val pkg = packageName
             ?: activeDeliveryPackage()
-            ?: LocationCallerResolver.packageNameForUid(callingUid)
+            ?: Callers.packageFor(callingUid)
 
         val profile = if (pkg != null && pkg != "android" && pkg != "com.google.android.gms") {
             config.perPackage[pkg] ?: config.defaultProfile
@@ -67,8 +68,8 @@ internal class LocationProfileResolver(
      * the calling UID. Honours per-package overrides.
      */
     fun forArgs(args: Array<Any?>): LocationProfile? = forPackage(
-        LocationCallerResolver.callerFromArgs(args)
-            ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+        Callers.fromArgs(args)
+            ?: Callers.packageFor(Binder.getCallingUid())
     )
 
     /**
@@ -76,7 +77,7 @@ internal class LocationProfileResolver(
      * reflectively. Honours per-package overrides.
      */
     fun forReceiver(receiver: Any?): LocationProfile? =
-        forPackage(LocationCallerResolver.packageNameFromObject(receiver))
+        forPackage(Callers.fromObject(receiver))
 
     /**
      * The global default profile, **ignoring `config.perPackage` entirely**.

@@ -1,8 +1,8 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 
-import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.xposed.HookLog
 import asia.nana7mi.arirang.hook.util.callOneArgIfCompatible
 
 

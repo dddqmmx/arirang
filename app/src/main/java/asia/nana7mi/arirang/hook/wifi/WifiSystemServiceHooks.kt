@@ -1,51 +1,30 @@
 package asia.nana7mi.arirang.hook.wifi
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
 import java.util.Collections
 import java.util.WeakHashMap
+import asia.nana7mi.arirang.hook.target.Targets
 
 internal class WifiSystemServiceHooks(
     private val serviceHooks: WifiServiceHooks
 ) {
     private val hookedWifiSystemServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
 
-    @Volatile
-    private var systemServiceManagerHookInstalled = false
-
+    /**
+     * `WifiService` is started from a jar by `SystemServiceManager`, so the started instance is
+     * the way to its class — it is not resolvable from the loader handed to `onHook` yet.
+     */
     fun hookWifiSystemServiceManager(classLoader: ClassLoader) {
-        synchronized(this) {
-            if (systemServiceManagerHookInstalled) return
-            systemServiceManagerHookInstalled = true
-        }
-
-        val managerClass = HookBridge.findClassIfExists(
-            "com.android.server.SystemServiceManager",
-            classLoader
-        )
-        if (managerClass == null) {
-            HookLog.w(HookLog.Module.WIFI, "SystemServiceManager class not found in $classLoader")
-            return
-        }
-
-        HookBridge.hookAllMethods(managerClass, "startServiceFromJar", afterHookedMethod {
-            val className = args.firstOrNull() as? String ?: return@afterHookedMethod
-            val jarPath = args.getOrNull(1) as? String
-            if (className != WIFI_SYSTEM_SERVICE_CLASS) return@afterHookedMethod
-
-            val wifiService = result ?: run {
-                HookLog.w(HookLog.Module.WIFI, "WifiService startServiceFromJar returned null")
-                return@afterHookedMethod
-            }
+        Targets.onSystemServiceStarted(WIFI_SYSTEM_SERVICE_CLASS, classLoader) { wifiService ->
             HookLog.i(
                 HookLog.Module.WIFI,
-                "WifiService started from jar serviceClass=$className jarPath=$jarPath class=${wifiService.javaClass.name} classLoader=${wifiService.javaClass.classLoader}"
+                "WifiService started class=${wifiService.javaClass.name} classLoader=${wifiService.javaClass.classLoader}"
             )
             hookWifiSystemServiceClass(wifiService.javaClass)
             serviceHooks.hookWifiServiceInstance(wifiService)
-        })
-        HookLog.i(HookLog.Module.WIFI, "installed SystemServiceManager.startServiceFromJar watcher for Wi-Fi service")
+        }
     }
 
     private fun hookWifiSystemServiceClass(wifiServiceClass: Class<*>) {

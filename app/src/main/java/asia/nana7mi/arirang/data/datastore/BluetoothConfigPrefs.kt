@@ -6,6 +6,7 @@ import androidx.core.content.edit
 import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
 import asia.nana7mi.arirang.data.datastore.schema.BluetoothDeviceSchema
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import java.util.Date
 
@@ -28,8 +29,8 @@ object BluetoothConfigPrefs {
     private val gson = Gson()
 
     data class Device(
-        val name: String = DEFAULT_DEVICE_NAME,
-        val address: String = DEFAULT_DEVICE_ADDRESS
+        @SerializedName("name") val name: String = DEFAULT_DEVICE_NAME,
+        @SerializedName("address") val address: String = DEFAULT_DEVICE_ADDRESS
     )
 
     data class Config(
@@ -134,8 +135,9 @@ object BluetoothConfigPrefs {
         val type = object : TypeToken<List<Device>>() {}.type
         return runCatching { gson.fromJson<List<Device>>(json, type) }
             .getOrNull()
+            ?.filterNotNull()
+            ?.filter { (it.name as String?).isNullOrBlank().not() || (it.address as String?).isNullOrBlank().not() }
             .orEmpty()
-            .filter { it.name.isNotBlank() || it.address.isNotBlank() }
     }
 
     private fun String.normalizedMacOrNull(): String? {

@@ -1,16 +1,15 @@
 package asia.nana7mi.arirang.hook.clipboard
 
 import android.os.Binder
-import android.os.Build
 import android.os.Process
 import android.os.UserHandle
 import asia.nana7mi.arirang.BuildConfig
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.ipc.ArirangClient
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -91,6 +90,8 @@ class FuckClipboard : BaseHookModule(matchSystem = true) {
 
     private fun shouldBypass(callingPackage: String, uid: Int): Boolean {
         if (callingPackage in bypassPackages) return true
+        // Deliberately narrower than Callers.isPlatform: this gate *grants* access, so it must
+        // fail closed and admit only a true system uid, not every per-user platform uid.
         if (uid in 0..SYSTEM_UID_MAX) return true
         return false
     }

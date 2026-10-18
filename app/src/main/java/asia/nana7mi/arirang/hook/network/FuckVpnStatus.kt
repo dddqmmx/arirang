@@ -5,14 +5,14 @@ import android.net.NetworkCapabilities
 import android.net.NetworkInfo
 import android.os.Binder
 import android.os.Build
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.util.CallerPackages
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.MethodHookParam
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 import java.util.concurrent.atomic.AtomicBoolean
+import asia.nana7mi.arirang.hook.target.Targets
+import asia.nana7mi.arirang.hook.caller.Callers
 
 /**
  * Hides VPN and proxy state from applications, inside system_server.
@@ -29,35 +29,21 @@ import java.util.concurrent.atomic.AtomicBoolean
  * system_server. Hiding `tun*` from that API would mean loading into every
  * third-party app, which the project's design constraint forbids.
  */
+private const val CONNECTIVITY_SERVICE_NAME = "connectivity"
+private const val CONNECTIVITY_SERVICE_CLASS = "com.android.server.ConnectivityService"
+
 class FuckVpnStatus : BaseHookModule(matchSystem = true) {
 
-    private val config = VpnHookConfigFile.create()
+    
 
     override fun onHook(param: HookPackageParam) {
-        // ConnectivityService may not be loaded yet when this module is injected
-        // at system_server startup, and findClassIfExists never triggers a load.
-        // Catch the service registration instead: the framework ServiceManager
-        // class is always present, and at addService time the binder argument IS
-        // the ConnectivityService instance. A direct lookup is still attempted
-        // first for the case where the class already happened to be loaded.
-        installConnectivityHooks(
-            HookBridge.findClassIfExists(
-                "com.android.server.ConnectivityService",
-                param.classLoader
-            )
-        )
+        Targets.onServiceClassPublished(CONNECTIVITY_SERVICE_NAME) { binder ->
+            installConnectivityHooks(binder.javaClass)
+        }
 
-        val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", param.classLoader)
-            ?: run {
-                HookLog.w(HookLog.Module.CORE, "ServiceManager not found; VPN spoofing deferred indefinitely")
-                return
-            }
-        HookBridge.hookAllMethods(smClass, "addService", beforeHookedMethod {
-            if (args.getOrNull(0) == "connectivity") {
-                val binder = args.getOrNull(1) ?: return@beforeHookedMethod
-                installConnectivityHooks(binder.javaClass)
-            }
-        })
+        // The class can also be reachable before the service is published.
+        HookBridge.findClassIfExists(CONNECTIVITY_SERVICE_CLASS, param.classLoader)
+            ?.let(::installConnectivityHooks)
     }
 
     private val serviceHooked = AtomicBoolean(false)
@@ -73,6 +59,7 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
             hookCapabilityDispatch(service)
         }.onFailure {
             HookLog.e(HookLog.Module.CORE, "failed to install VPN status hooks", it)
+            serviceHooked.set(false)
         }
     }
 
@@ -82,42 +69,66 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
      * uncertain, so a failure here degrades to "no spoofing" rather than to a
      * broken network stack.
      */
-    private fun activeConfig(): VpnHookConfig? = activeConfig(Binder.getCallingUid())
+    /**
+     * Whether the config governs [callerUid] — which is not necessarily the Binder caller.
+     *
+     * Two things have to hold, and they are separate questions: the caller must be an app rather
+     * than the platform, and the config must not exempt it. Framework internals reach
+     * ConnectivityService in-process, where `Binder.getCallingUid()` reports the platform's own
+     * uid, and rewriting their answers would feed spoofed data back into the platform's own
+     * networking. This is the `where` precondition of every gate below.
+     */
+    private fun governs(callerUid: Int, config: VpnHookConfig): Boolean =
+        !Callers.isPlatform(callerUid) && config.appliesTo(Callers.packagesFor(callerUid))
+
+    /** For the surfaces where the Binder caller is the app being served. */
+    private fun binderCallerGoverned(param: MethodHookParam, config: VpnHookConfig): Boolean =
+        governs(Binder.getCallingUid(), config)
 
     /**
-     * The config to apply for a specific target [callingUid], which is not
-     * necessarily the Binder caller. NetworkCallback deliveries are marshalled
-     * on ConnectivityService's own handler thread where
-     * `Binder.getCallingUid()` is the platform uid; those paths pass the
-     * destined app's uid down instead.
+     * For `linkPropertiesRestrictedForCallerPermissions(lp, callerPid, callerUid)`, which names
+     * its caller in the arguments because it also serves the async callback path.
      */
-    private fun activeConfig(callingUid: Int): VpnHookConfig? {
-        if (CallerPackages.isPlatformCaller(callingUid)) return null
-        val current = config.current()
-        if (!current.enabled) return null
-        return current.takeIf { it.appliesTo(CallerPackages.forUid(callingUid)) }
+    private fun permissionsCallerGoverned(param: MethodHookParam, config: VpnHookConfig): Boolean {
+        val callerUid = (param.args.getOrNull(2) as? Number)?.toInt() ?: return false
+        return governs(callerUid, config)
+    }
+
+    /**
+     * For a capability that is being dispatched to a callback rather than returned to a caller.
+     *
+     * The destined app's uid is an argument rather than the Binder caller, because on that path
+     * this runs on ConnectivityService's own thread where `Binder.getCallingUid()` is the
+     * platform uid.
+     */
+    private fun deliveredCallerGoverned(param: MethodHookParam, config: VpnHookConfig): Boolean {
+        val raw = when (param.args.size) {
+            // Android 14+ (6 args): (nc, includeLocationSensitiveInfo, callingPid, callingUid, …)
+            6 -> param.args.getOrNull(3)
+            // Android 12-13 (5 args): (nc, callerPid, callerUid, …)
+            5 -> param.args.getOrNull(2)
+            else -> param.args.getOrNull(3) ?: param.args.getOrNull(2)
+        }
+        val callerUid = (raw as? Number)?.toInt() ?: return false
+        return governs(callerUid, config)
     }
 
     // ---- NetworkCapabilities: the modern detection path ----
 
     private fun hookNetworkCapabilities(service: Class<*>) {
-        HookBridge.hookAllMethods(
-            service,
-            "getNetworkCapabilities",
-            afterHookedMethod {
-                if (hasThrowable()) return@afterHookedMethod
-                val current = activeConfig() ?: return@afterHookedMethod
-                if (!current.hideVpnTransport) return@afterHookedMethod
-                val original = result as? NetworkCapabilities ?: return@afterHookedMethod
+        val hook = VpnConfig.vpnTransport.after(where = ::binderCallerGoverned) { current ->
+            val original = result as? NetworkCapabilities ?: return@after
 
-                val spoofed = spoofCapabilities(original, current.spoofedTransport)
-                    ?: return@afterHookedMethod
-                if (spoofed !== original) {
-                    result = spoofed
-                    HookLog.d(HookLog.Module.CORE, "hid VPN transport from uid ${Binder.getCallingUid()}")
-                }
+            val spoofed = spoofCapabilities(original, current.spoofedTransport)
+                ?: return@after
+            if (spoofed !== original) {
+                result = spoofed
+                HookLog.i(HookLog.Module.CORE, "hid VPN transport from uid ${Binder.getCallingUid()}")
             }
-        )
+        }
+
+        HookBridge.hookAllMethods(service, "getNetworkCapabilities", hook)
+        HookBridge.hookAllMethods(service, "getDefaultNetworkCapabilitiesForUser", hook)
     }
 
     /**
@@ -132,8 +143,7 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         spoofedTransport: String
     ): NetworkCapabilities? {
         // Fast path: nothing to hide, avoid the copy on every single
-        // createWithSensitiveInfoSanitizedIfNecessaryWhenParceled() call — that
-        // method fires for every NetworkCallback delivery on the device.
+        // callback delivery.
         if (!original.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
             original.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) &&
             !hasVpnTransportInfo(original)
@@ -156,7 +166,7 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
             // Hide VpnTransportInfo (API 30+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val info = HookBridge.getObjectField(copy, "mTransportInfo")
-                if (info != null && info.javaClass.name.endsWith("VpnTransportInfo")) {
+                if (info != null && info.javaClass.name.contains("VpnTransportInfo")) {
                     HookBridge.setObjectField(copy, "mTransportInfo", null)
                     changed = true
                 }
@@ -167,6 +177,15 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
             // itself a tell.
             if (!original.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
                 HookBridge.callMethod(copy, "addCapability", NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                changed = true
+            }
+
+            // If removing VPN left no transports at all, ensure it reports at least WIFI
+            val hasRemainingTransport = copy.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    copy.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    copy.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+            if (!hasRemainingTransport) {
+                HookBridge.callMethod(copy, "addTransportType", NetworkCapabilities.TRANSPORT_WIFI)
                 changed = true
             }
 
@@ -181,7 +200,7 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         val info = runCatching {
             HookBridge.getObjectField(capabilities, "mTransportInfo")
         }.getOrNull() ?: return false
-        return info.javaClass.name.endsWith("VpnTransportInfo")
+        return info.javaClass.name.contains("VpnTransportInfo")
     }
 
     private fun substituteTransport(spoofedTransport: String): Int? = when (spoofedTransport) {
@@ -196,16 +215,13 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
     // ---- NetworkInfo: the legacy detection path ----
 
     private fun hookNetworkInfo(service: Class<*>) {
-        val hook = afterHookedMethod {
-            if (hasThrowable()) return@afterHookedMethod
-            val current = activeConfig() ?: return@afterHookedMethod
-            if (!current.hideVpnTransport) return@afterHookedMethod
-            val original = result as? NetworkInfo ?: return@afterHookedMethod
+        val hook = VpnConfig.vpnTransport.after(where = ::binderCallerGoverned) { current ->
+            val original = result as? NetworkInfo ?: return@after
             @Suppress("DEPRECATION")
-            if (original.type != TYPE_VPN) return@afterHookedMethod
+            if (original.type != TYPE_VPN) return@after
 
             val spoofed = spoofNetworkInfo(original, current.spoofedTransport)
-                ?: return@afterHookedMethod
+                ?: return@after
             result = spoofed
         }
 
@@ -242,21 +258,40 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
     // ---- LinkProperties ----
 
     private fun hookLinkProperties(service: Class<*>) {
-        val hook = afterHookedMethod {
-            if (hasThrowable()) return@afterHookedMethod
-            val current = activeConfig() ?: return@afterHookedMethod
-            val original = result as? LinkProperties ?: return@afterHookedMethod
+        val syncHook = VpnConfig.enabled.after(where = ::binderCallerGoverned) { current ->
+            val original = result as? LinkProperties ?: return@after
 
             val spoofed = spoofLinkProperties(original, current)
-                ?: return@afterHookedMethod
+                ?: return@after
             if (spoofed !== original) {
                 result = spoofed
-                HookLog.d(HookLog.Module.CORE, "spoofed LinkProperties for uid ${Binder.getCallingUid()}")
+                HookLog.i(HookLog.Module.CORE, "spoofed LinkProperties for uid ${Binder.getCallingUid()}")
             }
         }
 
-        HookBridge.hookAllMethods(service, "getLinkProperties", hook)
-        HookBridge.hookAllMethods(service, "getLinkPropertiesForType", hook)
+        HookBridge.hookAllMethods(service, "getLinkProperties", syncHook)
+        HookBridge.hookAllMethods(service, "getLinkPropertiesForType", syncHook)
+        HookBridge.hookAllMethods(service, "getActiveLinkProperties", syncHook)
+
+        // Internal method called by both sync getters and async callbacks:
+        // linkPropertiesRestrictedForCallerPermissions(LinkProperties lp, int callerPid, int callerUid)
+        HookBridge.hookAllMethods(
+            service,
+            "linkPropertiesRestrictedForCallerPermissions",
+            VpnConfig.enabled.after(where = ::permissionsCallerGoverned) { current ->
+                val original = result as? LinkProperties ?: return@after
+
+                val spoofed = spoofLinkProperties(original, current)
+                    ?: return@after
+                if (spoofed !== original) {
+                    result = spoofed
+                    HookLog.i(
+                        HookLog.Module.CORE,
+                        "spoofed LinkProperties callback for uid ${args.getOrNull(2)}"
+                    )
+                }
+            }
+        )
     }
 
     private fun spoofLinkProperties(original: LinkProperties, config: VpnHookConfig): LinkProperties? = runCatching {
@@ -287,13 +322,10 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
     // ---- Proxy ----
 
     private fun hookProxy(service: Class<*>) {
-        val hook = afterHookedMethod {
-            if (hasThrowable()) return@afterHookedMethod
-            if (result == null) return@afterHookedMethod
-            val current = activeConfig() ?: return@afterHookedMethod
-            if (!current.hideProxy) return@afterHookedMethod
+        val hook = VpnConfig.proxy.after(where = ::binderCallerGoverned) {
+            if (result == null) return@after
             result = null
-            HookLog.d(HookLog.Module.CORE, "hid proxy from uid ${Binder.getCallingUid()}")
+            HookLog.i(HookLog.Module.CORE, "hid proxy from uid ${Binder.getCallingUid()}")
         }
 
         HookBridge.hookAllMethods(service, "getProxyForNetwork", hook)
@@ -303,38 +335,28 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
     /**
      * Coverage for NetworkCallback leaks.
      *
-     * Android 14 (U) ConnectivityService no longer has the `sendNetworkCapabilities`
-     * / `sendLinkProperties` senders this class previously targeted: callback
-     * deliveries were refactored onto a Messenger, where each recipient's
-     * [NetworkCapabilities] is marshalled per-uid via
-     * `createWithSensitiveInfoSanitizedIfNecessaryWhenParceled()`. That method is
-     * also the return path for the synchronous `getNetworkCapabilities()` query, so
-     * hooking it alone covers both the query and the callback surfaces in one place.
+     * In Android 14+ ConnectivityService, callbacks and queries use
+     * `createWithSensitiveInfoSanitizedIfNecessaryWhenParceled()`.
+     * In Android 12-13, it was `createWithLocationInfoSanitizedIfNecessaryWhenParceled()`.
      *
-     * The destined app's uid is passed as an explicit argument (args[3]) rather than
+     * The destined app's uid is passed as an explicit argument rather than
      * read from the Binder thread, because on the callback path this method runs on
      * ConnectivityService's own thread where `Binder.getCallingUid()` is the
      * platform uid and would disable spoofing entirely.
      */
     private fun hookCapabilityDispatch(service: Class<*>) {
-        HookBridge.hookAllMethods(
-            service,
-            "createWithSensitiveInfoSanitizedIfNecessaryWhenParceled",
-            afterHookedMethod {
-                if (hasThrowable()) return@afterHookedMethod
-                val callingUid = args.getOrNull(3) as? Int ?: return@afterHookedMethod
-                val current = activeConfig(callingUid) ?: return@afterHookedMethod
-                if (!current.hideVpnTransport) return@afterHookedMethod
-
-                val original = result as? NetworkCapabilities ?: return@afterHookedMethod
-                val spoofed = spoofCapabilities(original, current.spoofedTransport)
-                    ?: return@afterHookedMethod
-                if (spoofed !== original) {
-                    result = spoofed
-                    HookLog.d(HookLog.Module.CORE, "hid VPN transport for uid $callingUid")
-                }
+        val hook = VpnConfig.vpnTransport.after(where = ::deliveredCallerGoverned) { current ->
+            val original = result as? NetworkCapabilities ?: return@after
+            val spoofed = spoofCapabilities(original, current.spoofedTransport)
+                ?: return@after
+            if (spoofed !== original) {
+                result = spoofed
+                HookLog.i(HookLog.Module.CORE, "hid VPN transport for a dispatched callback")
             }
-        )
+        }
+
+        HookBridge.hookAllMethods(service, "createWithSensitiveInfoSanitizedIfNecessaryWhenParceled", hook)
+        HookBridge.hookAllMethods(service, "createWithLocationInfoSanitizedIfNecessaryWhenParceled", hook)
     }
 
     private companion object {

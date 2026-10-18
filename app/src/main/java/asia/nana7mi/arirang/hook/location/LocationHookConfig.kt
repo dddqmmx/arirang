@@ -1,11 +1,13 @@
 package asia.nana7mi.arirang.hook.location
 
-import asia.nana7mi.arirang.hook.core.HookLog
-
+import asia.nana7mi.arirang.data.config.ConfigIds
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
-import asia.nana7mi.arirang.data.datastore.schema.LocationConfigSchema
-import asia.nana7mi.arirang.data.datastore.schema.LocationProfileSchema
-import android.content.SharedPreferences
+import asia.nana7mi.arirang.hook.config.ConfigSpec
+import asia.nana7mi.arirang.hook.config.ConfigValues
+import asia.nana7mi.arirang.hook.config.RemotePrefsSource
+import asia.nana7mi.arirang.hook.config.ServiceSnapshotSource
+import asia.nana7mi.arirang.hook.target.Targets
+import asia.nana7mi.arirang.hook.xposed.HookLog
 import org.json.JSONObject
 
 internal data class LocationHookConfig(
@@ -25,109 +27,72 @@ internal data class LocationProfile(
     val satellites: Int = LocationConfigPrefs.DEFAULT_SATELLITES
 )
 
-internal object LocationHookConfigParser {
-    fun parseSnapshot(snapshot: String): LocationHookConfig? {
-        return runCatching {
-            val schema = LocationConfigSchema.fromJson(snapshot)
-            LocationHookConfig(
-                enabled = schema.enabled,
-                defaultProfile = schema.toProfile(),
-                perPackage = schema.perPackage.mapValues { (_, profile) -> profile.toProfile() }
-            )
-        }.onFailure {
-            HookLog.w(HookLog.Module.LOCATION, "failed to parse location config snapshot: ${it.message}")
-        }.getOrNull()
-    }
+private const val REFRESH_INTERVAL_MS = 300L
 
-    private fun LocationConfigSchema.toProfile(): LocationProfile = LocationProfile(
+/**
+ * The location config.
+ *
+ * The source binds with the host process's own Context, which does not exist until its
+ * `Application` is created, so before that point the snapshot source reports itself as unable to
+ * bind — as the hand-written store did.
+ *
+ * The two sources disagree on exactly two things, and the decoder says both once: the top-level
+ * `perPackage` object is spelled `per_package` in prefs, and the per-package profile's `enabled`
+ * flag was defaulted **differently** by the two old decoders — `false` in the snapshot decoder
+ * (matching `LocationProfileSchema` and `LocationConfigPrefs.Profile`, which both declare
+ * `false`) and `true` in the prefs decoder. The models agree on `false`, so `false` is what they
+ * mean, and the prefs path was the outlier.
+ */
+internal object LocationConfig : ConfigSpec<LocationHookConfig>(
+    id = ConfigIds.LOCATION,
+    typeName = "location",
+    logModule = HookLog.Module.LOCATION,
+    fallback = LocationHookConfig(),
+    sources = listOf(
+        ServiceSnapshotSource(
+            configName = ConfigIds.LOCATION,
+            logName = "location",
+            bindContext = { Targets.applicationContext() },
+        ),
+        RemotePrefsSource(LocationConfigPrefs.PREFS_NAME),
+    ),
+    refreshIntervalMs = REFRESH_INTERVAL_MS,
+    decode = ::decode,
+)
+
+private fun decode(values: ConfigValues): LocationHookConfig? {
+    if (values.isEmpty()) return null
+    val enabled = values.boolean("enabled") ?: false
+    return LocationHookConfig(
         enabled = enabled,
-        latitude = latitude,
-        longitude = longitude,
-        altitude = altitude,
-        accuracy = accuracy,
-        speed = speed,
-        bearing = bearing,
-        satellites = satellites.coerceIn(0, 64)
+        defaultProfile = decodeProfile(values, enabledWhenAbsent = enabled),
+        perPackage = decodePerPackage(values.jsonObject("perPackage", "per_package")),
+    )
+}
+
+private fun decodeProfile(values: ConfigValues, enabledWhenAbsent: Boolean): LocationProfile =
+    LocationProfile(
+        enabled = values.boolean("enabled") ?: enabledWhenAbsent,
+        latitude = values.double("latitude") ?: LocationConfigPrefs.DEFAULT_LATITUDE,
+        longitude = values.double("longitude") ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
+        altitude = values.double("altitude") ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
+        accuracy = values.float("accuracy") ?: LocationConfigPrefs.DEFAULT_ACCURACY,
+        speed = values.float("speed") ?: LocationConfigPrefs.DEFAULT_SPEED,
+        bearing = values.float("bearing") ?: LocationConfigPrefs.DEFAULT_BEARING,
+        satellites = (values.int("satellites") ?: LocationConfigPrefs.DEFAULT_SATELLITES)
+            .coerceIn(0, MAX_SATELLITES),
     )
 
-    private fun LocationProfileSchema.toProfile(): LocationProfile = LocationProfile(
-        enabled = enabled,
-        latitude = latitude,
-        longitude = longitude,
-        altitude = altitude,
-        accuracy = accuracy,
-        speed = speed,
-        bearing = bearing,
-        satellites = satellites.coerceIn(0, 64)
-    )
-
-    fun readStored(prefs: SharedPreferences): LocationHookConfig {
-        return LocationHookConfig(
-            enabled = prefs.getBoolean(LocationConfigPrefs.KEY_ENABLED, false),
-            defaultProfile = LocationProfile(
-                latitude = prefs.getString(LocationConfigPrefs.KEY_LATITUDE, null)?.toDoubleOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_LATITUDE,
-                longitude = prefs.getString(LocationConfigPrefs.KEY_LONGITUDE, null)?.toDoubleOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_LONGITUDE,
-                altitude = prefs.getString(LocationConfigPrefs.KEY_ALTITUDE, null)?.toDoubleOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_ALTITUDE,
-                accuracy = prefs.getString(LocationConfigPrefs.KEY_ACCURACY, null)?.toFloatOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_ACCURACY,
-                speed = prefs.getString(LocationConfigPrefs.KEY_SPEED, null)?.toFloatOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_SPEED,
-                bearing = prefs.getString(LocationConfigPrefs.KEY_BEARING, null)?.toFloatOrNull()
-                    ?: LocationConfigPrefs.DEFAULT_BEARING,
-                satellites = prefs.getInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
-                    .coerceIn(0, 64)
-            ),
-            perPackage = prefs.getString(LocationConfigPrefs.KEY_PER_PACKAGE, null)
-                ?.takeIf { it.isNotBlank() }
-                ?.let(::parseStoredPackageProfiles)
-                .orEmpty()
-        )
-    }
-
-    private fun profileFromJson(json: JSONObject): LocationProfile {
-        return LocationProfile(
-            enabled = json.optBoolean(LocationConfigPrefs.KEY_ENABLED, true),
-            latitude = json.optDouble(LocationConfigPrefs.KEY_LATITUDE, LocationConfigPrefs.DEFAULT_LATITUDE),
-            longitude = json.optDouble(LocationConfigPrefs.KEY_LONGITUDE, LocationConfigPrefs.DEFAULT_LONGITUDE),
-            altitude = json.optDouble(LocationConfigPrefs.KEY_ALTITUDE, LocationConfigPrefs.DEFAULT_ALTITUDE),
-            accuracy = json.optDouble(
-                LocationConfigPrefs.KEY_ACCURACY,
-                LocationConfigPrefs.DEFAULT_ACCURACY.toDouble()
-            ).toFloat(),
-            speed = json.optDouble(LocationConfigPrefs.KEY_SPEED, LocationConfigPrefs.DEFAULT_SPEED.toDouble()).toFloat(),
-            bearing = json.optDouble(
-                LocationConfigPrefs.KEY_BEARING,
-                LocationConfigPrefs.DEFAULT_BEARING.toDouble()
-            ).toFloat(),
-            satellites = json.optInt(LocationConfigPrefs.KEY_SATELLITES, LocationConfigPrefs.DEFAULT_SATELLITES)
-                .coerceIn(0, 64)
-        )
-    }
-
-    private fun parsePackageProfiles(json: JSONObject): Map<String, LocationProfile> {
-        val root = json.optJSONObject("perPackage")
-            ?: json.optJSONObject(LocationConfigPrefs.KEY_PER_PACKAGE)
-            ?: json.optJSONObject("package_profiles")
-            ?: json
-
-        return buildMap {
-            val keys = root.keys()
-            while (keys.hasNext()) {
-                val packageName = keys.next()
-                val profileJson = root.optJSONObject(packageName) ?: continue
-                put(packageName, profileFromJson(profileJson))
-            }
+private fun decodePerPackage(root: JSONObject?): Map<String, LocationProfile> {
+    if (root == null) return emptyMap()
+    return buildMap {
+        val names = root.keys()
+        while (names.hasNext()) {
+            val packageName = names.next()
+            val entry = root.optJSONObject(packageName) ?: continue
+            put(packageName, decodeProfile(ConfigValues.ofJson(entry.toString()) ?: continue, false))
         }
     }
-
-    private fun parseStoredPackageProfiles(rawJson: String): Map<String, LocationProfile> {
-        return runCatching {
-            parsePackageProfiles(JSONObject(rawJson))
-        }.onFailure {
-            HookLog.w(HookLog.Module.LOCATION, "failed to parse stored per-package location config: ${it.message}")
-        }.getOrDefault(emptyMap())
-    }
 }
+
+private const val MAX_SATELLITES = 64

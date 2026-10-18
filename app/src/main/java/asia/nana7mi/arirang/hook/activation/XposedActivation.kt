@@ -1,9 +1,9 @@
 package asia.nana7mi.arirang.hook.activation
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 
 // 用于检测客户端xposed是否生效
 class XposedActivation : BaseHookModule(matchClient = true) {

@@ -3,21 +3,15 @@ package asia.nana7mi.arirang.hook.settings
 import android.os.Binder
 import android.os.Bundle
 import android.provider.Settings
-import asia.nana7mi.arirang.data.config.ConfigIds
-import asia.nana7mi.arirang.data.datastore.BluetoothConfigPrefs
-import asia.nana7mi.arirang.data.datastore.UniqueIdentifierPrefs
-import asia.nana7mi.arirang.data.datastore.schema.BluetoothConfigSchema
-import asia.nana7mi.arirang.data.datastore.schema.IdentifierConfigSchema
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookConfigFile
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.RealtimeHookConfig
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.network.VpnHookConfigFile
-import asia.nana7mi.arirang.hook.util.CallerPackages
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
+import asia.nana7mi.arirang.hook.network.VpnConfig
+import asia.nana7mi.arirang.hook.api.HookPackageParam
+import asia.nana7mi.arirang.hook.caller.Callers
+import asia.nana7mi.arirang.hook.gms.UniqueIdentifierConfig
+import asia.nana7mi.arirang.hook.bluetooth.BluetoothConfig
 
 // Android ID is handled at SettingsProvider so apps receive the rewritten value
 // through the normal Settings.Secure path instead of per-app hooks.
@@ -30,53 +24,6 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         private val ALWAYS_ON_VPN_KEYS = setOf("always_on_vpn_app", "always_on_vpn_lockdown")
         private val ALWAYS_ON_VPN_BYPASS = setOf("com.android.settings", "com.android.systemui")
     }
-
-    private data class StringSetting(val enabled: Boolean = false, val value: String? = null)
-
-    private val androidIdConfig = RealtimeHookConfig(
-        defaultValue = StringSetting(),
-        refreshIntervalMs = REFRESH_INTERVAL_MS,
-        readSnapshot = { force ->
-            ArirangClient.readConfigSnapshot(
-                configName = ConfigIds.UNIQUE_IDENTIFIER,
-                force = force,
-                allowBind = true,
-                logName = "unique identifier"
-            )
-        },
-        parseSnapshot = {
-            runCatching { IdentifierConfigSchema.fromJson(it) }.getOrNull()?.let { schema ->
-                StringSetting(schema.enabled, schema.androidId.takeIf(String::isNotBlank))
-            }
-        },
-        readFallback = {
-            parseStoredSetting(UniqueIdentifierPrefs.PREFS_NAME, KEY_ANDROID_ID)
-        }
-    )
-
-    private val bluetoothNameConfig = RealtimeHookConfig(
-        defaultValue = StringSetting(),
-        refreshIntervalMs = REFRESH_INTERVAL_MS,
-        readSnapshot = { force ->
-            ArirangClient.readConfigSnapshot(
-                configName = ConfigIds.BLUETOOTH,
-                force = force,
-                allowBind = true,
-                logName = "Bluetooth"
-            )
-        },
-        parseSnapshot = {
-            runCatching { BluetoothConfigSchema.fromJson(it) }.getOrNull()?.let { schema ->
-                StringSetting(schema.enabled, schema.deviceName.takeIf(String::isNotBlank))
-            }
-        },
-        readFallback = {
-            parseStoredSetting(BluetoothConfigPrefs.PREFS_NAME, BluetoothConfigPrefs.KEY_DEVICE_NAME)
-        }
-    )
-
-    /** Shares the VPN config with FuckVpnStatus; each host process caches its own copy. */
-    private val vpnConfig = VpnHookConfigFile.create()
 
     override fun isEnabled(): Boolean {
         return true
@@ -158,13 +105,16 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
         )
     }
 
-    private fun readAndroidIdFromConfig(): String? {
-        return androidIdConfig.current().takeIf { it.enabled }?.value
-    }
+    /**
+     * Both values come from the owning config's own store, as declared fields.
+     *
+     * This module used to hold a second reader of the unique-identifier config and a second
+     * reader of the Bluetooth one, each with its own refresh clock — so it and the owning module
+     * were free to act on two different values of one config in one process.
+     */
+    private fun readAndroidIdFromConfig(): String? = UniqueIdentifierConfig.spoofedAndroidId.current()
 
-    private fun readBluetoothNameFromConfig(): String? {
-        return bluetoothNameConfig.current().takeIf { it.enabled }?.value
-    }
+    private fun readBluetoothNameFromConfig(): String? = BluetoothConfig.spoofedDeviceName.current()
 
     /**
      * Whether the always-on VPN keys should read as unset for the current caller.
@@ -177,24 +127,13 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
      */
     private fun shouldHideAlwaysOnVpn(): Boolean {
         val callingUid = Binder.getCallingUid()
-        if (CallerPackages.isPlatformCaller(callingUid)) return false
-        val current = vpnConfig.current()
+        if (Callers.isPlatform(callingUid)) return false
+        val current = VpnConfig.current()
         if (!current.enabled || !current.hideAlwaysOnVpn) return false
-        val callerPackages = CallerPackages.forUid(callingUid)
+        val callerPackages = Callers.packagesFor(callingUid)
         if (callerPackages.any { it in ALWAYS_ON_VPN_BYPASS }) return false
         return current.appliesTo(callerPackages)
     }
 
-    private fun parseStoredSetting(prefsName: String, valueKey: String): StringSetting {
-        val values = HookConfigFile.readSharedPrefsValues(
-            prefsName = prefsName,
-            logModule = HookLog.Module.SETTINGS,
-            logName = prefsName
-        ).orEmpty()
-        return StringSetting(
-            enabled = values[KEY_ENABLED]?.toBooleanStrictOrNull() == true,
-            value = values[valueKey]?.takeIf { it.isNotBlank() }
-        )
-    }
 
 }

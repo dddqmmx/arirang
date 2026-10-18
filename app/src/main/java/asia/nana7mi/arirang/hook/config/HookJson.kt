@@ -1,8 +1,6 @@
-package asia.nana7mi.arirang.hook.util
+package asia.nana7mi.arirang.hook.config
 
 import org.json.JSONObject
-
-internal fun Boolean?.orFalse(): Boolean = this ?: false
 
 internal fun JSONObject.optCleanString(name: String): String? {
     if (!has(name) || isNull(name)) return null

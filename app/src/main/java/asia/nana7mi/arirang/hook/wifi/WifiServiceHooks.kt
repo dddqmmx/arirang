@@ -1,14 +1,11 @@
 package asia.nana7mi.arirang.hook.wifi
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
 import java.util.Collections
 import java.util.WeakHashMap
 
-internal class WifiServiceHooks(
-    private val currentConfig: () -> WifiHookConfig
-) {
+internal class WifiServiceHooks {
     private val hookedServiceClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
     private val hookedScanRequestProxyClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
 
@@ -99,10 +96,7 @@ internal class WifiServiceHooks(
         candidateMethods
             .filter { it.returnsList() }
             .forEach { method ->
-                HookBridge.hookMethod(method, afterHookedMethod {
-                    if (hasThrowable()) return@afterHookedMethod
-                    val config = currentConfig()
-                    if (!config.enabled || config.unchangedScanResults) return@afterHookedMethod
+                HookBridge.hookMethod(method, WifiConfig.scanResults.after { config ->
                     method.wrapScanResults(spoofedScanResults(config))?.let { result = it }
                     HookLog.d(HookLog.Module.WIFI, "spoof ScanRequestProxy.getScanResults via ${method.signature()}")
                 })
@@ -140,11 +134,8 @@ internal class WifiServiceHooks(
         candidateMethods.forEach { method ->
             when {
                 method.name == "getConnectionInfo" && method.returnsWifiInfo() -> {
-                    HookBridge.hookMethod(method, afterHookedMethod {
-                        if (hasThrowable()) return@afterHookedMethod
-                        if (isRedactedWifiInfo(result)) return@afterHookedMethod
-                        val config = currentConfig()
-                        if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
+                    HookBridge.hookMethod(method, WifiConfig.identity.after { config ->
+                        if (isRedactedWifiInfo(result)) return@after
                         spoofedWifiInfo(config, result)?.let { result = it }
                         HookLog.d(HookLog.Module.WIFI, "spoof getConnectionInfo via ${method.signature()}")
                     })
@@ -152,11 +143,8 @@ internal class WifiServiceHooks(
                 }
 
                 method.name == "getScanResults" && method.returnsScanResults() -> {
-                    HookBridge.hookMethod(method, afterHookedMethod {
-                        if (hasThrowable()) return@afterHookedMethod
-                        if (!containsVisibleScanResults(result)) return@afterHookedMethod
-                        val config = currentConfig()
-                        if (!config.enabled || config.unchangedScanResults) return@afterHookedMethod
+                    HookBridge.hookMethod(method, WifiConfig.scanResults.after { config ->
+                        if (!containsVisibleScanResults(result)) return@after
                         method.wrapScanResults(spoofedScanResults(config))?.let { result = it }
                         HookLog.d(HookLog.Module.WIFI, "spoof getScanResults via ${method.signature()}")
                     })
@@ -164,10 +152,7 @@ internal class WifiServiceHooks(
                 }
 
                 method.name == "getDhcpInfo" && method.returnType.name == "android.net.DhcpInfo" -> {
-                    HookBridge.hookMethod(method, afterHookedMethod {
-                        if (hasThrowable()) return@afterHookedMethod
-                        val config = currentConfig()
-                        if (!config.enabled || config.unchangedCurrentWifi) return@afterHookedMethod
+                    HookBridge.hookMethod(method, WifiConfig.identity.after { config ->
                         result = spoofedDhcpInfo(config)
                         HookLog.d(HookLog.Module.WIFI, "spoof getDhcpInfo via ${method.signature()}")
                     })

@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.util
 
-import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 
 import java.lang.reflect.Field
 

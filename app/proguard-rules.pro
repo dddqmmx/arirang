@@ -14,10 +14,30 @@
 # ui.** class is reached normally and is kept by AGP's manifest-component rules.
 -keep class asia.nana7mi.arirang.ui.fragment.HomeFragment { *; }
 
-# Keep Gson-backed preference models. Hook code reads these JSON keys by name.
+# Keep Gson-backed preference models and schemas
 -keepattributes Signature
 -keepattributes *Annotation*
--keep class asia.nana7mi.arirang.model.SimInfo { *; }
+-keepattributes EnclosingMethod,InnerClasses
+
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+-keep class * extends com.google.gson.reflect.TypeToken
+-keepclassmembers class * extends com.google.gson.reflect.TypeToken {
+    *;
+}
+
+# Keep all models, schemas, and datastore configuration classes
+-keep class asia.nana7mi.arirang.model.** { *; }
+-keep class asia.nana7mi.arirang.data.datastore.** { *; }
+-keep class asia.nana7mi.arirang.data.datastore.schema.** { *; }
+-keep class asia.nana7mi.arirang.data.config.** { *; }
 
 # Keep BuildConfig (sometimes used in hooks)
 -keep class asia.nana7mi.arirang.BuildConfig { *; }

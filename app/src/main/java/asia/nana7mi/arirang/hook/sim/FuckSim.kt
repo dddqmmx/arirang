@@ -4,20 +4,21 @@ import android.os.Binder
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.core.hookedMethod
+import asia.nana7mi.arirang.hook.ipc.ArirangClient
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
 import asia.nana7mi.arirang.hook.util.asIntOrNull
 import asia.nana7mi.arirang.hook.util.firstIntOrNull
 import asia.nana7mi.arirang.hook.util.getFieldValue
-import asia.nana7mi.arirang.hook.core.HookPackageParam
-import asia.nana7mi.arirang.hook.core.MethodHookParam
-import java.lang.reflect.Array as ReflectArray
+import asia.nana7mi.arirang.hook.api.HookPackageParam
+import asia.nana7mi.arirang.hook.xposed.MethodHookParam
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
+import java.lang.reflect.Array as ReflectArray
+import java.util.concurrent.atomic.AtomicBoolean
+import asia.nana7mi.arirang.hook.target.Targets
 
 private const val CONFIG_REFRESH_DELAY_MS = 600L
 
@@ -31,14 +32,41 @@ private const val CONFIG_REFRESH_DELAY_MS = 600L
 // Do not broaden this module to arbitrary app packages; callers should observe the
 // rewritten values through framework services.
 class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "android")) {
-    private val configStore = SimHookConfigStore()
+    // sim_config_prefs is MODE_PRIVATE, so another process cannot read it and isEnabled()
+    // cannot be answered before the bind completes.
+    override val installsBeforeConfigIsKnown: Boolean = true
+
+    /**
+     * Whether this process may apply the SIM spoof yet.
+     *
+     * Open everywhere except the phone process, which starts closed. `PhoneApp.onCreate` builds
+     * that process's RCS state out of the subscription list it reads through
+     * `SubscriptionManagerService`; a rewritten list at that moment makes `RcsProvisioningMonitor`
+     * register an RCS feature the platform cannot serve, and AOSP's
+     * `RcsFeatureManager.invalidate()` then NPEs on the null connection — so the persistent phone
+     * process dies on *every* start and takes telephony, and everything that reports on it, down
+     * with it. [activateSpoofing] opens the gate once the process has finished starting its
+     * Application, the first moment the rewrite is safe.
+     */
+    private val spoofingActive = AtomicBoolean(true)
 
     private val hookConfig: SimHookConfig
-        get() = configStore.current()
+        get() = SimConfig.current()
+
+    /** The config a rewriting site may act on right now, or null while the gate is closed. */
+    private val activeConfig: SimHookConfig?
+        get() = if (spoofingActive.get()) SimConfig.enabled.currentOrNull() else null
+
+    /**
+     * The precondition the `around` sites pass to their guard: the gate must be open when the
+     * hooked method is entered. One lambda rather than a flag test written out at six sites.
+     */
+    private val activationGate: (MethodHookParam, SimHookConfig) -> Boolean = { _, _ ->
+        spoofingActive.get()
+    }
 
     private val propertyHooks = SimSystemPropertyHooks(
-        configStore = configStore,
-        currentConfig = { hookConfig },
+        currentConfig = { activeConfig },
         profileForTelephonyManager = ::profileForTelephonyManager,
         profileForSlot = ::profileForSlot
     )
@@ -47,9 +75,11 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     private var phoneConfigBindHookInstalled = false
 
     private val serviceConnectionListener = ArirangClient.ConnectionListener {
-        configStore.current(force = true)
+        // Inline read: the phone process writes telephony properties from this config and must
+        // see a change as soon as it is made.
+        SimConfig.current(force = true)
         Handler(Looper.getMainLooper()).postDelayed({
-            configStore.current()
+            SimConfig.current()
             propertyHooks.writeProofTelephonyProperties()
         }, CONFIG_REFRESH_DELAY_MS)
     }
@@ -58,7 +88,6 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
     override fun onHook(param: HookPackageParam) {
         runCatching {
-            configStore.preferHookNotifyConfig = param.packageName == "android" || param.packageName == "com.android.phone"
             val config = hookConfig
             when (param.packageName) {
                 "android" -> {
@@ -66,8 +95,15 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     HookLog.i(HookLog.Module.SIM, "system_server hook installed enabled=${config.enabled}")
                 }
                 "com.android.phone" -> {
+                    // Closed before a single hook goes in: from here until this process's
+                    // Application has started, every rewriting site reads [activeConfig] as null.
+                    spoofingActive.set(false)
                     hookPhoneProcessSurfaces(param.classLoader)
-                    HookLog.i(HookLog.Module.SIM, "phone process hook installed enabled=${config.enabled}")
+                    HookLog.i(
+                        HookLog.Module.SIM,
+                        "phone process hook installed enabled=${config.enabled}; " +
+                            "spoofing deferred until the Application has started"
+                    )
                 }
             }
         }.onFailure {
@@ -85,7 +121,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
     }
 
     private fun hookPhoneProcessSurfaces(classLoader: ClassLoader) {
-        hookPhoneConfigServiceBind(classLoader)
+        hookPhoneConfigServiceBind()
         hookServiceStateSurfaces(classLoader)
         hookSubscriptionServiceSurfaces(classLoader, externalClientsOnly = false)
         hookPhoneInterfaceManager(classLoader)
@@ -98,17 +134,46 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         propertyHooks.writeProofTelephonyProperties()
     }
 
-    private fun hookPhoneConfigServiceBind(classLoader: ClassLoader) {
+    private fun hookPhoneConfigServiceBind() {
         if (phoneConfigBindHookInstalled) return
         phoneConfigBindHookInstalled = true
 
         ArirangClient.addConnectionListener(serviceConnectionListener)
+        Targets.onApplicationContext { context ->
+            ArirangClient.autoBindCurrentUser(context)
+            // One message later, not here. This callback runs inside `PhoneApp.onCreate` — as soon
+            // as `super.onCreate()` returns, while the app's own `onCreate` body (the part that
+            // registers for RCS) is still ahead of it — so activating now would reproduce exactly
+            // the crash the deferral exists to avoid. Posting to the main looper puts the
+            // activation after the message that is running this process's startup.
+            val main = Looper.getMainLooper()
+            if (main == null) {
+                HookLog.w(
+                    HookLog.Module.SIM,
+                    "no main looper; SIM spoofing stays off in this process"
+                )
+            } else {
+                Handler(main).post { activateSpoofing() }
+            }
+        }
+    }
 
-        val applicationClass = HookBridge.findClassIfExists("android.app.Application", classLoader) ?: return
-        HookBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
-            val app = thisObject as? android.app.Application ?: return@afterHookedMethod
-            ArirangClient.autoBindCurrentUser(app)
-        })
+    /**
+     * Lets this process apply the SIM spoof, from just after its Application started.
+     *
+     * Idempotent, and deliberately fails closed: a signal that cannot be deferred, or a proof
+     * property that cannot be written, must not turn into the phone process's startup crash.
+     */
+    private fun activateSpoofing() {
+        if (!spoofingActive.compareAndSet(false, true)) return
+        HookLog.i(
+            HookLog.Module.SIM,
+            "phone process spoofing activated enabled=${hookConfig.enabled}"
+        )
+        runCatching { propertyHooks.writeProofTelephonyProperties() }
+            .onFailure {
+                HookLog.w(HookLog.Module.SIM, "proof telephony properties failed: ${it.message}")
+            }
     }
 
     private fun hookServiceStateSurfaces(classLoader: ClassLoader) {
@@ -134,8 +199,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 .filter { it.returnType == serviceStateClass }
                 .forEach { method ->
                     HookBridge.hookMethod(method, afterHookedMethod {
-                        val config = hookConfig
-                        if (!config.enabled) return@afterHookedMethod
+                        val config = activeConfig ?: return@afterHookedMethod
                         rewriteServiceState(result, config.primaryProfile)
                     })
                 }
@@ -143,18 +207,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             targetClass.declaredMethods
                 .filter { method -> method.parameterTypes.any { it == serviceStateClass } }
                 .forEach { method ->
-                    HookBridge.hookMethod(method, hookedMethod(
-                        before = {
-                            val config = hookConfig
-                            if (config.enabled) {
-                                args.forEach { rewriteServiceState(it, config.primaryProfile) }
-                            }
+                    HookBridge.hookMethod(method, SimConfig.enabled.around(
+                        where = activationGate,
+                        before = { config ->
+                            args.forEach { rewriteServiceState(it, config.primaryProfile) }
                         },
-                        after = {
-                            val config = hookConfig
-                            if (config.enabled) {
-                                rewriteServiceState(result, config.primaryProfile)
-                            }
+                        after = { config ->
+                            rewriteServiceState(result, config.primaryProfile)
                         }
                     ))
                 }
@@ -282,8 +341,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
                 .forEach { method ->
                     HookBridge.hookMethod(method, afterHookedMethod {
-                        val config = hookConfig
-                        if (!config.enabled) return@afterHookedMethod
+                        val config = activeConfig ?: return@afterHookedMethod
                         rewriteNestedTelephonyObject(result, config.primaryProfile)
                     })
                 }
@@ -391,8 +449,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 .filter { it.name == methodName && !Modifier.isAbstract(it.modifiers) }
                 .forEach { method ->
                     HookBridge.hookMethod(method, afterHookedMethod {
-                        val config = hookConfig
-                        if (!config.enabled) return@afterHookedMethod
+                        val config = activeConfig ?: return@afterHookedMethod
                         rewriteNestedTelephonyObject(result, config.primaryProfile)
                     })
                 }
@@ -442,8 +499,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
             }
             .forEach { method ->
                 HookBridge.hookMethod(method, afterHookedMethod {
-                    val config = hookConfig
-                    if (!config.enabled) return@afterHookedMethod
+                    val config = activeConfig ?: return@afterHookedMethod
                     rewriteNestedTelephonyObject(result, config.primaryProfile)
                 })
             }
@@ -461,18 +517,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass.declaredMethods
             .filter { it.name == methodName && it.parameterTypes.isEmpty() && !Modifier.isAbstract(it.modifiers) }
             .forEach { method ->
-                HookBridge.hookMethod(method, hookedMethod(
-                    before = {
-                        val config = hookConfig
-                        if (config.enabled) {
-                            rewriteNestedTelephonyObject(thisObject, config.primaryProfile)
-                        }
+                HookBridge.hookMethod(method, SimConfig.enabled.around(
+                    where = activationGate,
+                    before = { config ->
+                        rewriteNestedTelephonyObject(thisObject, config.primaryProfile)
                     },
-                    after = {
-                        val config = hookConfig
-                        if (config.enabled) {
-                            result = coerceHookResult(valueProvider(config.primaryProfile), result)
-                        }
+                    after = { config ->
+                        result = coerceHookResult(valueProvider(config.primaryProfile), result)
                     }
                 ))
             }
@@ -485,17 +536,15 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         targetClass.declaredMethods
             .filter { it.name == "toString" && it.parameterTypes.isEmpty() && !Modifier.isAbstract(it.modifiers) }
             .forEach { method ->
-                HookBridge.hookMethod(method, hookedMethod(
-                    before = {
-                        val config = hookConfig
-                        val target = thisObject ?: return@hookedMethod
-                        if (config.enabled) {
-                            rewriter(target, config.primaryProfile)
-                        }
+                HookBridge.hookMethod(method, SimConfig.enabled.around(
+                    where = activationGate,
+                    before = { config ->
+                        thisObject?.let { target -> rewriter(target, config.primaryProfile) }
                     },
-                    after = {
-                        val config = hookConfig
-                        if (config.enabled && result is String) {
+                    after = { config ->
+                        // The shape check is this site's own business; only the config policy
+                        // moved into the gate.
+                        if (result is String) {
                             result = rewriteTelephonyDebugString(result as String, config.primaryProfile)
                         }
                     }
@@ -633,8 +682,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                     }
                     .forEach { method ->
                         HookBridge.hookMethod(method, afterHookedMethod {
-                            val config = hookConfig
-                            if (!config.enabled) return@afterHookedMethod
+                            val config = activeConfig ?: return@afterHookedMethod
                             rewriteNestedTelephonyObject(result, config.primaryProfile)
                         })
                     }
@@ -673,26 +721,21 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                         )
                     }
                     .forEach { method ->
-                        HookBridge.hookMethod(method, hookedMethod(
-                            before = {
-                                val config = hookConfig
-                                if (config.enabled) {
-                                    rewriteCommonOperatorFields(thisObject, config.primaryProfile)
-                                }
+                        HookBridge.hookMethod(method, SimConfig.enabled.around(
+                            where = activationGate,
+                            before = { config ->
+                                rewriteCommonOperatorFields(thisObject, config.primaryProfile)
                             },
-                            after = {
-                                val config = hookConfig
-                                if (config.enabled) {
-                                    val profile = config.primaryProfile
-                                    result = when (method.name) {
-                                        "getOperatorAlphaLong" -> profile.alphaLong
-                                        "getOperatorAlphaShort" -> profile.alphaShort
-                                        "getMcc" -> profile.mcc.toIntOrNull() ?: 0
-                                        "getMnc" -> profile.mnc.toIntOrNull() ?: 0
-                                        "getMccString" -> profile.mcc
-                                        "getMncString" -> profile.mnc
-                                        else -> result
-                                    }
+                            after = { config ->
+                                val profile = config.primaryProfile
+                                result = when (method.name) {
+                                    "getOperatorAlphaLong" -> profile.alphaLong
+                                    "getOperatorAlphaShort" -> profile.alphaShort
+                                    "getMcc" -> profile.mcc.toIntOrNull() ?: 0
+                                    "getMnc" -> profile.mnc.toIntOrNull() ?: 0
+                                    "getMccString" -> profile.mcc
+                                    "getMncString" -> profile.mnc
+                                    else -> result
                                 }
                             }
                         ))
@@ -701,16 +744,13 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 cellIdentityClass.declaredMethods
                     .filter { it.name == "toString" && it.parameterTypes.isEmpty() }
                     .forEach { method ->
-                        HookBridge.hookMethod(method, hookedMethod(
-                            before = {
-                                val config = hookConfig
-                                if (config.enabled) {
-                                    rewriteCommonOperatorFields(thisObject, config.primaryProfile)
-                                }
+                        HookBridge.hookMethod(method, SimConfig.enabled.around(
+                            where = activationGate,
+                            before = { config ->
+                                rewriteCommonOperatorFields(thisObject, config.primaryProfile)
                             },
-                            after = {
-                                val config = hookConfig
-                                if (config.enabled && result is String) {
+                            after = { config ->
+                                if (result is String) {
                                     result = rewriteTelephonyDebugString(
                                         result as String,
                                         config.primaryProfile
@@ -743,16 +783,19 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         ).forEach { methodName ->
             if (targetClass.declaredMethods.none { it.name == methodName }) return@forEach
 
-            HookBridge.hookAllMethods(targetClass, methodName, hookedMethod(
-                before = {
-                    val config = hookConfig
-                    if (config.enabled && shouldRewriteForCaller(externalClientsOnly) && shouldShortCircuitInternalSubscriptionIdRead()) {
+            // Only `enabled` is shared between the halves: the caller conditions differ (the
+            // before half additionally requires a short-circuitable read), so each keeps its own.
+            HookBridge.hookAllMethods(targetClass, methodName, SimConfig.enabled.around(
+                where = activationGate,
+                before = { config ->
+                    if (shouldRewriteForCaller(externalClientsOnly) &&
+                        shouldShortCircuitInternalSubscriptionIdRead()
+                    ) {
                         result = config.visibleProfiles.map { it.subId }.toIntArray()
                     }
                 },
-                after = {
-                    val config = hookConfig
-                    if (config.enabled && shouldRewriteForCaller(externalClientsOnly)) {
+                after = { config ->
+                    if (shouldRewriteForCaller(externalClientsOnly)) {
                         result = config.visibleProfiles.map { it.subId }.toIntArray()
                     }
                 }
@@ -770,6 +813,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
 
         methods.forEach { method ->
             HookBridge.hookMethod(method, afterHookedMethod {
+                if (!spoofingActive.get()) return@afterHookedMethod
                 if (!hookConfig.enabled || !shouldRewriteForCaller(externalClientsOnly)) return@afterHookedMethod
                 result = rewriteSubscriptionResult(
                     result = result,
@@ -794,6 +838,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
         methods.forEach { method ->
             HookBridge.hookMethod(method, afterHookedMethod {
                 if (callerWasRefused()) return@afterHookedMethod
+                if (!spoofingActive.get()) return@afterHookedMethod
                 val config = hookConfig
                 if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly)) {
                     result = coerceHookResult(valueProvider(this, method), result)
@@ -882,6 +927,7 @@ class FuckSim : BaseHookModule(targetPackages = setOf("com.android.phone", "andr
                 }
                 HookBridge.hookMethod(method, afterHookedMethod {
                     if (callerWasRefused()) return@afterHookedMethod
+                    if (!spoofingActive.get()) return@afterHookedMethod
                     val config = hookConfig
                     if (shouldHandle(config) && shouldRewriteForCaller(externalClientsOnly) && (result == null || result is String)) {
                         result = resultProvider(this, method)

@@ -2,12 +2,11 @@ package asia.nana7mi.arirang.hook.network
 
 import asia.nana7mi.arirang.data.config.ConfigIds
 import asia.nana7mi.arirang.data.datastore.VpnStatusPrefs
-import asia.nana7mi.arirang.data.datastore.schema.VpnStatusConfigSchema
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.HookConfigFile
-import asia.nana7mi.arirang.hook.core.HookLog
-import android.content.SharedPreferences
-import org.json.JSONArray
+import asia.nana7mi.arirang.hook.config.ConfigSpec
+import asia.nana7mi.arirang.hook.config.ConfigValues
+import asia.nana7mi.arirang.hook.config.RemotePrefsSource
+import asia.nana7mi.arirang.hook.config.ServiceSnapshotSource
+import asia.nana7mi.arirang.hook.xposed.HookLog
 
 internal data class VpnHookConfig(
     val enabled: Boolean = false,
@@ -37,74 +36,54 @@ internal data class VpnHookConfig(
     }
 }
 
-internal object VpnHookConfigFile {
+private const val REFRESH_INTERVAL_MS = 1_000L
 
-    fun create(): HookConfigFile<VpnHookConfig> = HookConfigFile(
-        configName = ConfigIds.VPN_STATUS,
-        prefsName = VpnStatusPrefs.PREFS_NAME,
-        defaultValue = VpnHookConfig(),
-        refreshIntervalMs = REFRESH_INTERVAL_MS,
-        readRealtimeSnapshot = { force ->
-            ArirangClient.readConfigSnapshot(
-                configName = ConfigIds.VPN_STATUS,
-                force = force,
-                allowBind = true,
-                logName = "VPN status"
-            )
-        },
-        parseRealtimeSnapshot = ::parseSnapshot,
-        readStoredConfig = ::readStored
+/**
+ * The VPN/proxy config, read by both the VPN module and the settings-provider module.
+ *
+ * They each used to stand up their own reader of it in the same process, with independent
+ * refresh clocks, so the two could act on two different values of one config.
+ *
+ * One decoder serves both sources: the snapshot says `hideVpnTransport`/`exemptPackages` and the
+ * prefs file says `hide_vpn_transport`/`exempt_packages`.
+ */
+internal object VpnConfig : ConfigSpec<VpnHookConfig>(
+    id = ConfigIds.VPN_STATUS,
+    typeName = "VPN status",
+    logModule = HookLog.Module.CORE,
+    fallback = VpnHookConfig(),
+    sources = listOf(
+        ServiceSnapshotSource(ConfigIds.VPN_STATUS, logName = "VPN status"),
+        RemotePrefsSource(VpnStatusPrefs.PREFS_NAME),
+    ),
+    refreshIntervalMs = REFRESH_INTERVAL_MS,
+    decode = ::decode,
+) {
+    /** The module is switched on. Whether it governs *this* caller is the site's own question. */
+    val enabled = guard("enabled") { it.enabled }
+
+    /** The transport surfaces: the reported network type must stop saying VPN. */
+    val vpnTransport = guard("vpnTransport") { it.enabled && it.hideVpnTransport }
+
+    /** The proxy surfaces. A separate switch from the transport one, and a separate site. */
+    val proxy = guard("proxy") { it.enabled && it.hideProxy }
+}
+
+private fun decode(values: ConfigValues): VpnHookConfig? {
+    if (values.isEmpty()) return null
+    val defaults = VpnHookConfig()
+    return VpnHookConfig(
+        enabled = values.boolean("enabled") ?: defaults.enabled,
+        hideVpnTransport = values.boolean("hideVpnTransport", "hide_vpn_transport")
+            ?: defaults.hideVpnTransport,
+        spoofedTransport = values.string("spoofedTransport", "spoofed_transport")
+            ?: defaults.spoofedTransport,
+        hideVpnInterfaces = values.boolean("hideVpnInterfaces", "hide_vpn_interfaces")
+            ?: defaults.hideVpnInterfaces,
+        hideAlwaysOnVpn = values.boolean("hideAlwaysOnVpn", "hide_always_on_vpn")
+            ?: defaults.hideAlwaysOnVpn,
+        hideProxy = values.boolean("hideProxy", "hide_proxy") ?: defaults.hideProxy,
+        // The snapshot carries a JSON array, prefs a set; strings() reads either.
+        exemptPackages = values.strings("exemptPackages", "exempt_packages").toSet(),
     )
-
-    private fun parseSnapshot(snapshot: String): VpnHookConfig? = runCatching {
-        val schema = VpnStatusConfigSchema.fromJson(snapshot)
-        VpnHookConfig(
-            enabled = schema.enabled,
-            hideVpnTransport = schema.hideVpnTransport,
-            spoofedTransport = schema.spoofedTransport,
-            hideVpnInterfaces = schema.hideVpnInterfaces,
-            hideAlwaysOnVpn = schema.hideAlwaysOnVpn,
-            hideProxy = schema.hideProxy,
-            exemptPackages = schema.exemptPackages.toSet()
-        )
-    }.onFailure {
-        HookLog.w(HookLog.Module.CORE, "failed to parse VPN status snapshot: ${it.message}")
-    }.getOrNull()
-
-    private fun readStored(prefs: SharedPreferences): VpnHookConfig {
-        val defaults = VpnHookConfig()
-        return VpnHookConfig(
-            enabled = prefs.getBoolean(VpnStatusPrefs.KEY_ENABLED, defaults.enabled),
-            hideVpnTransport = prefs.getBoolean(
-                VpnStatusPrefs.KEY_HIDE_VPN_TRANSPORT,
-                defaults.hideVpnTransport
-            ),
-            spoofedTransport = prefs.getString(VpnStatusPrefs.KEY_SPOOFED_TRANSPORT, null)
-                ?.takeIf { it.isNotBlank() }
-                ?: defaults.spoofedTransport,
-            hideVpnInterfaces = prefs.getBoolean(
-                VpnStatusPrefs.KEY_HIDE_VPN_INTERFACES,
-                defaults.hideVpnInterfaces
-            ),
-            hideAlwaysOnVpn = prefs.getBoolean(
-                VpnStatusPrefs.KEY_HIDE_ALWAYS_ON_VPN,
-                defaults.hideAlwaysOnVpn
-            ),
-            hideProxy = prefs.getBoolean(VpnStatusPrefs.KEY_HIDE_PROXY, defaults.hideProxy),
-            exemptPackages = prefs.getString(VpnStatusPrefs.KEY_EXEMPT_PACKAGES, null)
-                ?.let(::parsePackages)
-                .orEmpty()
-        )
-    }
-
-    private fun parsePackages(json: String): Set<String> = runCatching {
-        val array = JSONArray(json)
-        buildSet {
-            for (index in 0 until array.length()) {
-                array.optString(index).takeIf { it.isNotBlank() }?.let(::add)
-            }
-        }
-    }.getOrDefault(emptySet())
-
-    private const val REFRESH_INTERVAL_MS = 1_000L
 }

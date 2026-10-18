@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.hook.core
+package asia.nana7mi.arirang.hook.xposed
 
 import android.content.SharedPreferences
 import android.util.Log
@@ -170,16 +170,24 @@ object HookBridge {
         return findAndHookMethod(clazz, methodName, *parameterTypesAndCallback)
     }
 
-    private fun findMethodExact(clazz: Class<*>, methodName: String, vararg parameterTypes: Class<*>): Method? {
+    private fun findMethodExact(clazz: Class<*>, methodName: String, vararg parameterTypes: Class<*>): Method? =
+        findMethodInHierarchy(clazz) { method ->
+            method.name == methodName && method.parameterTypes.contentEquals(parameterTypes)
+        }?.also { it.isAccessible = true }
+
+    /**
+     * The first declared method in [clazz]'s hierarchy that [predicate] accepts.
+     *
+     * Walks up from [clazz], so an override wins over the method it overrides — which is what
+     * hooking wants. This walk, and its stopping condition, used to be written out three times:
+     * here, in the GMS helpers, and in the package-manager hooks, each guarded a little
+     * differently.
+     */
+    fun findMethodInHierarchy(clazz: Class<*>, predicate: (Method) -> Boolean): Method? {
         var current: Class<*>? = clazz
         while (current != null) {
-            try {
-                val method = current.getDeclaredMethod(methodName, *parameterTypes)
-                method.isAccessible = true
-                return method
-            } catch (_: NoSuchMethodException) {
-                current = current.superclass
-            }
+            current.declaredMethods.firstOrNull(predicate)?.let { return it }
+            current = current.superclass
         }
         return null
     }

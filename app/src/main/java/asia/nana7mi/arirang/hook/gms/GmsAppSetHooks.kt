@@ -4,13 +4,13 @@ import android.os.IBinder
 import android.os.IInterface
 import android.os.Parcel
 import android.os.Parcelable
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
 import com.google.android.gms.appset.zzc as AppSetIdResult
 import com.google.android.gms.common.api.Status
-import asia.nana7mi.arirang.hook.core.HookCallback
-import asia.nana7mi.arirang.hook.core.MethodHookParam
+import asia.nana7mi.arirang.hook.xposed.HookCallback
+import asia.nana7mi.arirang.hook.xposed.MethodHookParam
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -123,7 +123,7 @@ internal class GmsAppSetHooks(
             val infoClass = HookBridge.findClass("com.google.android.gms.appset.AppSetInfoParcel", classLoader)
             val info = infoClass.newAppSetInfoParcel(appSetId)
 
-            val callbackMethod = callback.javaClass.findDeclaredMethodInHierarchy { method ->
+            val callbackMethod = HookBridge.findMethodInHierarchy(callback.javaClass) { method ->
                 method.returnType == Void.TYPE &&
                     method.parameterTypes.size == 2 &&
                     method.parameterTypes[0].name == "com.google.android.gms.common.api.Status" &&

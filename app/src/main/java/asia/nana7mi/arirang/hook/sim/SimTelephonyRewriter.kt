@@ -1,6 +1,6 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 
 import asia.nana7mi.arirang.hook.util.getFieldValue
 import asia.nana7mi.arirang.hook.util.setFieldValueIfExists

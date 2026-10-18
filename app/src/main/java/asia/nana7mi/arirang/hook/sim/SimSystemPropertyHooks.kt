@@ -1,16 +1,21 @@
 package asia.nana7mi.arirang.hook.sim
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.hookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.xposed.hookedMethod
 import asia.nana7mi.arirang.hook.util.asIntOrNull
 import asia.nana7mi.arirang.hook.util.firstIntOrNull
-import asia.nana7mi.arirang.hook.core.MethodHookParam
+import asia.nana7mi.arirang.hook.xposed.MethodHookParam
 
 internal class SimSystemPropertyHooks(
-    private val configStore: SimHookConfigStore,
-    private val currentConfig: () -> SimHookConfig,
+    /**
+     * The config this process may act on now, i.e. [SimConfig] behind [FuckSim]'s activation gate.
+     * Injected rather than read here: whether the spoof may run at all is a property of *when* in
+     * the process's life the call arrives — the phone process must not spoof while its
+     * `Application` is still being created — and that timeline belongs to the module.
+     */
+    private val currentConfig: () -> SimHookConfig?,
     private val profileForTelephonyManager: (MethodHookParam) -> SimProfile?,
     private val profileForSlot: (slotIndex: Int?, allowFallback: Boolean) -> SimProfile?
 ) {
@@ -21,8 +26,7 @@ internal class SimSystemPropertyHooks(
         ) ?: return
 
         HookBridge.hookAllMethods(telephonyManagerClass, "setTelephonyProperty", beforeHookedMethod {
-            val config = currentConfig()
-            if (!config.enabled) return@beforeHookedMethod
+            val config = currentConfig() ?: return@beforeHookedMethod
             val profile = profileForSlot(args.getOrNull(0).asIntOrNull(), false)
                 ?: return@beforeHookedMethod
             val propertyName = args.getOrNull(1)?.toString() ?: return@beforeHookedMethod
@@ -110,7 +114,7 @@ internal class SimSystemPropertyHooks(
                 before = {
                     if (args.size == 1 && args[0] is List<*>) {
                         val config = currentConfig()
-                        if (config.enabled) {
+                        if (config != null) {
                             args[0] = value(config)
                         }
                     }
@@ -118,7 +122,7 @@ internal class SimSystemPropertyHooks(
                 after = {
                     if (args.isEmpty() && result is List<*>) {
                         val config = currentConfig()
-                        if (config.enabled) {
+                        if (config != null) {
                             result = value(config)
                         }
                     }
@@ -146,8 +150,7 @@ internal class SimSystemPropertyHooks(
 
     fun writeProofTelephonyProperties() {
         runCatching {
-            val config = currentConfig()
-            if (!config.enabled) return
+            val config = currentConfig() ?: return
             val systemPropertiesClass = HookBridge.findClass("android.os.SystemProperties", null)
             listOf(
                 "gsm.sim.operator.iso-country" to config.countryIsoPropertyValue,
@@ -172,7 +175,7 @@ internal class SimSystemPropertyHooks(
         if (telephonyManagerClass.declaredMethods.none { it.name == methodName }) return
 
         HookBridge.hookAllMethods(telephonyManagerClass, methodName, beforeHookedMethod {
-            if (!currentConfig().enabled) return@beforeHookedMethod
+            currentConfig() ?: return@beforeHookedMethod
             val value = valueProvider(this) ?: return@beforeHookedMethod
             val valueIndex = args.indexOfLast { it is String }
             if (valueIndex >= 0) args[valueIndex] = value
@@ -187,8 +190,7 @@ internal class SimSystemPropertyHooks(
             .takeIf { it in SYSTEM_PROPERTY_KEYS }
         val propertyKey = directKey ?: suffixedKey ?: return null
 
-        val config = configStore.current()
-        if (!config.enabled) return null
+        val config = currentConfig() ?: return null
 
         val slotIndex = if (directKey == null) {
             propertyName.substringAfterLast(".", "").toIntOrNull()

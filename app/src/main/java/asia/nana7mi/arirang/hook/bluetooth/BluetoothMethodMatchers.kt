@@ -1,7 +1,7 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
 import android.bluetooth.BluetoothDevice
-import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 import java.lang.reflect.Method
 
 // Java type erasure prevents generic inspection, so these helpers are always

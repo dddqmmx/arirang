@@ -1,7 +1,7 @@
 package asia.nana7mi.arirang.hook.wifi
 
 import android.net.wifi.ScanResult
-import asia.nana7mi.arirang.hook.core.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 import java.lang.reflect.Method
 
 internal fun Method.wrapScanResults(results: List<ScanResult>): Any? {

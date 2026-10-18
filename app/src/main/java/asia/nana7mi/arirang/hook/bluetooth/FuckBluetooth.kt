@@ -1,9 +1,8 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 
 /**
  * Rewrites the local Bluetooth identity and Bluetooth stack results from inside
@@ -13,9 +12,8 @@ import asia.nana7mi.arirang.hook.core.HookPackageParam
 class FuckBluetooth : BaseHookModule(
     targetPackages = setOf("com.android.bluetooth", "com.google.android.bluetooth")
 ) {
-    private val configStore = BluetoothConfigStore()
-    private val adapterHooks = BluetoothAdapterHooks(::currentConfig)
-    private val scanHooks = BluetoothScanHooks(::currentConfig)
+    private val adapterHooks = BluetoothAdapterHooks()
+    private val scanHooks = BluetoothScanHooks()
 
     override fun isEnabled(): Boolean = currentConfig().enabled
 
@@ -40,7 +38,5 @@ class FuckBluetooth : BaseHookModule(
         }
     }
 
-    private fun currentConfig(): BluetoothHookConfig {
-        return configStore.current()
-    }
+    private fun currentConfig(): BluetoothHookConfig = BluetoothConfig.current()
 }

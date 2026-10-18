@@ -3,12 +3,12 @@ package asia.nana7mi.arirang.hook.systemsetting
 import android.content.res.Configuration
 import android.os.LocaleList
 import asia.nana7mi.arirang.data.datastore.SystemSettingPrefs
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.core.HookCallback
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookCallback
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 
 /**
  * Reports a configured per-application locale from system_server.
@@ -34,7 +34,7 @@ import asia.nana7mi.arirang.hook.core.HookPackageParam
  */
 class FuckAppLocale : BaseHookModule(matchSystem = true) {
 
-    private val config = SystemSettingHookConfigFile.create()
+
 
     override fun onHook(param: HookPackageParam) {
         val classLoader = param.classLoader
@@ -71,8 +71,9 @@ class FuckAppLocale : BaseHookModule(matchSystem = true) {
             "updateConfigIfNeeded",
             afterHookedMethod {
                 if (hasThrowable()) return@afterHookedMethod
+                val config = SystemSettingConfig.enabled.currentOrNull() ?: return@afterHookedMethod
                 val packageName = args.getOrNull(2) as? String ?: return@afterHookedMethod
-                val locales = resolveLocales(packageName) ?: return@afterHookedMethod
+                val locales = resolveLocales(config, packageName) ?: return@afterHookedMethod
                 val container = args.getOrNull(0) ?: return@afterHookedMethod
                 if (!applyLocalesToContainer(container, locales)) {
                     HookLog.w(
@@ -94,8 +95,9 @@ class FuckAppLocale : BaseHookModule(matchSystem = true) {
             "findPackageConfiguration",
             afterHookedMethod {
                 if (hasThrowable()) return@afterHookedMethod
+                val config = SystemSettingConfig.enabled.currentOrNull() ?: return@afterHookedMethod
                 val packageName = args.firstOrNull() as? String ?: return@afterHookedMethod
-                val locales = resolveLocales(packageName) ?: return@afterHookedMethod
+                val locales = resolveLocales(config, packageName) ?: return@afterHookedMethod
                 val packageConfigClass = HookBridge.findClassIfExists(
                     PACKAGE_CONFIG_CLASS,
                     classLoader
@@ -136,8 +138,9 @@ class FuckAppLocale : BaseHookModule(matchSystem = true) {
 
     private fun localeQueryHook(): HookCallback = afterHookedMethod {
         if (hasThrowable()) return@afterHookedMethod
+        val config = SystemSettingConfig.enabled.currentOrNull() ?: return@afterHookedMethod
         val packageName = args.firstOrNull() as? String ?: return@afterHookedMethod
-        val locales = resolveLocales(packageName) ?: return@afterHookedMethod
+        val locales = resolveLocales(config, packageName) ?: return@afterHookedMethod
         result = locales
         HookLog.d(HookLog.Module.CORE, "reported locale query for $packageName")
     }
@@ -146,9 +149,7 @@ class FuckAppLocale : BaseHookModule(matchSystem = true) {
      * Resolved [LocaleList] for [packageName], or null when this package must
      * keep the real locale (feature off, package exempt, or empty tag).
      */
-    private fun resolveLocales(packageName: String): LocaleList? {
-        val current = config.current()
-        if (!current.enabled) return null
+    private fun resolveLocales(current: SystemSettingPrefs.Config, packageName: String): LocaleList? {
         val resolved = SystemSettingPrefs.resolveFor(current, packageName)
         if (!resolved.enabled) return null
         val languageTag = resolved.languageTag.takeIf { it.isNotEmpty() } ?: return null

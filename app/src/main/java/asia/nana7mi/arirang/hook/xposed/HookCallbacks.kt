@@ -1,4 +1,4 @@
-package asia.nana7mi.arirang.hook.core
+package asia.nana7mi.arirang.hook.xposed
 
 import java.lang.reflect.Executable
 

@@ -7,53 +7,48 @@ import android.content.pm.ProviderInfo
 import android.content.pm.ResolveInfo
 import android.os.Binder
 import android.util.ArrayMap
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.HookCallback
-import asia.nana7mi.arirang.hook.core.HookPackageParam
-import asia.nana7mi.arirang.hook.core.MethodHookParam
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookCallback
+import asia.nana7mi.arirang.hook.api.HookPackageParam
+import asia.nana7mi.arirang.hook.xposed.MethodHookParam
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import asia.nana7mi.arirang.hook.target.Targets
+import asia.nana7mi.arirang.hook.caller.Callers
+
+private const val PACKAGE_SERVICE_NAME = "package"
 
 class FuckPackageList : BaseHookModule(matchSystem = true) {
-    private val config = PackageListHookConfig("clipboard_visibility_prefs")
+    // clipboard_visibility_prefs is MODE_PRIVATE, so another process cannot read it and
+    // isEnabled() cannot be answered before the bind completes.
+    override val installsBeforeConfigIsKnown: Boolean = true
+
+    /**
+     * The current visibility state.
+     *
+     * A read refreshes on the config's own cadence, so the ten hook sites no longer have to call
+     * `loadIfUpdated()` first — and cannot forget to.
+     */
+    private val config: PackageListState
+        get() = PackageListConfig.current()
 
     override fun isEnabled(): Boolean {
-        config.loadIfUpdated()
         return config.enabled
     }
 
     override fun onHook(param: HookPackageParam) {
         runCatching {
-            val smClass = HookBridge.findClassIfExists("android.os.ServiceManager", param.classLoader)
-                ?: throw ClassNotFoundException("ServiceManager not found")
-
-            // Find addService method
-            val addServiceMethod = smClass.declaredMethods.find {
-                it.name == "addService" &&
-                    it.parameterTypes.size >= 2 &&
-                    it.parameterTypes[0] == String::class.java
-            } ?: throw NoSuchMethodException("addService not found")
-
-            HookLog.d(HookLog.Module.PACKAGE_LIST, "hooking ServiceManager.addService")
-
-            HookBridge.hookMethod(addServiceMethod, beforeHookedMethod {
-                if (args.getOrNull(0) == "package") {
-                    val binder = args.getOrNull(1) ?: return@beforeHookedMethod
-                    val pmClass = binder.javaClass
-                    HookLog.d(HookLog.Module.PACKAGE_LIST, "package manager service registered; hooking methods")
-                    hookPackageManagerService(pmClass)
-                }
-            })
-
-            HookLog.i(HookLog.Module.PACKAGE_LIST, "ServiceManager hook installed successfully")
-
+            Targets.onServiceClassPublished(PACKAGE_SERVICE_NAME) { binder ->
+                HookLog.d(HookLog.Module.PACKAGE_LIST, "package manager service registered; hooking methods")
+                hookPackageManagerService(binder.javaClass)
+            }
             hookPmsInternals(param.classLoader)
         }.onFailure {
-            HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to install ServiceManager hook", it)
+            HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to install package-manager hooks", it)
         }
     }
 
@@ -136,9 +131,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     private fun MethodHookParam.hideTargetForCaller() {
         if (isInternalCall.get() == true) return
         val callingUid = args.getOrNull(1) as? Int ?: return
-        if (callingUid.appId() < 10000) return
-        config.loadIfUpdated()
-        if (!config.enabled) return
+        if (Callers.isPlatform(callingUid)) return
+        val config = PackageListConfig.enabled.currentOrNull() ?: return
         val targetPackage = extractPackageStateName(args.getOrNull(0)) ?: return
         val callingPackages = resolveCallingPackages(this.thisObject, callingUid)
         if (!config.shouldKeepForPackages(callingUid, callingPackages, targetPackage)) {
@@ -154,9 +148,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
     private fun MethodHookParam.filterPackageStatesMap() {
         if (isInternalCall.get() == true) return
         val callingUid = Binder.getCallingUid()
-        if (callingUid.appId() < 10000) return
-        config.loadIfUpdated()
-        if (!config.enabled) return
+        if (Callers.isPlatform(callingUid)) return
+        val config = PackageListConfig.enabled.currentOrNull() ?: return
         val states = result as? ArrayMap<*, *> ?: return
         val callingPackages = resolveCallingPackages(this.thisObject, callingUid)
 
@@ -200,7 +193,7 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
      */
     private fun resolveCallingPackages(pmObject: Any?, uid: Int): Set<String> {
         if (pmObject == null || uid <= 0) return emptySet()
-        val version = config.version
+        val version = PackageListConfig.store.version()
         if (cachedConfigVersion != version) {
             cachedConfigVersion = version
             callingPackagesCache.clear()
@@ -231,19 +224,6 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         }
     }
 
-    private fun findDeclaringClass(clazz: Class<*>, methodName: String, vararg parameterTypes: Class<*>): Class<*>? {
-        var current: Class<*>? = clazz
-        while (current != null && current != Any::class.java) {
-            try {
-                current.getDeclaredMethod(methodName, *parameterTypes)
-                return current
-            } catch (e: NoSuchMethodException) {
-                current = current.superclass
-            }
-        }
-        return null
-    }
-
     private fun hookMethodIfExists(
         pmClass: Class<*>,
         methodName: String,
@@ -254,14 +234,19 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             .map { it as Class<*> }
             .toTypedArray()
         
-        val declaringClass = findDeclaringClass(pmClass, methodName, *parameterTypes)
-        if (declaringClass == null) {
+        // findAndHookMethod walks the hierarchy itself, so the only thing to establish here is
+        // whether there is anything to hook at all — worth a warning, since a renamed framework
+        // method silently stops being filtered otherwise.
+        val present = HookBridge.findMethodInHierarchy(pmClass) { method ->
+            method.name == methodName && method.parameterTypes.contentEquals(parameterTypes)
+        } != null
+        if (!present) {
             HookLog.w(HookLog.Module.PACKAGE_LIST, "method $methodName not found")
             return
         }
-        
+
         runCatching {
-            HookBridge.findAndHookMethod(declaringClass, methodName, *parameterTypesAndCallback)
+            HookBridge.findAndHookMethod(pmClass, methodName, *parameterTypesAndCallback)
             HookLog.d(HookLog.Module.PACKAGE_LIST, "hooked $methodName")
         }.onFailure {
             HookLog.e(HookLog.Module.PACKAGE_LIST, "failed to hook $methodName", it)
@@ -315,9 +300,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     if (isInternalCall.get() == true) return@beforeHookedMethod
                     val packageName = args[0] as? String ?: return@beforeHookedMethod
                     val callingUid = Binder.getCallingUid()
-                    if (callingUid.appId() < 10000) return@beforeHookedMethod
-                    config.loadIfUpdated()
-                    if (!config.enabled) return@beforeHookedMethod
+                    if (Callers.isPlatform(callingUid)) return@beforeHookedMethod
+                    val config = PackageListConfig.enabled.currentOrNull() ?: return@beforeHookedMethod
 
                     val callingPackages = getPackagesForUid(this.thisObject, callingUid)
                     if (!config.shouldKeepForPackages(callingUid, callingPackages, packageName)) {
@@ -410,9 +394,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     if (isInternalCall.get() == true) return@afterHookedMethod
                     val pkgs = result as? Array<*> ?: return@afterHookedMethod
                     val callingUid = Binder.getCallingUid()
-                    if (callingUid.appId() < 10000) return@afterHookedMethod
-                    config.loadIfUpdated()
-                    if (!config.enabled) return@afterHookedMethod
+                    if (Callers.isPlatform(callingUid)) return@afterHookedMethod
+                    val config = PackageListConfig.enabled.currentOrNull() ?: return@afterHookedMethod
 
                     val targetUid = args[0] as Int
                     val targetPackages = pkgs.mapNotNull { it as? String }.toSet()
@@ -453,9 +436,8 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
                     val targetUid = args[0] as Int
                     val name = result as? String ?: return@afterHookedMethod
                     val callingUid = Binder.getCallingUid()
-                    if (callingUid.appId() < 10000 || targetUid == callingUid) return@afterHookedMethod
-                    config.loadIfUpdated()
-                    if (!config.enabled) return@afterHookedMethod
+                    if (Callers.isPlatform(callingUid) || targetUid == callingUid) return@afterHookedMethod
+                    val config = PackageListConfig.enabled.currentOrNull() ?: return@afterHookedMethod
 
                     val targetPackages = getPackagesForUid(this.thisObject, targetUid)
                     val callingPackages = getPackagesForUid(this.thisObject, callingUid)
@@ -513,10 +495,9 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
             val list = HookBridge.callMethod(parceledListSlice, "getList") as? List<*> ?: return
 
             val callingUid = Binder.getCallingUid()
-            if (callingUid.appId() < 10000) return
+            if (Callers.isPlatform(callingUid)) return
 
-            config.loadIfUpdated()
-            if (!config.enabled) return
+            val config = PackageListConfig.enabled.currentOrNull() ?: return
 
             val callingPackages = getPackagesForUid(param.thisObject, callingUid)
             var filteredCount = 0
@@ -538,7 +519,6 @@ class FuckPackageList : BaseHookModule(matchSystem = true) {
         }
     }
 
-    private fun Int.appId(): Int = Math.floorMod(this, 100_000)
 
     private companion object {
         private const val CALLING_PACKAGES_CACHE_CAP = 32

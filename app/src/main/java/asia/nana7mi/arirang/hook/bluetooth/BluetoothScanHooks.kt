@@ -1,14 +1,11 @@
 package asia.nana7mi.arirang.hook.bluetooth
 
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
+import asia.nana7mi.arirang.hook.xposed.HookBridge
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
-internal class BluetoothScanHooks(
-    private val currentConfig: () -> BluetoothHookConfig
-) {
+internal class BluetoothScanHooks {
     private val hookedClasses = Collections.newSetFromMap(WeakHashMap<Class<*>, Boolean>())
     private val nextProfile = AtomicInteger()
 
@@ -31,14 +28,12 @@ internal class BluetoothScanHooks(
             scanControllerClass.declaredMethods.forEach { method ->
                 if (method.name == "onScanResult" && method.isKnownControllerScanResult()
                 ) {
-                    HookBridge.hookMethod(method, beforeHookedMethod {
-                        val config = currentConfig()
-                        if (!config.enabled || config.unchangedScanResults) return@beforeHookedMethod
+                    HookBridge.hookMethod(method, BluetoothConfig.scanResults.before { config ->
                         if (config.hideScanResults) {
                             result = null
-                            return@beforeHookedMethod
+                            return@before
                         }
-                        if (config.scanResults.isEmpty()) return@beforeHookedMethod
+                        if (config.scanResults.isEmpty()) return@before
                         val profile = config.scanResults[
                             Math.floorMod(nextProfile.getAndIncrement(), config.scanResults.size)
                         ]
@@ -51,9 +46,7 @@ internal class BluetoothScanHooks(
                     method.returnType == Void.TYPE &&
                     method.parameterTypes.size >= 3
                 ) {
-                    HookBridge.hookMethod(method, beforeHookedMethod {
-                        val config = currentConfig()
-                        if (!config.enabled || config.unchangedScanResults || !config.hideScanResults) return@beforeHookedMethod
+                    HookBridge.hookMethod(method, BluetoothConfig.scanResultsOnlyWhenHidden.before {
                         result = null
                     })
                 }
@@ -74,9 +67,7 @@ internal class BluetoothScanHooks(
                 method.returnType == Void.TYPE &&
                 method.parameterTypes.size == 2
             ) {
-                HookBridge.hookMethod(method, beforeHookedMethod {
-                    val config = currentConfig()
-                    if (!config.enabled || config.unchangedScanResults || !config.hideScanResults) return@beforeHookedMethod
+                HookBridge.hookMethod(method, BluetoothConfig.scanResultsOnlyWhenHidden.before {
                     result = null
                 })
             }

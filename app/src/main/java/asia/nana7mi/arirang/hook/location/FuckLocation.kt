@@ -1,7 +1,5 @@
 package asia.nana7mi.arirang.hook.location
 
-import android.app.Application
-import android.content.Context
 import android.location.Location
 import android.location.LocationManager
 import android.os.Binder
@@ -11,24 +9,38 @@ import android.os.IInterface
 import android.os.Looper
 import android.os.SystemClock
 import asia.nana7mi.arirang.BuildConfig
-import asia.nana7mi.arirang.data.config.ConfigIds
-import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
-import asia.nana7mi.arirang.hook.core.ArirangClient
-import asia.nana7mi.arirang.hook.core.BaseHookModule
-import asia.nana7mi.arirang.hook.core.HookBridge
-import asia.nana7mi.arirang.hook.core.HookConfigFile
-import asia.nana7mi.arirang.hook.core.HookLog
-import asia.nana7mi.arirang.hook.core.afterHookedMethod
-import asia.nana7mi.arirang.hook.core.beforeHookedMethod
-import asia.nana7mi.arirang.hook.core.hookedMethod
+import asia.nana7mi.arirang.hook.ipc.ArirangClient
+import asia.nana7mi.arirang.hook.api.BaseHookModule
+import asia.nana7mi.arirang.hook.xposed.HookBridge
+import asia.nana7mi.arirang.hook.xposed.HookLog
+import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
+import asia.nana7mi.arirang.hook.xposed.beforeHookedMethod
+import asia.nana7mi.arirang.hook.xposed.hookedMethod
 import asia.nana7mi.arirang.hook.util.getFieldValue
-import asia.nana7mi.arirang.hook.core.HookPackageParam
+import asia.nana7mi.arirang.hook.api.HookPackageParam
 import java.lang.ref.WeakReference
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
+import asia.nana7mi.arirang.hook.target.Targets
+import asia.nana7mi.arirang.hook.caller.Callers
+
+/**
+ * The provider named in a hooked call's arguments, defaulting to GPS.
+ *
+ * Kept here rather than in [asia.nana7mi.arirang.hook.caller.Callers]: this is the *provider*
+ * dimension of a call, not the caller's identity.
+ */
+private fun providerFromArgs(args: Array<Any?>): String {
+    return args.firstOrNull {
+        it == LocationManager.GPS_PROVIDER ||
+            it == LocationManager.NETWORK_PROVIDER ||
+            it == LocationManager.FUSED_PROVIDER
+    } as? String
+        ?: LocationManager.GPS_PROVIDER
+}
 
 class FuckLocation : BaseHookModule(
     targetPackages = setOf(
@@ -72,30 +84,7 @@ class FuckLocation : BaseHookModule(
         Collections.newSetFromMap(WeakHashMap<IBinder, Boolean>())
     )
 
-    @Volatile
-    private var gmsContext: Context? = null
-
-    private val configFile = HookConfigFile(
-        configName = ConfigIds.LOCATION,
-        prefsName = LocationConfigPrefs.PREFS_NAME,
-        defaultValue = LocationHookConfig(),
-        refreshIntervalMs = CONFIG_REFRESH_INTERVAL_MS,
-        readRealtimeSnapshot = { force ->
-            val context = gmsContext
-            ArirangClient.readConfigSnapshot(
-                configName = ConfigIds.LOCATION,
-                force = force,
-                allowBind = true,
-                bindContext = context,
-                bindCurrentUser = context != null,
-                logName = "location"
-            )
-        },
-        parseRealtimeSnapshot = LocationHookConfigParser::parseSnapshot,
-        readStoredConfig = LocationHookConfigParser::readStored
-    )
-
-    override fun isEnabled(): Boolean = currentConfig().enabled
+    override fun isEnabled(): Boolean = LocationConfig.current().enabled
 
     override fun onHook(param: HookPackageParam) {
         runCatching {
@@ -112,7 +101,7 @@ class FuckLocation : BaseHookModule(
                     hookFrameworkLocationResult(param.classLoader)
                 }
                 "com.google.android.gms" -> {
-                    hookApplicationContext(param.classLoader)
+                    hookApplicationContext()
                     hookGmsReceiverBinding(param.classLoader)
                     hookLocationAccessors()
                     hookFrameworkLocationManagerClient(param.classLoader)
@@ -130,16 +119,10 @@ class FuckLocation : BaseHookModule(
         }
     }
 
-    private fun hookApplicationContext(classLoader: ClassLoader) {
-        val applicationClass = HookBridge.findClassIfExists("android.app.Application", classLoader)
-            ?: Application::class.java
-        if (!hookedClasses.add(applicationClass)) return
-
-        HookBridge.hookAllMethods(applicationClass, "onCreate", afterHookedMethod {
-            val app = thisObject as? Application ?: return@afterHookedMethod
-            gmsContext = app.applicationContext
-            ArirangClient.autoBindCurrentUser(app)
-        })
+    private fun hookApplicationContext() {
+        Targets.onApplicationContext { context ->
+            ArirangClient.autoBindCurrentUser(context)
+        }
     }
 
     /**
@@ -170,7 +153,7 @@ class FuckLocation : BaseHookModule(
 
     private fun captureReceiverBinding(holder: Any?) {
         holder ?: return
-        val pkg = LocationCallerResolver.packageNameFromObject(holder) ?: callingPackageForBinding()
+        val pkg = Callers.fromObject(holder) ?: callingPackageForBinding()
 
         // 1) 绑定所有投递 binder（ILocationCallback / ILocationListener / IFusedLocationProviderCallback）。
         var current: Class<*>? = holder.javaClass
@@ -461,7 +444,7 @@ class FuckLocation : BaseHookModule(
      * 若构造发生在 GMS 内部（无事务上下文），则回退为 GMS 自身，放弃归属（保持默认档）。
      */
     private fun callingPackageForBinding(): String? {
-        val pkg = LocationCallerResolver.packageNameForUid(Binder.getCallingUid()) ?: return null
+        val pkg = Callers.packageFor(Binder.getCallingUid()) ?: return null
         return pkg.takeIf { it != "com.google.android.gms" && it != "android" }
     }
 
@@ -508,13 +491,10 @@ class FuckLocation : BaseHookModule(
     }
 
     private val profiles = LocationProfileResolver(
-        currentConfig = ::currentConfig,
+        currentConfig = { LocationConfig.current() },
         activeDeliveryPackage = { activeDeliveryPackage.get() }
     )
 
-    private fun currentConfig(): LocationHookConfig {
-        return configFile.current()
-    }
 
 
     private fun hookLocationAccessors() {
@@ -588,23 +568,23 @@ class FuckLocation : BaseHookModule(
 
         HookBridge.hookAllMethods(lmsClass, "getLastLocation", afterHookedMethod {
             val profile = profiles.forArgs(args) ?: return@afterHookedMethod
-            val provider = LocationCallerResolver.providerFromArgs(args)
+            val provider = providerFromArgs(args)
             result = fakeLocation(profile, provider)
             HookLog.d(
                 HookLog.Module.LOCATION,
-                "spoofed getLastLocation provider=$provider caller=${LocationCallerResolver.callerFromArgs(args)}"
+                "spoofed getLastLocation provider=$provider caller=${Callers.fromArgs(args)}"
             )
         })
 
         HookBridge.hookAllMethods(lmsClass, "getCurrentLocation", beforeHookedMethod {
             val profile = profiles.forArgs(args) ?: return@beforeHookedMethod
             val callback = args.firstOrNull { it?.javaClass?.hasLocationCallbackMethod() == true } ?: return@beforeHookedMethod
-            val location = fakeLocation(profile, LocationCallerResolver.providerFromArgs(args))
+            val location = fakeLocation(profile, providerFromArgs(args))
             if (callback.dispatchLocation(location)) {
                 result = null
                 HookLog.d(
                     HookLog.Module.LOCATION,
-                    "spoofed getCurrentLocation provider=${location.provider} caller=${LocationCallerResolver.callerFromArgs(args)}"
+                    "spoofed getCurrentLocation provider=${location.provider} caller=${Callers.fromArgs(args)}"
                 )
             }
         })
@@ -626,9 +606,9 @@ class FuckLocation : BaseHookModule(
                 },
                 after = {
                     val profile = profiles.forArgs(args) ?: return@hookedMethod
-                    val provider = LocationCallerResolver.providerFromArgs(args)
-                    val pkg = LocationCallerResolver.callerFromArgs(args)
-                        ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+                    val provider = providerFromArgs(args)
+                    val pkg = Callers.fromArgs(args)
+                        ?: Callers.packageFor(Binder.getCallingUid())
                     args.forEach { arg ->
                         if (isLocationDeliveryTarget(arg)) {
                             scheduleProactiveUpdateDelivery(arg, profile, provider, pkg)
@@ -648,12 +628,12 @@ class FuckLocation : BaseHookModule(
             HookBridge.hookAllConstructors(receiverClass, afterHookedMethod {
                 val profile = profiles.forReceiver(thisObject)
                     ?: profiles.forArgs(args)
-                    ?: profiles.forPackage(LocationCallerResolver.packageNameForUid(Binder.getCallingUid()))
+                    ?: profiles.forPackage(Callers.packageFor(Binder.getCallingUid()))
                     ?: return@afterHookedMethod
-                val provider = LocationCallerResolver.providerFromArgs(args)
-                val pkg = LocationCallerResolver.packageNameFromObject(thisObject)
-                    ?: LocationCallerResolver.callerFromArgs(args)
-                    ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+                val provider = providerFromArgs(args)
+                val pkg = Callers.fromObject(thisObject)
+                    ?: Callers.fromArgs(args)
+                    ?: Callers.packageFor(Binder.getCallingUid())
                 // Receiver 构造后立即 + 延迟各投一次：部分版本字段在构造末尾才写完。
                 scheduleProactiveUpdateDelivery(thisObject, profile, provider, pkg)
                 val receiverRef = WeakReference(thisObject)
@@ -689,7 +669,7 @@ class FuckLocation : BaseHookModule(
                                 arg == null && method.parameterTypes[index] == Location::class.java -> {
                                     args[index] = fakeLocation(
                                         profile,
-                                        LocationCallerResolver.providerFromArgs(args)
+                                        providerFromArgs(args)
                                     )
                                 }
                                 else -> args[index] = rewriteLocationContainer(arg, profile)
@@ -697,7 +677,7 @@ class FuckLocation : BaseHookModule(
                         }
                         HookLog.d(
                             HookLog.Module.LOCATION,
-                            "rewrote receiver delivery for ${LocationCallerResolver.packageNameFromObject(thisObject)} via ${method.name}"
+                            "rewrote receiver delivery for ${Callers.fromObject(thisObject)} via ${method.name}"
                         )
                     })
                 }
@@ -790,7 +770,7 @@ class FuckLocation : BaseHookModule(
                             target = thisObject,
                             profile = profile,
                             provider = provider,
-                            packageName = LocationCallerResolver.packageNameFromObject(thisObject)
+                            packageName = Callers.fromObject(thisObject)
                         )
                     })
                 }
@@ -1087,8 +1067,8 @@ class FuckLocation : BaseHookModule(
                 },
                 after = {
                     val profile = profiles.forArgs(args) ?: profiles.forCurrentCaller() ?: return@hookedMethod
-                    val pkg = LocationCallerResolver.callerFromArgs(args)
-                        ?: LocationCallerResolver.packageNameForUid(Binder.getCallingUid())
+                    val pkg = Callers.fromArgs(args)
+                        ?: Callers.packageFor(Binder.getCallingUid())
                     args.forEach { arg ->
                         if (isLocationDeliveryTarget(arg)) {
                             scheduleProactiveUpdateDelivery(

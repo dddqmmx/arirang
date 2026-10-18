@@ -1,7 +1,7 @@
 package asia.nana7mi.arirang.hook.gms
 
 import android.os.Binder
-import asia.nana7mi.arirang.hook.core.HookLog
+import asia.nana7mi.arirang.hook.xposed.HookLog
 import java.lang.reflect.Method
 
 internal fun Class<*>.findOnTransactClass(): Class<*>? {
@@ -10,17 +10,6 @@ internal fun Class<*>.findOnTransactClass(): Class<*>? {
         if (current.declaredMethods.any { it.name == "onTransact" }) {
             return current
         }
-        current = current.superclass
-    }
-    return null
-}
-
-internal fun Class<*>.findDeclaredMethodInHierarchy(
-    predicate: (Method) -> Boolean
-): Method? {
-    var current: Class<*>? = this
-    while (current != null && current != Any::class.java) {
-        current.declaredMethods.firstOrNull(predicate)?.let { return it }
         current = current.superclass
     }
     return null
