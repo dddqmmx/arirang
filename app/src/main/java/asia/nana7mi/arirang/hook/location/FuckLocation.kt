@@ -51,7 +51,6 @@ class FuckLocation : BaseHookModule(
 ) {
 
     private companion object {
-        private const val CONFIG_REFRESH_INTERVAL_MS = 300L
         private const val STATUS_DELIVERY_DEDUP_WINDOW_MS = 1_000L
         private const val PROACTIVE_UPDATES_DELAY_MS = 200L
         private const val PROACTIVE_UPDATES_DEDUP_WINDOW_MS = 2_000L

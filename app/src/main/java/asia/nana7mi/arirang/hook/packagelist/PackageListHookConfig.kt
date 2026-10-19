@@ -44,7 +44,6 @@ internal data class PackageListState(
     val templates: Map<String, Template> = emptyMap(),
     val appRules: Map<String, AppRule> = emptyMap(),
     val resolvedTemplates: Map<String, ResolvedTemplate> = emptyMap(),
-    val timestamp: Long = INITIAL_TIMESTAMP
 ) {
 
     fun shouldKeepForPackages(
@@ -144,7 +143,6 @@ private fun decode(values: ConfigValues): PackageListState? {
         templates = templates,
         appRules = parseAppRules(values.jsonArray(KEY_APP_RULES, KEY_APP_RULES_LEGACY)),
         resolvedTemplates = templates.keys.associateWith { resolveTemplate(it, templates) },
-        timestamp = values.long(KEY_LAST_MODIFIED, KEY_LAST_MODIFIED_LEGACY) ?: INITIAL_TIMESTAMP,
     )
 }
 
@@ -209,13 +207,11 @@ private fun JSONArray?.asStringSet(): Set<String> {
 }
 
 private const val KEY_ENABLED = "enabled"
-private const val KEY_LAST_MODIFIED = "lastModified"
 private const val KEY_DEFAULT_MODE = "defaultMode"
 private const val KEY_DEFAULT_TEMPLATE_ID = "defaultTemplateId"
 private const val KEY_TEMPLATES = "templates"
 private const val KEY_APP_RULES = "appRules"
 
-private const val KEY_LAST_MODIFIED_LEGACY = "last_modified"
 private const val KEY_DEFAULT_MODE_LEGACY = "default_display_mode"
 private const val KEY_DEFAULT_TEMPLATE_ID_LEGACY = "default_template_id"
 private const val KEY_TEMPLATES_LEGACY = "visibility_templates"
@@ -229,6 +225,5 @@ private const val MODE_CUSTOM = "CUSTOM"
 private const val MODE_WHITELIST = "WHITELIST"
 private const val MODE_BLACKLIST = "BLACKLIST"
 
-private const val INITIAL_TIMESTAMP = -1L
 private const val PER_USER_RANGE = 100_000
 private const val FIRST_APPLICATION_UID = 10_000

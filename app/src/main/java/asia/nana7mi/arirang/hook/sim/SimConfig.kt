@@ -62,7 +62,10 @@ private fun decode(values: ConfigValues): SimHookConfig? {
             profiles.ifEmpty { SimHookDefaults.PROFILES_BY_SLOT }
         ),
         uniqueIdentifiers = UniqueIdentifierHookConfig(
-            enabled = values.boolean("enabled") != false,
+            // The unique-identifier config's own switch, decoded by its projection below — not
+            // the SIM config's `enabled`, which used to gate IMEI/TAC rewriting by accident and
+            // left the unique-identifier switch unable to turn it off.
+            enabled = UniqueIdentifierConfig.current().enabled,
             imeiBySlot = UniqueIdentifierConfig.imeiBySlot.current(),
             tacBySlot = UniqueIdentifierConfig.tacBySlot.current(),
         ),

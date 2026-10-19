@@ -121,17 +121,21 @@ internal fun PackageListConfigScreen(onBack: () -> Unit) {
     val customLabel = stringResource(R.string.display_custom)
 
     // Order matters: index 0/1 are the two fixed modes, then one entry per
-    // template, then "new template" last.
+    // selectable template, then "new template" last. The selection below maps the
+    // same list back to a template, so anything skipped here has to be skipped
+    // there too or the dropdown selects its neighbour.
+    val selectableTemplates = config.templates.filter { it.name.isNotBlank() }
     val defaultOptions = buildList {
         add(allVisibleLabel)
         add(allHiddenLabel)
-        addAll(config.templates.mapNotNull { it.name.takeIf { name -> name.isNotBlank() } })
+        addAll(selectableTemplates.map { it.name })
         add(newTemplateLabel)
     }
     val defaultSelectedLabel = when (config.defaultMode) {
         DisplayMode.ALL_HIDDEN -> allHiddenLabel
         DisplayMode.TEMPLATE ->
-            config.templates.firstOrNull { it.id.isNotBlank() && it.id == config.defaultTemplateId }?.name ?: allVisibleLabel
+            selectableTemplates.firstOrNull { it.id == config.defaultTemplateId }?.name
+                ?: allVisibleLabel
         else -> allVisibleLabel
     }
 
@@ -214,7 +218,7 @@ internal fun PackageListConfigScreen(onBack: () -> Unit) {
                                     defaultOptions.lastIndex ->
                                         creatingTemplateFor = TemplateDestination.AsDefault
 
-                                    else -> config.templates.getOrNull(index - 2)?.let { template ->
+                                    else -> selectableTemplates.getOrNull(index - 2)?.let { template ->
                                         PackageVisibilityPrefs.setDefaultSelection(
                                             context, DisplayMode.TEMPLATE, template.id
                                         )

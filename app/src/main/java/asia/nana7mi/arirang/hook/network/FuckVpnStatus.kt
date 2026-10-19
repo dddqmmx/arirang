@@ -34,14 +34,14 @@ private const val CONNECTIVITY_SERVICE_CLASS = "com.android.server.ConnectivityS
 
 class FuckVpnStatus : BaseHookModule(matchSystem = true) {
 
-    
-
     override fun onHook(param: HookPackageParam) {
         Targets.onServiceClassPublished(CONNECTIVITY_SERVICE_NAME) { binder ->
             installConnectivityHooks(binder.javaClass)
         }
 
-        // The class can also be reachable before the service is published.
+        // The class can also be reachable before the service is published. This is the
+        // fallback path: when the lookup succeeds it installs first, and the binder path below
+        // then finds the hooks already in place and does nothing.
         HookBridge.findClassIfExists(CONNECTIVITY_SERVICE_CLASS, param.classLoader)
             ?.let(::installConnectivityHooks)
     }
@@ -102,13 +102,10 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
      * platform uid.
      */
     private fun deliveredCallerGoverned(param: MethodHookParam, config: VpnHookConfig): Boolean {
-        val raw = when (param.args.size) {
-            // Android 14+ (6 args): (nc, includeLocationSensitiveInfo, callingPid, callingUid, …)
-            6 -> param.args.getOrNull(3)
-            // Android 12-13 (5 args): (nc, callerPid, callerUid, …)
-            5 -> param.args.getOrNull(2)
-            else -> param.args.getOrNull(3) ?: param.args.getOrNull(2)
-        }
+        // Both shapes name the caller after a pid: (nc, <permission flag>, callingPid,
+        // callingUid, …). Reading args[2] instead would take the *pid* as a uid and never
+        // match the destined app.
+        val raw = param.args.getOrNull(3) ?: return false
         val callerUid = (raw as? Number)?.toInt() ?: return false
         return governs(callerUid, config)
     }
@@ -128,7 +125,6 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         }
 
         HookBridge.hookAllMethods(service, "getNetworkCapabilities", hook)
-        HookBridge.hookAllMethods(service, "getDefaultNetworkCapabilitiesForUser", hook)
     }
 
     /**
@@ -166,7 +162,7 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
             // Hide VpnTransportInfo (API 30+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val info = HookBridge.getObjectField(copy, "mTransportInfo")
-                if (info != null && info.javaClass.name.contains("VpnTransportInfo")) {
+                if (info != null && info.javaClass.name.endsWith("VpnTransportInfo")) {
                     HookBridge.setObjectField(copy, "mTransportInfo", null)
                     changed = true
                 }
@@ -180,11 +176,12 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
                 changed = true
             }
 
-            // If removing VPN left no transports at all, ensure it reports at least WIFI
-            val hasRemainingTransport = copy.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                    copy.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                    copy.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-            if (!hasRemainingTransport) {
+            // If removing VPN left no transport at all, report WIFI so the capability is not
+            // conspicuously empty. Any remaining transport (Bluetooth, satellite, an OEM one)
+            // counts: adding WIFI beside it would invent a second, contradictory transport.
+            // This is reached for SPOOFED_TRANSPORT_UNCHANGED with nothing underneath the VPN,
+            // where "leave what was reported" would otherwise report nothing.
+            if (remainingTransportCount(copy) == 0) {
                 HookBridge.callMethod(copy, "addTransportType", NetworkCapabilities.TRANSPORT_WIFI)
                 changed = true
             }
@@ -195,12 +192,26 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         }.getOrNull()
     }
 
+    /**
+     * How many transports [capabilities] still reports.
+     *
+     * `getTransportTypes()` is not public SDK surface, so it is reached reflectively; the known
+     * transports are the fallback when it is missing.
+     */
+    private fun remainingTransportCount(capabilities: NetworkCapabilities): Int {
+        val transports = runCatching {
+            HookBridge.callMethod(capabilities, "getTransportTypes") as? IntArray
+        }.getOrNull()
+        if (transports != null) return transports.size
+        return KNOWN_TRANSPORTS.count(capabilities::hasTransport)
+    }
+
     private fun hasVpnTransportInfo(capabilities: NetworkCapabilities): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
         val info = runCatching {
             HookBridge.getObjectField(capabilities, "mTransportInfo")
         }.getOrNull() ?: return false
-        return info.javaClass.name.contains("VpnTransportInfo")
+        return info.javaClass.name.endsWith("VpnTransportInfo")
     }
 
     private fun substituteTransport(spoofedTransport: String): Int? = when (spoofedTransport) {
@@ -367,5 +378,16 @@ class FuckVpnStatus : BaseHookModule(matchSystem = true) {
         private const val TYPE_ETHERNET = 9
         private const val TYPE_VPN = 17
         private val VPN_INTERFACE_PREFIXES = listOf("tun", "ppp", "wg", "utun", "ipsec", "tap")
+
+        /** Transports the platform defines; the fallback for [remainingTransportCount]. */
+        private val KNOWN_TRANSPORTS = intArrayOf(
+            NetworkCapabilities.TRANSPORT_CELLULAR,
+            NetworkCapabilities.TRANSPORT_WIFI,
+            NetworkCapabilities.TRANSPORT_BLUETOOTH,
+            NetworkCapabilities.TRANSPORT_ETHERNET,
+            NetworkCapabilities.TRANSPORT_VPN,
+            NetworkCapabilities.TRANSPORT_WIFI_AWARE,
+            NetworkCapabilities.TRANSPORT_LOWPAN,
+        )
     }
 }

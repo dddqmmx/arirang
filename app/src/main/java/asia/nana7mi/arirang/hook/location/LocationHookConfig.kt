@@ -36,12 +36,12 @@ private const val REFRESH_INTERVAL_MS = 300L
  * `Application` is created, so before that point the snapshot source reports itself as unable to
  * bind — as the hand-written store did.
  *
- * The two sources disagree on exactly two things, and the decoder says both once: the top-level
- * `perPackage` object is spelled `per_package` in prefs, and the per-package profile's `enabled`
- * flag was defaulted **differently** by the two old decoders — `false` in the snapshot decoder
- * (matching `LocationProfileSchema` and `LocationConfigPrefs.Profile`, which both declare
- * `false`) and `true` in the prefs decoder. The models agree on `false`, so `false` is what they
- * mean, and the prefs path was the outlier.
+ * The two sources disagree on spelling: the top-level `perPackage` object is `per_package` in
+ * prefs, and a per-package profile's `enabled` flag was defaulted **differently** by the two old
+ * decoders — `false` in the snapshot decoder (matching `LocationProfileSchema`, which declares
+ * `false`) and `true` in the prefs decoder. Both writers always emit the key, so the default is
+ * only reachable for hand-edited JSON; `false` is kept because it is the schema's meaning and
+ * the safe answer when a profile does not say.
  */
 internal object LocationConfig : ConfigSpec<LocationHookConfig>(
     id = ConfigIds.LOCATION,
@@ -66,7 +66,9 @@ private fun decode(values: ConfigValues): LocationHookConfig? {
     return LocationHookConfig(
         enabled = enabled,
         defaultProfile = decodeProfile(values, enabledWhenAbsent = enabled),
-        perPackage = decodePerPackage(values.jsonObject("perPackage", "per_package")),
+        perPackage = decodePerPackage(
+            values.jsonObject("perPackage", "per_package", "package_profiles")
+        ),
     )
 }
 

@@ -18,9 +18,6 @@ import asia.nana7mi.arirang.hook.bluetooth.BluetoothConfig
 class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.providers.settings")) {
 
     private companion object {
-        private const val KEY_ENABLED = "enabled"
-        private const val KEY_ANDROID_ID = "android_id"
-        private const val REFRESH_INTERVAL_MS = 1_000L
         private val ALWAYS_ON_VPN_KEYS = setOf("always_on_vpn_app", "always_on_vpn_lockdown")
         private val ALWAYS_ON_VPN_BYPASS = setOf("com.android.settings", "com.android.systemui")
     }
@@ -111,6 +108,10 @@ class FuckSettingsProvider : BaseHookModule(targetPackages = setOf("com.android.
      * This module used to hold a second reader of the unique-identifier config and a second
      * reader of the Bluetooth one, each with its own refresh clock — so it and the owning module
      * were free to act on two different values of one config in one process.
+     *
+     * The two declared fields already carry the old readers' conditions — the feature being
+     * switched on and the value being non-blank — so they are used directly; routing them
+     * through the owning modules' callbacks would also apply those callbacks' caller tests.
      */
     private fun readAndroidIdFromConfig(): String? = UniqueIdentifierConfig.spoofedAndroidId.current()
 

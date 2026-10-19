@@ -31,8 +31,8 @@ internal class ConfigValues(private val values: Map<String, String>) {
 
     fun boolean(vararg keys: String): Boolean? = raw(*keys)?.trim()?.lowercase()?.let {
         when (it) {
-            "true", "1", "y", "yes", "on" -> true
-            "false", "0", "n", "no", "off" -> false
+            "true", "1", "y", "yes", "on", "enable", "enabled" -> true
+            "false", "0", "n", "no", "off", "disable", "disabled" -> false
             else -> null
         }
     }

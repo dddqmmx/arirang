@@ -67,7 +67,9 @@ private fun decode(raw: ConfigValues): Map<String, Boolean>? {
     raw.boolean(HookLog.ALL_KEY)?.let { switches[HookLog.ALL_KEY] = it }
     raw.boolean(HookLog.DEBUG_KEY)?.let { switches[HookLog.DEBUG_KEY] = it }
     HookLog.Module.entries.forEach { module ->
-        switches[module.key] = raw.boolean(module.key) ?: module.defaultEnabled
+        // Only a switch a source actually set goes in. Writing the module default here would
+        // shadow the `all` switch below, which then could never turn a module off.
+        raw.boolean(module.key)?.let { switches[module.key] = it }
         val debugKey = "${module.key}.${HookLog.DEBUG_SUFFIX}"
         raw.boolean(debugKey)?.let { switches[debugKey] = it }
     }

@@ -38,6 +38,17 @@ class ConfigValuesTest {
     }
 
     @Test
+    fun `the spellings the log-switch properties used still parse`() {
+        // `persist.arirang.log.*` values predate this reader and included "enabled"/"disabled";
+        // dropping them would silently ignore an operator's override.
+        val values = ConfigValues.of(mapOf("a" to "enabled", "b" to "disabled", "c" to "enable"))
+
+        assertEquals(true, values.boolean("a"))
+        assertEquals(false, values.boolean("b"))
+        assertEquals(true, values.boolean("c"))
+    }
+
+    @Test
     fun `numbers survive being carried as strings`() {
         val values = ConfigValues.of(mapOf("n" to "42", "f" to "42.0", "bad" to "x"))
 

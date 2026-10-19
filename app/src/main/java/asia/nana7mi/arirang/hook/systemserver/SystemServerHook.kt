@@ -13,12 +13,11 @@ import asia.nana7mi.arirang.hook.xposed.afterHookedMethod
 import asia.nana7mi.arirang.hook.api.HookPackageParam
 import asia.nana7mi.arirang.hook.target.Targets
 import asia.nana7mi.arirang.hook.bluetooth.BluetoothConfig
+import asia.nana7mi.arirang.hook.bluetooth.SPOOFED_LOCAL_MAC
 
 private const val BLUETOOTH_MANAGER_SERVICE_NAME = "bluetooth_manager"
 private const val BLUETOOTH_MANAGER_SERVICE_CLASS =
     "com.android.server.bluetooth.BluetoothManagerService"
-
-private const val SPOOFED_LOCAL_MAC = "02:00:00:AA:BB:CC"
 
 class SystemServerHook : BaseHookModule(matchSystem = true) {
     override fun onHook(param: HookPackageParam) {
@@ -98,13 +97,12 @@ class SystemServerHook : BaseHookModule(matchSystem = true) {
             val bmsClass = HookBridge.findClassIfExists(
                 BLUETOOTH_MANAGER_SERVICE_CLASS,
                 binder.javaClass.classLoader
-            ) ?: run {
-                HookLog.w(
-                    HookLog.Module.BLUETOOTH,
-                    "BluetoothManagerService not found via APEX classloader (binder=${binder.javaClass.name})"
-                )
-                return@onServiceClassPublished
-            }
+            ) ?: throw NoClassDefFoundError(
+                // Thrown rather than returned so Targets counts the install as failed and
+                // retries on the next discovery; a class that is not reachable yet must not
+                // make "installed" permanent.
+                "BluetoothManagerService not found via APEX classloader (binder=${binder.javaClass.name})"
+            )
             HookLog.i(HookLog.Module.BLUETOOTH, "Found ${bmsClass.name} via ServiceManager, hooking name/address...")
             hookBluetoothManagerService(bmsClass)
         }

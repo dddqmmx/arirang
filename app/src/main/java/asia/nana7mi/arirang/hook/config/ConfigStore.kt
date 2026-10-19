@@ -51,8 +51,16 @@ internal object Configs {
 
     private val caches = ConcurrentHashMap<String, ConfigCache>()
 
-    fun cacheFor(spec: ConfigSpec<*>): ConfigCache =
-        caches.computeIfAbsent(spec.id) { id -> ConfigCache(id, spec).also { it.warm() } }
+    fun cacheFor(spec: ConfigSpec<*>): ConfigCache {
+        caches[spec.id]?.let { return it }
+        val created = ConfigCache(spec.id, spec)
+        caches.putIfAbsent(spec.id, created)?.let { return it }
+        // Warmed outside the map: a decode can reach another spec's cache (the SIM projection
+        // reads the unique-identifier config), and computeIfAbsent must not update a mapping
+        // from inside its own mapping function.
+        created.warm()
+        return created
+    }
 }
 
 /**
@@ -150,11 +158,17 @@ internal class ConfigCache(
         try {
             val candidates = spec.sources.mapNotNull { source ->
                 runCatching { source.read(force)?.canonicalised(spec.canonicalKeys) }
-                    .onFailure {
-                        HookLog.d(
-                            spec.logModule,
-                            "config $id: source ${source.id} failed: ${it.message}"
-                        )
+                    .onFailure { failure ->
+                        // Logging reads the hook-log config, and this may be that config's own
+                        // first read: a spec warms while its object is still being initialised,
+                        // so a re-entrant read finds a null INSTANCE and throws. A dropped log
+                        // line is the right failure mode; a broken initialiser is not.
+                        runCatching {
+                            HookLog.d(
+                                spec.logModule,
+                                "config $id: source ${source.id} failed: ${failure.message}"
+                            )
+                        }
                     }
                     .getOrNull()
             }
@@ -191,6 +205,24 @@ internal class ConfigStoreImpl<T>(private val spec: ConfigSpec<T>) : ConfigStore
     @Volatile
     private var generation: Long = 0
 
+    /**
+     * The candidate list [cached] was decoded from.
+     *
+     * The cache hands back the same list instance until it re-reads its sources, so comparing
+     * identity makes a decoder that parses JSON — the package list's templates and rules, the
+     * SIM profiles — run once per refresh instead of once per hooked call.
+     */
+    @Volatile
+    private var decodedFrom: List<ConfigValues>? = null
+
+    /**
+     * The candidate [cached] was decoded from. A decoder may reject the first candidate the
+     * arbitration offers and settle on a later one, so a [field] read has to come from the
+     * same values, not from whatever the arbitration listed first.
+     */
+    @Volatile
+    private var accepted: ConfigValues? = null
+
     /** Decodes once at install, so a process answers with real config before its first hook. */
     fun warm() {
         decodeOnce(cache.candidates(force = false))
@@ -210,7 +242,9 @@ internal class ConfigStoreImpl<T>(private val spec: ConfigSpec<T>) : ConfigStore
     override fun version(): Long = generation
 
     override fun <V> field(field: ConfigField<T, V>): V {
-        val values = cache.candidates(force = false).firstOrNull() ?: return field.default
+        val values = accepted
+            ?: cache.candidates(force = false).firstOrNull()
+            ?: return field.default
         return field.read(values) ?: field.default
     }
 
@@ -219,13 +253,17 @@ internal class ConfigStoreImpl<T>(private val spec: ConfigSpec<T>) : ConfigStore
      * none is acceptable — a failed refresh must not blank a config that was already known.
      */
     private fun decodeOnce(candidates: List<ConfigValues>) {
+        if (candidates === decodedFrom) return
         for (candidate in candidates) {
             val decoded = runCatching { spec.decode(candidate) }.getOrNull() ?: continue
             if (decoded != cached) {
                 cached = decoded
                 generation++
             }
+            accepted = candidate
+            decodedFrom = candidates
             return
         }
+        decodedFrom = candidates
     }
 }

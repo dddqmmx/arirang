@@ -189,6 +189,44 @@ class ConfigStoreTest {
     }
 
     @Test
+    fun `a decoder runs once per source read, not once per current call`() {
+        // The package-list config is asked its question from every PackageManager hook, and its
+        // decoder re-parses every template and per-app rule. A decode per call would put that
+        // parse back on the framework's hot path, which the old store's snapshot-identity fast
+        // path existed to avoid.
+        var decodes = 0
+        val spec = spec(
+            "decode-once",
+            listOf(FakeSource(payload = { ConfigValues.of(mapOf("v" to "stable")) })),
+            readInline = true,
+            decode = { decodes++; it.string("v") },
+        )
+        val decodesAtInstall = decodes
+
+        repeat(16) { spec.current() }
+
+        assertEquals(decodesAtInstall, decodes)
+    }
+
+    @Test
+    fun `a new source read is decoded again`() {
+        var decodes = 0
+        val payload = AtomicReference(ConfigValues.of(mapOf("v" to "one")))
+        val spec = spec(
+            "decode-per-refresh",
+            listOf(FakeSource { payload.get() }),
+            readInline = true,
+            decode = { decodes++; it.string("v") },
+        )
+        val decodesAtInstall = decodes
+
+        payload.set(ConfigValues.of(mapOf("v" to "two")))
+        assertEquals("two", spec.current(force = true))
+
+        assertEquals(decodesAtInstall + 1, decodes)
+    }
+
+    @Test
     fun `a declared field reads the values its own config was decoded from`() {
         val owner = OwnerSpec(
             id = "field-present",

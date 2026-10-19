@@ -52,18 +52,29 @@ object HookLog {
     }
 
     fun isEnabled(module: Module): Boolean {
-        val switches = HookLogSwitches.current()
+        val switches = switches()
         return switches[module.key]
             ?: switches[ALL_KEY]
             ?: module.defaultEnabled
     }
 
     private fun isDebugEnabled(module: Module): Boolean {
-        val switches = HookLogSwitches.current()
+        val switches = switches()
         return switches["${module.key}.$DEBUG_SUFFIX"]
             ?: switches[DEBUG_KEY]
             ?: BuildConfig.DEBUG
     }
+
+    /**
+     * The current switches, or none while they cannot be read.
+     *
+     * Logging reads a config, and every config read may log: during this class's own first
+     * initialization the switch object is not assigned yet, and a source that fails while it
+     * warms issues exactly such a log. Failing to "no switches" keeps a log line from turning
+     * into a broken initializer.
+     */
+    private fun switches(): Map<String, Boolean> =
+        runCatching { HookLogSwitches.current() }.getOrDefault(emptyMap())
 
     private fun write(module: Module, level: String, message: String) {
         if (!isEnabled(module)) return
