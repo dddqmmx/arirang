@@ -130,6 +130,12 @@
     <string name="sim_slot_limit_title">スロット上限に達しました</string>
     <string name="location_hook_enabled">仮想位置情報を有効化</string>
     <string name="location_hook_enabled_summary">設定した座標を、Hook 済みのネイティブおよび Fused 位置情報の読み取りに適用します</string>
+    <string name="location_unchanged_default">既定では変更しない</string>
+    <string name="location_unchanged_default_summary">アプリごとに有効化した位置情報設定のみ仮想化し、それ以外のアプリは実際の位置情報を使用します</string>
+    <string name="location_app_apply">このアプリに仮想位置情報を使用</string>
+    <string name="location_app_apply_summary">オフの場合、既定で仮想化していてもこのアプリは実際の位置情報を使用します</string>
+    <string name="location_app_unchanged">変更しない</string>
+    <string name="location_app_unchanged_hint">既定では変更しない: ここで有効化したアプリのみ仮想位置情報を使用します</string>
     <string name="location_global_config">グローバル位置情報</string>
     <string name="location_section_coordinates">座標</string>
     <string name="location_section_motion">移動と信号</string>

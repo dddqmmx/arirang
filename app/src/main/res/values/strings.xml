@@ -150,6 +150,12 @@
     <string name="sim_slot_limit_title">Slot limit reached</string>
     <string name="location_hook_enabled">Enable virtual location</string>
     <string name="location_hook_enabled_summary">Applies the configured coordinates to hooked native and fused location reads</string>
+    <string name="location_unchanged_default">Leave app locations unchanged by default</string>
+    <string name="location_unchanged_default_summary">Only apps with their own enabled location profile are spoofed; every other app sees its real location</string>
+    <string name="location_app_apply">Use a virtual location for this app</string>
+    <string name="location_app_apply_summary">When off, this app keeps its real location even if the default is spoofed</string>
+    <string name="location_app_unchanged">Leave unchanged</string>
+    <string name="location_app_unchanged_hint">Default is unchanged: only apps you enable here use a virtual location</string>
     <string name="location_global_config">Global location</string>
     <string name="location_section_coordinates">Coordinates</string>
     <string name="location_section_motion">Motion and signal</string>

@@ -12,6 +12,7 @@ object LocationConfigPrefs {
     const val PREFS_NAME = "location_config_prefs"
 
     const val KEY_ENABLED = "enabled"
+    const val KEY_UNCHANGED_DEFAULT = "unchanged_default"
     const val KEY_LAST_MODIFIED = "last_modified"
     const val KEY_LATITUDE = "latitude"
     const val KEY_LONGITUDE = "longitude"
@@ -32,6 +33,7 @@ object LocationConfigPrefs {
 
     data class Config(
         val enabled: Boolean = false,
+        val unchangedDefault: Boolean = false,
         val latitude: Double = DEFAULT_LATITUDE,
         val longitude: Double = DEFAULT_LONGITUDE,
         val altitude: Double = DEFAULT_ALTITUDE,
@@ -59,6 +61,7 @@ object LocationConfigPrefs {
         }
         return Config(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
+            unchangedDefault = prefs.getBoolean(KEY_UNCHANGED_DEFAULT, false),
             latitude = prefs.getString(KEY_LATITUDE, null)?.toDoubleOrNull() ?: DEFAULT_LATITUDE,
             longitude = prefs.getString(KEY_LONGITUDE, null)?.toDoubleOrNull() ?: DEFAULT_LONGITUDE,
             altitude = prefs.getString(KEY_ALTITUDE, null)?.toDoubleOrNull() ?: DEFAULT_ALTITUDE,
@@ -73,6 +76,7 @@ object LocationConfigPrefs {
     fun saveConfig(context: Context, config: Config) {
         prefs(context).edit(commit = true) {
             putBoolean(KEY_ENABLED, config.enabled)
+            putBoolean(KEY_UNCHANGED_DEFAULT, config.unchangedDefault)
             putLong(KEY_LAST_MODIFIED, Date().time)
             putString(KEY_LATITUDE, config.latitude.toString())
             putString(KEY_LONGITUDE, config.longitude.toString())
@@ -102,6 +106,7 @@ object LocationConfigPrefs {
             context,
             Config(
                 enabled = schema.enabled,
+                unchangedDefault = schema.unchangedDefault,
                 latitude = schema.latitude.validLatitude(DEFAULT_LATITUDE),
                 longitude = schema.longitude.validLongitude(DEFAULT_LONGITUDE),
                 altitude = schema.altitude.validFinite(DEFAULT_ALTITUDE, -1_000.0, 100_000.0),
@@ -125,6 +130,7 @@ object LocationConfigPrefs {
         val config = loadConfig(context)
         return LocationConfigSchema(
             enabled = config.enabled,
+            unchangedDefault = config.unchangedDefault,
             latitude = config.latitude,
             longitude = config.longitude,
             altitude = config.altitude,
@@ -227,6 +233,10 @@ object LocationConfigPrefs {
 
         sharedPrefs.edit(commit = true) {
             putBoolean(KEY_ENABLED, privatePrefs.getBoolean(KEY_ENABLED, false))
+            putBoolean(
+                KEY_UNCHANGED_DEFAULT,
+                privatePrefs.getBoolean(KEY_UNCHANGED_DEFAULT, false)
+            )
             putLong(KEY_LAST_MODIFIED, privatePrefs.getLong(KEY_LAST_MODIFIED, Date().time))
             privatePrefs.getString(KEY_LATITUDE, null)?.let { putString(KEY_LATITUDE, it) }
             privatePrefs.getString(KEY_LONGITUDE, null)?.let { putString(KEY_LONGITUDE, it) }

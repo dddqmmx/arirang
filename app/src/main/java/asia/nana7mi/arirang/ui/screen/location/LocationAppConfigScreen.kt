@@ -13,6 +13,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -89,6 +90,15 @@ internal fun LocationAppConfigScreen(onBack: () -> Unit) {
             }
             item {
                 AppTypeFilterChips(selected = filter, onSelect = { filter = it })
+            }
+            if (config.unchangedDefault) {
+                item {
+                    Text(
+                        text = stringResource(R.string.location_app_unchanged_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             items(
                 count = filteredApps.size,

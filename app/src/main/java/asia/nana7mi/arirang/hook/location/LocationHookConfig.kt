@@ -42,6 +42,13 @@ private const val REFRESH_INTERVAL_MS = 300L
  * `false`) and `true` in the prefs decoder. Both writers always emit the key, so the default is
  * only reachable for hand-edited JSON; `false` is kept because it is the schema's meaning and
  * the safe answer when a profile does not say.
+ *
+ * The user's "leave unchanged by default" switch is folded into the default profile's `enabled`
+ * flag rather than carried as its own field: both mean "the default profile does not apply", and
+ * every call site already answers that question by resolving a profile. With the switch on, only
+ * a package with its own enabled profile is spoofed — which is also the only reading that makes
+ * sense for `globalProfileIgnoringPerPackage`, where "the default, whatever it is" is all the
+ * information a call site has.
  */
 internal object LocationConfig : ConfigSpec<LocationHookConfig>(
     id = ConfigIds.LOCATION,
@@ -60,12 +67,17 @@ internal object LocationConfig : ConfigSpec<LocationHookConfig>(
     decode = ::decode,
 )
 
-private fun decode(values: ConfigValues): LocationHookConfig? {
+internal fun decode(values: ConfigValues): LocationHookConfig? {
     if (values.isEmpty()) return null
     val enabled = values.boolean("enabled") ?: false
+    val unchangedDefault = values.boolean("unchangedDefault", "unchanged_default") ?: false
     return LocationHookConfig(
         enabled = enabled,
-        defaultProfile = decodeProfile(values, enabledWhenAbsent = enabled),
+        // decodeProfile reads the same top-level `enabled` key as the profile's own flag — the
+        // schema spells the default profile's coordinates at the top level — so the switch has to
+        // be applied after the fact rather than as the absent-key default.
+        defaultProfile = decodeProfile(values, enabledWhenAbsent = enabled)
+            .let { if (unchangedDefault) it.copy(enabled = false) else it },
         perPackage = decodePerPackage(
             values.jsonObject("perPackage", "per_package", "package_profiles")
         ),

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import asia.nana7mi.arirang.ui.component.common.ConfigScreenScaffold
+import asia.nana7mi.arirang.ui.component.common.ToggleSettingRow
 import asia.nana7mi.arirang.R
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs
 import asia.nana7mi.arirang.data.datastore.LocationConfigPrefs.Config
@@ -196,6 +197,7 @@ internal fun LocationConfigScreen(
         validationError = null
         return Config(
             enabled = config.enabled,
+            unchangedDefault = config.unchangedDefault,
             latitude = profile.latitude,
             longitude = profile.longitude,
             altitude = profile.altitude,
@@ -223,6 +225,7 @@ internal fun LocationConfigScreen(
     }
 
     val hasChanges = config.enabled != savedConfig.enabled ||
+        config.unchangedDefault != savedConfig.unchangedDefault ||
         latitudeText != savedLatitudeText ||
         longitudeText != savedLongitudeText ||
         altitudeText != savedAltitudeText ||
@@ -237,7 +240,20 @@ internal fun LocationConfigScreen(
         onSave = { saveCurrent() },
         onBack = onBack,
         actions = {
-            IconButton(onClick = { applyConfig(Config(enabled = true)) }) {
+            // Reset the coordinates only. The "leave unchanged" switch is a privacy decision,
+            // not part of the coordinates, so pressing this must not turn spoofing back on for
+            // every app that has no profile of its own.
+            IconButton(
+                onClick = {
+                    applyConfig(
+                        Config(
+                            enabled = true,
+                            unchangedDefault = config.unchangedDefault,
+                            perPackage = config.perPackage
+                        )
+                    )
+                }
+            ) {
                 Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_default_pyongyang))
             }
         }
@@ -290,6 +306,24 @@ internal fun LocationConfigScreen(
 
             item {
                 ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        ToggleSettingRow(
+                            title = stringResource(R.string.location_unchanged_default),
+                            summary = stringResource(R.string.location_unchanged_default_summary),
+                            checked = config.unchangedDefault,
+                            onCheckedChange = { config = config.copy(unchangedDefault = it) }
+                        )
+                    }
+                }
+            }
+
+            item {
+                ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -326,62 +360,64 @@ internal fun LocationConfigScreen(
                 }
             }
 
-            item {
-                ConfigSectionCard(title = stringResource(R.string.location_section_coordinates)) {
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_latitude),
-                        value = latitudeText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Decimal,
-                        onValueChange = { latitudeText = it }
-                    )
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_longitude),
-                        value = longitudeText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Decimal,
-                        onValueChange = { longitudeText = it }
-                    )
+            if (!config.unchangedDefault) {
+                item {
+                    ConfigSectionCard(title = stringResource(R.string.location_section_coordinates)) {
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_latitude),
+                            value = latitudeText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { latitudeText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_longitude),
+                            value = longitudeText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { longitudeText = it }
+                        )
+                    }
                 }
-            }
 
-            item {
-                ConfigSectionCard(title = stringResource(R.string.location_section_motion)) {
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_altitude),
-                        value = altitudeText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Decimal,
-                        onValueChange = { altitudeText = it }
-                    )
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_accuracy),
-                        value = accuracyText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Decimal,
-                        onValueChange = { accuracyText = it }
-                    )
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_speed),
-                        value = speedText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Decimal,
-                        onValueChange = { speedText = it }
-                    )
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_bearing),
-                        value = bearingText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Decimal,
-                        onValueChange = { bearingText = it }
-                    )
-                    LocationTextField(
-                        label = stringResource(R.string.location_field_satellites),
-                        value = satellitesText,
-                        revision = revision,
-                        keyboardType = KeyboardType.Number,
-                        onValueChange = { satellitesText = it.filter(Char::isDigit) }
-                    )
+                item {
+                    ConfigSectionCard(title = stringResource(R.string.location_section_motion)) {
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_altitude),
+                            value = altitudeText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { altitudeText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_accuracy),
+                            value = accuracyText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { accuracyText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_speed),
+                            value = speedText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { speedText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_bearing),
+                            value = bearingText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Decimal,
+                            onValueChange = { bearingText = it }
+                        )
+                        LocationTextField(
+                            label = stringResource(R.string.location_field_satellites),
+                            value = satellitesText,
+                            revision = revision,
+                            keyboardType = KeyboardType.Number,
+                            onValueChange = { satellitesText = it.filter(Char::isDigit) }
+                        )
+                    }
                 }
             }
 

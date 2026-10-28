@@ -112,6 +112,7 @@ class ConfigSchemaTest {
             speed = 1.5f,
             bearing = 90.0f,
             satellites = 8,
+            unchangedDefault = true,
             perPackage = mapOf(
                 "com.test" to LocationProfileSchema(
                     enabled = true, latitude = 35.0, longitude = 135.0,
@@ -131,6 +132,7 @@ class ConfigSchemaTest {
         assertEquals(original.speed, restored.speed)
         assertEquals(original.bearing, restored.bearing)
         assertEquals(original.satellites, restored.satellites)
+        assertEquals(original.unchangedDefault, restored.unchangedDefault)
         assertEquals(1, restored.perPackage.size)
         val profile = restored.perPackage["com.test"]!!
         assertEquals(35.0, profile.latitude, 0.0001)
@@ -751,6 +753,14 @@ class ConfigSchemaTest {
             "unchangedScanResults", "hideScanResults", "scanResults"
         ).forEach { field ->
             assertTrue("BluetoothConfigSchema is missing '$field'", bluetooth.contains("\"$field\""))
+        }
+
+        val location = LocationConfigSchema().toJson()
+        listOf(
+            "schemaVersion", "lastModified", "enabled", "unchangedDefault", "latitude",
+            "longitude", "altitude", "accuracy", "speed", "bearing", "satellites", "perPackage"
+        ).forEach { field ->
+            assertTrue("LocationConfigSchema is missing '$field'", location.contains("\"$field\""))
         }
     }
 }

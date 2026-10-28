@@ -5,6 +5,7 @@ import com.google.gson.annotations.SerializedName
 
 data class LocationConfigSchema(
     @SerializedName("enabled") val enabled: Boolean = false,
+    @SerializedName("unchangedDefault") val unchangedDefault: Boolean = false,
     @SerializedName("latitude") val latitude: Double = 39.019444,
     @SerializedName("longitude") val longitude: Double = 125.738052,
     @SerializedName("altitude") val altitude: Double = 27.0,
@@ -47,6 +48,8 @@ data class LocationConfigSchema(
             }
             return LocationConfigSchema(
                 enabled = root.get("enabled")?.asBoolean ?: DEFAULTS.enabled,
+                unchangedDefault = root.get("unchangedDefault")?.asBoolean
+                    ?: DEFAULTS.unchangedDefault,
                 latitude = root.get("latitude")?.asDouble ?: DEFAULTS.latitude,
                 longitude = root.get("longitude")?.asDouble ?: DEFAULTS.longitude,
                 altitude = root.get("altitude")?.asDouble ?: DEFAULTS.altitude,
@@ -64,6 +67,7 @@ data class LocationConfigSchema(
     override fun toJson(): String {
         val obj = baseJson()
         obj.addProperty("enabled", enabled)
+        obj.addProperty("unchangedDefault", unchangedDefault)
         obj.addProperty("latitude", latitude)
         obj.addProperty("longitude", longitude)
         obj.addProperty("altitude", altitude)

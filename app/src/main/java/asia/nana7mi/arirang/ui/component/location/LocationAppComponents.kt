@@ -79,13 +79,17 @@ internal fun AppLocationRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = profile?.let {
-                        stringResource(
+                    text = when {
+                        profile == null -> stringResource(R.string.location_app_not_configured)
+                        // A stored profile can be an opt-out, which reads differently from
+                        // "configured": the coordinates in it are never applied.
+                        !profile.enabled -> stringResource(R.string.location_app_unchanged)
+                        else -> stringResource(
                             R.string.location_app_configured,
-                            it.latitude.toString(),
-                            it.longitude.toString()
+                            profile.latitude.toString(),
+                            profile.longitude.toString()
                         )
-                    } ?: stringResource(R.string.location_app_not_configured),
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (profile == null) {
                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -114,7 +118,9 @@ internal fun EditProfileDialog(
     onSave: (Profile) -> Unit,
     onDelete: (() -> Unit)?
 ) {
-    var enabled by remember(app.packageName) { mutableStateOf(profile?.enabled ?: false) }
+    // A profile the user is about to create is one they asked for, so it starts applied; only a
+    // stored profile's own flag can make it an opt-out.
+    var enabled by remember(app.packageName) { mutableStateOf(profile?.enabled ?: true) }
     var latitudeText by remember(app.packageName) {
         mutableStateOf((profile?.latitude ?: LocationConfigPrefs.DEFAULT_LATITUDE).toString())
     }
@@ -259,10 +265,17 @@ internal fun EditProfileDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = stringResource(R.string.location_hook_enabled),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.location_app_apply),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = stringResource(R.string.location_app_apply_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Switch(checked = enabled, onCheckedChange = null)
                 }
 

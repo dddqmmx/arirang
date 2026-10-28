@@ -69,6 +69,10 @@ This document provides in-depth technical documentation for all features current
 ### Virtual Location
 - **Status**: Experimental
 - **Description**: Configure virtual latitude, longitude, altitude, accuracy, speed, bearing, and satellite count.
+- **Scope**:
+  - **Default profile**: applied to every app that has no location profile of its own.
+  - **Leave app locations unchanged**: opt-in switch that stops the default profile from applying, so only apps with their own enabled profile are spoofed. Off by default, so an existing configuration keeps working as before.
+  - **Per-app profiles**: each one carries its own enable flag, so an app can be given its own coordinates *or* exempted from the default.
 - **Coverage**:
   - Android Framework Location APIs (`LocationManager`)
   - System Fused Location Provider (FLP)

@@ -157,6 +157,7 @@ class ConfigImportExportTest {
     fun locationSnapshot_hasCoordinateFields() {
         val snapshot = buildLocationSnapshot(
             enabled = true,
+            unchangedDefault = false,
             latitude = 39.019444,
             longitude = 125.738052,
             altitude = 27.0,
@@ -167,6 +168,7 @@ class ConfigImportExportTest {
             perPackageJson = "{}"
         )
         assertEquals(true, snapshot.get("enabled"))
+        assertEquals(false, snapshot.get("unchangedDefault"))
         assertEquals(39.019444, snapshot.getDouble("latitude"), 0.0001)
         assertEquals(125.738052, snapshot.getDouble("longitude"), 0.0001)
         assertEquals(27.0, snapshot.getDouble("altitude"), 0.0001)
@@ -371,6 +373,7 @@ class ConfigImportExportTest {
     fun snapshotRoundTrip_locationConfig_dataPreserved() {
         val original = buildLocationSnapshot(
             enabled = true,
+            unchangedDefault = true,
             latitude = 37.5665,
             longitude = 126.9780,
             altitude = 38.0,
@@ -386,6 +389,7 @@ class ConfigImportExportTest {
         assertEquals(original.getDouble("latitude"), restored.getDouble("latitude"), 0.0001)
         assertEquals(original.getDouble("longitude"), restored.getDouble("longitude"), 0.0001)
         assertEquals(original.getInt("satellites"), restored.getInt("satellites"))
+        assertEquals(original.getBoolean("unchangedDefault"), restored.getBoolean("unchangedDefault"))
     }
 
     @Test
@@ -564,6 +568,7 @@ class ConfigImportExportTest {
 
     private fun buildLocationSnapshot(
         enabled: Boolean,
+        unchangedDefault: Boolean = false,
         latitude: Double,
         longitude: Double,
         altitude: Double,
@@ -575,6 +580,7 @@ class ConfigImportExportTest {
     ): JSONObject {
         val json = JSONObject()
         json.put("enabled", enabled)
+        json.put("unchangedDefault", unchangedDefault)
         json.put("last_modified", 6000000L)
         json.put("latitude", latitude)
         json.put("longitude", longitude)
@@ -656,7 +662,7 @@ class ConfigImportExportTest {
             .put("locationConfigVersion", 1L)
             .put(
                 "locationConfigSnapshot",
-                """{"enabled":true,"last_modified":1,"latitude":39.019444,"longitude":125.738052,"altitude":27,"accuracy":5,"speed":0,"bearing":0,"satellites":12,"per_package":{}}"""
+                """{"enabled":true,"unchangedDefault":false,"last_modified":1,"latitude":39.019444,"longitude":125.738052,"altitude":27,"accuracy":5,"speed":0,"bearing":0,"satellites":12,"per_package":{}}"""
             )
             .put("packageListConfigVersion", 1L)
             .put(

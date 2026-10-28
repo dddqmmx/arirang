@@ -128,8 +128,8 @@ object ConfigRegistry {
             currentSchemaVersion = LocationConfigSchema.SCHEMA_VERSION,
             realtimeAvailable = true,
             requiredFields = requiredFields(
-                "enabled", "latitude", "longitude", "altitude", "accuracy", "speed",
-                "bearing", "satellites", "perPackage"
+                "enabled", "unchangedDefault", "latitude", "longitude", "altitude",
+                "accuracy", "speed", "bearing", "satellites", "perPackage"
             ),
             versionReader = LocationConfigPrefs::lastModified,
             snapshotReader = LocationConfigPrefs::buildHookSnapshot,
